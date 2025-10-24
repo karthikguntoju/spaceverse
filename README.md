@@ -60,29 +60,24 @@ An immersive 3D educational platform for exploring our solar system with interac
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Priyanshukumar9134/Spaceverse.git
-   cd Spaceverse
-   ```
 
-2. **Install dependencies**
+1. **Install dependencies**
    ```bash
    npm install
    ```
 
-3. **Set up environment variables**
+2. **Set up environment variables**
    Create a `.env` file in the root directory:
    ```env
    MONGODB_URI=mongodb://localhost:27017/spaceverse
    PORT=5000
    ```
 
-4. **Start MongoDB**
+3. **Start MongoDB**
    - For local MongoDB: `mongod`
    - For MongoDB Atlas: Use your connection string in `.env`
 
-5. **Run the application**
+4. **Run the application**
    ```bash
    # Production mode
    npm start
@@ -94,7 +89,7 @@ An immersive 3D educational platform for exploring our solar system with interac
    npm run original
    ```
 
-6. **Open your browser**
+5. **Open your browser**
    Navigate to `http://localhost:5000`
 
 ## 🎮 How to Use
@@ -138,7 +133,7 @@ An immersive 3D educational platform for exploring our solar system with interac
 - Email: 23eg107d32@anurag.edu.in
 **Priyanshukumar9134**
 - GitHub: [@Priyanshukumar9134](https://github.com/Priyanshukumar9134)
-- Email: 23eg107d54@anurag9134
+- Email: 23eg107d54@anurag.edu.in
 **KesaraHarshita**
 - GitHub: [@kharshi14](https://github.com/kharshi14)
 - Email: 23eg107d34@anurag.edu.in
