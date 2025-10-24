@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>About - Spaceverse</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root{
+            --bg: #0D1117;
+            --panel: rgba(13,17,23,0.55);
+            --accent: #64FFDA;
+            --accent2: #9457EB;
+            --text: #E6F1FF;
+            --muted: rgba(230,241,255,0.06);
+        }
+        *{box-sizing: border-box}
+        body{font-family: 'Inter', sans-serif; margin:0; padding:0; background: linear-gradient(180deg,#05060a 0%, #0b0f17 60%); color:var(--text)}
+        .navbar{
+            position:fixed; top:0; left:0; right:0; height:64px; display:flex; align-items:center; justify-content:space-between; padding:0 20px; z-index:1000;
+            background: rgba(8,10,14,0.6); backdrop-filter: blur(8px); border-bottom:1px solid rgba(148,87,235,0.06);
+        }
+        .logo{font-weight:700; color:var(--accent)}
+        .nav-links{display:flex; gap:18px}
+        .nav-links a{color:var(--text); text-decoration:none; padding:8px 12px; border-radius:8px}
+        .nav-links a:hover{background:rgba(148,87,235,0.06); color:var(--accent)}
+        main{padding:100px 20px 60px; max-width:1100px; margin:0 auto}
+        .intro{display:grid; grid-template-columns:1fr 320px; gap:24px; align-items:start}
+        .card{background:var(--panel); border-radius:14px; padding:20px; box-shadow:0 8px 30px rgba(0,0,0,0.6); border:1px solid rgba(148,87,235,0.05); backdrop-filter: blur(10px)}
+        .mission h1{color:var(--accent); margin:0 0 12px}
+        .mission p{color:var(--text); line-height:1.6}
+        .vision{margin-top:18px}
+        .team-section{margin-top:48px}
+        .team-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:20px}
+        .member{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:18px; display:flex; gap:14px; align-items:center; transition:transform 0.25s ease, box-shadow 0.25s ease}
+        .member:hover{transform:translateY(-8px); box-shadow:0 20px 40px rgba(100,255,218,0.06)}
+        .avatar{width:72px; height:72px; border-radius:50%; overflow:hidden; flex:0 0 72px; border:2px solid rgba(100,255,218,0.08)}
+        .avatar img{width:100%; height:100%; object-fit:cover}
+        .meta h3{margin:0; font-size:1.05rem; color:var(--text)}
+        .meta p{margin:4px 0 0; font-size:0.9rem; color:rgba(230,241,255,0.7)}
+        .role{font-weight:600; color:var(--accent)}
+        .bio{font-size:0.9rem; color:rgba(230,241,255,0.75); margin-top:10px}
+        @media (max-width:900px){
+            .intro{grid-template-columns:1fr}
+            .team-grid{grid-template-columns:repeat(2,1fr)}
+        }
+        @media (max-width:560px){
+            .team-grid{grid-template-columns:1fr}
+            .avatar{width:56px; height:56px; flex:0 0 56px}
+            main{padding:80px 12px 40px}
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">🚀 Spaceverse</div>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/solar-system">Explore</a>
+            <a href="/quiz">Quiz</a>
+            <a href="/about.html" aria-current="page">About</a>
+        </div>
+    </nav>
+    <main>
+        <section class="intro">
+            <div class="card mission">
+                <h1>About Spaceverse</h1>
+                <p>Spaceverse is an educational, interactive 3D experience built to inspire curiosity about our Solar System. We combine accurate planetary models, approachable explanations, and engaging quizzes to help learners of all ages explore space in a memorable way.</p>
+                <div class="vision">
+                    <h3 style="color:var(--accent); margin:8px 0">Our Vision</h3>
+                    <p>We envision a world where learning about space is playful and accessible. Spaceverse aims to bridge the gap between scientific accuracy and delightful interaction — enabling anyone to explore the cosmos from their browser.</p>
+                </div>
+                <div class="mission" style="margin-top:14px">
+                    <h3 style="color:var(--accent); margin:8px 0">Mission</h3>
+                    <p>Build an accessible, delightful web application that teaches core planetary science concepts through immersive 3D visuals and interactive activities.</p>
+                </div>
+            </div>
+            <aside class="card">
+                <h3 style="color:var(--accent); margin-top:0">Project Details</h3>
+                <p class="bio">Version: 1.0.0<br>License: MIT<br>Repository: WPMLAB / spaceverse-main</p>
+            </aside>
+        </section>
+
+        <section class="team-section">
+            <h2 style="color:var(--accent); margin:0 0 16px">Meet the Team</h2>
+            <div class="team-grid">
+                <div class="member card">
+                    <div class="avatar"><img src="/images/GSFC_20171208_Archive_e001435~orig.jpg" alt="Priyanshu Kumar"></div>
+                    <div class="meta">
+                        <h3>Priyanshu Kumar</h3>
+                        <p class="role">Lead Developer</p>
+                        <p class="bio">Architect of the app, responsible for backend integration, build pipelines, and overall engineering leadership.</p>
+                    </div>
+                </div>
+
+                <div class="member card">
+                    <div class="avatar"><img src="/images/jupiter.png" alt="Karthik Guntoju"></div>
+                    <div class="meta">
+                        <h3>Karthik Guntoju</h3>
+                        <p class="role">3D Graphics Specialist</p>
+                        <p class="bio">Responsible for 3D models, lighting, shaders and performance optimizations across devices.</p>
+                    </div>
+                </div>
+
+                <div class="member card">
+                    <div class="avatar"><img src="/images/venus.jpg" alt="K. Harshitha"></div>
+                    <div class="meta">
+                        <h3>K. Harshitha</h3>
+                        <p class="role">Content & UX Designer</p>
+                        <p class="bio">Crafts the content, design, and user journeys to make the educational experience immersive and clear.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

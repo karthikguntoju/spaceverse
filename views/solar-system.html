@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaceverse - 3D Solar System Explorer</title>
+    <style>
+        :root{
+            --bg: #0D1117; /* Obsidian */
+            --text: #E6F1FF; /* Starlight White */
+            --accent: #64FFDA; /* Aqua Glow */
+            --accent2: #9457EB; /* Amethyst */
+            --panel-bg: rgba(13,17,23,0.6);
+            --muted: rgba(230,241,255,0.06);
+            --muted-strong: rgba(100,255,218,0.12);
+        }
+
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            font-family: 'Inter', sans-serif; 
+            background-color: var(--bg);
+            color: var(--text);
+        }
+        canvas { display: block; }
+        
+        #loader-container { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 100%; 
+            height: 100%; 
+            background-color: #0D1117; /* Obsidian */
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            flex-direction: column; 
+            z-index: 100; 
+            transition: opacity 0.5s ease; 
+        }
+        #loader-container.hidden { opacity: 0; pointer-events: none; }
+    .loader-text { font-size: 1.5em; margin-bottom: 20px; color: var(--text); }
+        .progress-bar { 
+            width: 300px; 
+            height: 6px; 
+            background-color: var(--muted); /* subtle */
+            border-radius: 6px; 
+            overflow: hidden; 
+            box-shadow: inset 0 1px 2px rgba(148,87,235,0.04);
+        }
+        #progress { 
+            width: 0%; 
+            height: 100%; 
+            background: linear-gradient(90deg, var(--accent) 0%, var(--accent) 60%, var(--accent2) 100%);
+            transition: width 0.2s ease; 
+            box-shadow: 0 4px 14px rgba(100,255,218,0.12);
+        }
+        
+        #info-panel { 
+            position: absolute; 
+            top: 20px; 
+            left: -450px; 
+            width: 380px; 
+            max-height: calc(100vh - 40px); 
+            background: rgba(13,17,23,0.6); /* slightly transparent obsidian */
+            border-radius: 15px; 
+            padding: 25px; 
+            box-shadow: 0 8px 32px 0 rgba(100,255,218,0.04); 
+            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px); 
+            border: 1px solid rgba(148,87,235,0.08); 
+            transition: left 0.5s ease-in-out; 
+            overflow-y: auto; 
+            z-index: 10; 
+        }
+        #info-panel.visible { left: 20px; }
+        #info-panel h2 { 
+            margin-top: 0; 
+            color: #64FFDA; 
+            font-size: 1.8em; 
+            text-align: center; 
+        }
+    #info-panel p { line-height: 1.6; font-size: 0.95em; color: #E6F1FF; }
+        #close-btn { 
+            position: absolute; 
+            top: 15px; 
+            right: 15px; 
+            background: none; 
+            border: none; 
+            color: #E6F1FF; 
+            font-size: 24px; 
+            cursor: pointer; 
+            transition: transform 0.2s; 
+        }
+        #close-btn:hover { transform: scale(1.2); color: #64FFDA; }
+        
+        .info-item { 
+            display: flex; 
+            justify-content: space-between; 
+            margin-bottom: 12px; 
+            border-bottom: 1px solid rgba(230,241,255,0.03); 
+            padding-bottom: 8px; 
+            color: #E6F1FF;
+        }
+        .info-item span:first-child { font-weight: bold; color: #64FFDA; }
+        
+        #navigation-bar { 
+            position: absolute; 
+            bottom: 20px; 
+            left: 50%; 
+            transform: translateX(-50%); 
+            background: rgba(13,17,23,0.7); 
+            border-radius: 15px; 
+            padding: 12px 18px; 
+            box-shadow: 0 8px 32px 0 rgba(100,255,218,0.04); 
+            backdrop-filter: blur(12px); 
+            border: 1px solid rgba(148,87,235,0.06); 
+            display: flex; 
+            gap: 22px; 
+            z-index: 10; 
+            align-items: center;
+            justify-content: center;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            overscroll-behavior-x: contain;
+            max-width: 90vw;
+        }
+        
+        .nav-btn { 
+            background: transparent; 
+            border: 1px solid rgba(100,255,218,0.08);
+            color: #E6F1FF; 
+            padding: 10px 14px; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-size: 1em; 
+            transition: all 0.18s ease; 
+            white-space: nowrap;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.6);
+            font-weight: 600;
+        }
+        .nav-btn:hover { 
+            color: #64FFDA;
+            background: rgba(148,87,235,0.08);
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(148,87,235,0.06);
+        }
+        .nav-btn.active { 
+            color: var(--accent);
+            background-color: rgba(100,255,218,0.06);
+            border-color: var(--accent);
+            box-shadow: 0 6px 22px rgba(100,255,218,0.10);
+            animation: pulseAccent 2.5s infinite;
+        }
+
+        @keyframes pulseAccent {
+            0% { box-shadow: 0 6px 18px rgba(100,255,218,0.06); transform: translateY(0); }
+            50% { box-shadow: 0 12px 36px rgba(100,255,218,0.14); transform: translateY(-2px); }
+            100% { box-shadow: 0 6px 18px rgba(100,255,218,0.06); transform: translateY(0); }
+        }
+        
+        #panel-planet-img { 
+            display: block; 
+            width: 100px; 
+            height: 100px; 
+            border-radius: 50%; 
+            object-fit: cover; 
+            margin: 0 auto 20px auto; 
+            box-shadow: 0 0 15px rgba(100, 255, 218, 0.5); 
+            background-color: #000; 
+        }
+        
+        .controls-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(13,17,23,0.85);
+            border-radius: 15px;
+            padding: 20px;
+            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(100,255,218,0.06);
+        }
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(100, 255, 218, 0.12);
+            z-index: 10;
+            min-width: 200px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            color: #64FFDA;
+            margin-bottom: 5px;
+            font-size: 0.9em;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 5px;
+        }
+        
+        .control-group button {
+            width: 100%;
+            padding: 8px;
+            background: rgba(100, 255, 218, 0.08);
+            border: 1px solid #64FFDA;
+            color: #E6F1FF;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .control-group button:hover {
+            background: rgba(100, 255, 218, 0.14);
+            color: #0D1117;
+        }
+        
+        .help-tooltip {
+            position: fixed;
+            top: 20px;
+            right: 260px;
+            background: rgba(0, 5, 20, 0.95);
+            border: 1px solid #64FFDA(8, 64, 84, 0.3);
+            border-radius: 12px;
+            padding: 10px 15px;
+            color: #fff;
+            font-size: 0.85em;
+            letter-spacing: 0.2px;
+            -webkit-backdrop-filter: blur(12px);
+            backdrop-filter: blur(12px);
+            z-index: 1000;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.2);
+            transition: all 0.5s ease;
+            white-space: nowrap;
+            transform-origin: top right;
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        
+        .help-tooltip .shortcut {
+            color: #64FFDA;
+            font-weight: 600;
+            text-shadow: 0 0 8px rgba(100,255,218,0.18);
+        }
+        
+        .help-tooltip.fade {
+            opacity: 0;
+            transform: translateY(-5px);
+            pointer-events: none;
+        }
+        
+        .help-tooltip:hover {
+            opacity: 1;
+            transform: none;
+            pointer-events: auto;
+        }
+        
+        @media (max-width: 1024px) {
+            .help-tooltip {
+                top: auto;
+                bottom: 180px;
+                right: 20px;
+                transform-origin: bottom right;
+                transform: translateY(10px);
+            }
+            .help-tooltip.fade {
+                opacity: 0;
+                transform: translateY(10px);
+                pointer-events: none;
+            }
+        }
+        
+        .back-btn {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(100, 255, 218, 0.06);
+            border: 2px solid #64FFDA;
+            color: #E6F1FF;
+            padding: 10px 20px;
+            border-radius: 25px;
+            text-decoration: none;
+            transition: all 0.3s;
+            z-index: 15;
+        }
+        
+        .back-btn:hover {
+            background: rgba(100, 255, 218, 0.14);
+            transform: translateY(-2px);
+            color: #0D1117;
+        }
+        
+        .quiz-btn {
+            background: rgba(100, 255, 218, 0.06);
+            border: 2px solid #64FFDA;
+            color: #E6F1FF;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+            width: 100%;
+        }
+        
+        .quiz-btn:hover {
+            background: rgba(148,87,235,0.12);
+            transform: translateY(-2px);
+            color: #64FFDA;
+        }
+        
+        .facts-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid rgba(100,255,218,0.08);
+        }
+        
+        .fact-item {
+            background: rgba(100, 255, 218, 0.04);
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border-left: 3px solid #64FFDA;
+            font-size: 0.9em;
+            color: #E6F1FF;
+        }
+
+        /* Visual layers */
+        #starfield-layer, #vignette-layer, #lensflare {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            z-index: 5;
+        }
+
+        /* Starfield: generate stars via CSS radial gradients for perf and parallax */
+        #starfield-layer {
+            background-image: radial-gradient(rgba(230,241,255,0.9) 0.6px, transparent 0.7px),
+                              radial-gradient(rgba(148,87,235,0.8) 1px, transparent 1.2px),
+                              radial-gradient(rgba(100,255,218,0.75) 0.7px, transparent 0.9px);
+            background-size: 1200px 1200px, 2000px 2000px, 800px 800px;
+            opacity: 0.7;
+            mix-blend-mode: screen;
+            transform: translateZ(0);
+        }
+
+        /* vignette */
+        #vignette-layer {
+            background: radial-gradient(ellipse at center, rgba(0,0,0,0) 50%, rgba(0,0,0,0.5) 100%);
+            opacity: 0.6;
+            mix-blend-mode: multiply;
+        }
+
+        /* lensflare sprite - positioned via JS */
+        #lensflare {
+            background-image: radial-gradient(circle at 30% 30%, rgba(100,255,218,0.35), rgba(100,255,218,0.08) 25%, transparent 40%),
+                              radial-gradient(circle at 70% 70%, rgba(148,87,235,0.18), transparent 35%);
+            background-repeat: no-repeat;
+            background-size: 200px 200px;
+            opacity: 0.0; /* toggled by JS */
+            transition: opacity 0.3s ease, transform 0.3s ease;
+            z-index: 6;
+        }
+
+        /* planet selection pop */
+        .planet-pop {
+            animation: popSelect 300ms cubic-bezier(.2,.8,.2,1);
+        }
+        @keyframes popSelect {
+            0% { transform: scale(0.85); filter: drop-shadow(0 0 0 rgba(100,255,218,0)); }
+            60% { transform: scale(1.08); filter: drop-shadow(0 10px 30px rgba(100,255,218,0.12)); }
+            100% { transform: scale(1); filter: drop-shadow(0 6px 18px rgba(100,255,218,0.08)); }
+        }
+
+        @media (max-width: 768px) {
+            .controls-panel {
+                position: fixed;
+                top: auto;
+                bottom: 100px;
+                right: 10px;
+                left: 10px;
+                width: auto;
+            }
+
+            #navigation-bar {
+                bottom: 10px;
+                left: 10px;
+                right: 10px;
+                transform: none;
+                max-width: none;
+            }
+
+            #info-panel {
+                width: calc(100vw - 40px);
+                left: -100vw;
+            }
+
+            #info-panel.visible {
+                left: 20px;
+            }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <a href="/" class="back-btn">← Back to Home</a>
+    
+    <div class="help-tooltip" id="controlsHelp">
+        <span class="shortcut">Left-drag</span>: rotate |
+        <span class="shortcut">Right/Shift+drag</span>: pan |
+        <span class="shortcut">Scroll</span>: zoom
+    </div>
+    
+    <div id="loader-container">
+        <div class="loader-text">Loading Solar System...</div>
+        <div class="progress-bar"><div id="progress"></div></div>
+    </div>
+    
+    <div class="controls-panel">
+        <div class="control-group">
+            <label for="speedControl">Animation Speed</label>
+            <input type="range" id="speedControl" min="0" max="5" step="0.1" value="1" 
+                   aria-label="Animation Speed Control" title="Adjust animation speed from 0 to 5x">
+        </div>
+        <div class="control-group">
+            <label for="zoomControl">Camera Distance</label>
+            <input type="range" id="zoomControl" min="50" max="800" value="200"
+                   aria-label="Camera Distance Control" title="Adjust camera distance from 50 to 800 units">
+        </div>
+        <div class="control-group">
+            <label for="realTimeToggle">Real-time alignment (approx)</label>
+            <input type="checkbox" id="realTimeToggle" title="Use approximate real-time orbital positions based on J2000 epoch and orbital periods">
+        </div>
+        
+        <div class="control-group">
+            <button id="pauseBtn">Pause Animation</button>
+        </div>
+        <div class="control-group">
+            <button id="resetViewBtn">Reset View</button>
+        </div>
+        <div class="control-group">
+            <button onclick="window.location.href='/quiz'">🧠 Take Quiz</button>
+        </div>
+        <div class="control-group">
+            <label for="parallaxToggle">UI Parallax (stars & chrome)</label>
+            <input type="checkbox" id="parallaxToggle" checked>
+        </div>
+        <div class="control-group">
+            <label for="lensflareToggle">Sun Lens Flare</label>
+            <input type="checkbox" id="lensflareToggle" checked>
+        </div>
+    </div>
+    
+    <div id="info-panel">
+        <button id="close-btn">&times;</button>
+        <img src="" alt="Selected Planet" id="panel-planet-img">
+        <h2 id="planet-name"></h2>
+        <div id="planet-info"></div>
+        <button class="quiz-btn" id="planetQuizBtn">Quiz about this planet</button>
+        <div class="facts-section" id="factsSection"></div>
+    </div>
+
+    <div id="navigation-bar"></div>
+
+    <!-- Visual layers -->
+    <div id="starfield-layer" aria-hidden="true"></div>
+    <div id="vignette-layer" aria-hidden="true"></div>
+    <div id="lensflare" aria-hidden="true"></div>
+
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/18.6.4/tween.umd.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // Scene setup
+            const scene = new THREE.Scene();
+            const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+
+            // Loading manager
+            const loadingManager = new THREE.LoadingManager();
+            const loaderContainer = document.getElementById('loader-container');
+            const progressElement = document.getElementById('progress');
+            loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+                progressElement.style.width = (itemsLoaded / itemsTotal * 100) + '%';
+            };
+            
+            loadingManager.onLoad = () => {
+                setTimeout(() => {
+                    loaderContainer.classList.add('hidden');
+                    
+                    // Show help tooltip after loading screen is gone
+                    const helpTooltip = document.getElementById('controlsHelp');
+                    helpTooltip.style.opacity = '1';
+                    helpTooltip.style.transform = 'none';
+                    
+                    // Fade help tooltip after delay
+                    setTimeout(() => helpTooltip.classList.add('fade'), 8000);
+                }, 500);
+            };
+
+            const textureLoader = new THREE.TextureLoader(loadingManager);
+            const gltfLoader = new THREE.GLTFLoader(loadingManager);
+
+            // Mapping from planet key to GLB model path
+            const planetModelMap = {
+                sun: '/models/the_star_sun.glb',
+                mercury: '/models/mercury_planet.glb',
+                venus: '/models/planet_venus.glb',
+                earth: '/models/Earth_1_12756.glb',
+                mars: '/models/mars.glb',
+                jupiter: '/models/jupiter.glb',
+                saturn: '/models/saturn.glb',
+                uranus: '/models/realistic_uranus_4k.glb',
+                neptune: '/models/neptune.glb'
+            };
+            
+            // Enhanced lighting
+            // Brighter ambient and sun light for visibility
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+            scene.add(ambientLight);
+            
+            const sunLight = new THREE.PointLight(0xffffff, 3.2, 5000);
+            sunLight.position.set(0, 0, 0);
+            sunLight.castShadow = true;
+            sunLight.shadow.mapSize.width = 4096;
+            sunLight.shadow.mapSize.height = 4096;
+            scene.add(sunLight);
+
+            // Starfield
+            const starGeometry = new THREE.BufferGeometry();
+            const starVertices = [];
+            for (let i = 0; i < 20000; i++) {
+                const x = (Math.random() - 0.5) * 4000;
+                const y = (Math.random() - 0.5) * 4000;
+                const z = (Math.random() - 0.5) * 4000;
+                starVertices.push(x, y, z);
+            }
+            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            const starMaterial = new THREE.PointsMaterial({ 
+                color: 0xffffff, 
+                size: Math.random() * 2 + 0.5,
+                transparent: true,
+                opacity: 0.8
+            });
+            const stars = new THREE.Points(starGeometry, starMaterial);
+            scene.add(stars);
+
+            // Variables
+            const celestialObjects = new Map();
+            const navigationBar = document.getElementById('navigation-bar');
+            let animationSpeed = 1;
+            let isPaused = false;
+            let useRealTimeAlignment = false; // toggled from UI
+
+            // Visual layers and toggles
+            const starfieldLayer = document.getElementById('starfield-layer');
+            const vignetteLayer = document.getElementById('vignette-layer');
+            const lensflareEl = document.getElementById('lensflare');
+            const parallaxToggle = document.getElementById('parallaxToggle');
+            const lensflareToggle = document.getElementById('lensflareToggle');
+
+            // The overlay, overlayToggle and soundToggle elements were removed from the UI.
+            // Declare safe fallbacks so remaining script checks won't throw ReferenceErrors.
+            const overlayLayer = null;
+            const overlayToggle = null;
+            const soundToggle = null;
+            const uiSound = null;
+
+            let parallaxEnabled = parallaxToggle ? parallaxToggle.checked : true;
+            let overlayEnabled = false; // overlay removed
+            let lensflareEnabled = lensflareToggle ? lensflareToggle.checked : true;
+            let soundsEnabled = false; // sounds removed
+
+            // initialize layer visibility
+            if (overlayLayer) overlayLayer.style.opacity = overlayEnabled ? '0.12' : '0';
+            if (lensflareEl) lensflareEl.style.opacity = lensflareEnabled ? '1' : '0';
+            if (starfieldLayer) {
+                starfieldLayer.style.transformOrigin = 'center center';
+                starfieldLayer.style.opacity = '0.85';
+            }
+            if (vignetteLayer) vignetteLayer.style.opacity = '0.6';
+
+            // Minimal music control: user-initiated Play/Pause for the Interstellar theme
+            // This is intentionally simple to avoid autoplay blocks and to be robust
+            // when users have removed other sound UI toggles.
+            (function setupMusicControl() {
+                try {
+                    const musicBtn = document.createElement('button');
+                    musicBtn.setAttribute('aria-label', 'Play Interstellar Theme');
+                    musicBtn.className = 'nav-btn';
+                    musicBtn.style.position = 'fixed';
+                    musicBtn.style.right = '18px';
+                    musicBtn.style.bottom = '18px';
+                    musicBtn.style.zIndex = 60;
+                    musicBtn.style.padding = '8px 12px';
+                    musicBtn.textContent = 'Play Music';
+
+                    const bgAudio = new Audio('/public/audio/interstellar-cornfield-chase.mp3');
+                    bgAudio.loop = true;
+                    bgAudio.preload = 'none';
+
+                    let playing = false;
+                    musicBtn.addEventListener('click', async () => {
+                        try {
+                            if (!playing) {
+                                await bgAudio.play();
+                                playing = true;
+                                musicBtn.textContent = 'Pause Music';
+                            } else {
+                                bgAudio.pause();
+                                playing = false;
+                                musicBtn.textContent = 'Play Music';
+                            }
+                        } catch (err) {
+                            // Play may be blocked or the file missing; show fallback message briefly
+                            console.warn('Music playback failed:', err);
+                            musicBtn.textContent = 'Play Music';
+                        }
+                    });
+
+                    document.body.appendChild(musicBtn);
+                } catch (e) {
+                    console.warn('Failed to create music control', e);
+                }
+            })();
+
+            // Background audio and UI sound controls have been removed for a quieter experience.
+
+            // Orbital periods (approx, in Earth days) and epoch for live alignment
+            const orbitalPeriods = {
+                sun: null,
+                mercury: 87.969,    // days
+                venus: 224.701,
+                earth: 365.256,
+                mars: 686.98,
+                jupiter: 4332.589,
+                saturn: 10759,
+                uranus: 30688.5,
+                neptune: 60182
+            };
+
+            // J2000 epoch (approx): Jan 1, 2000 at 12:00 UTC
+            const J2000 = Date.UTC(2000, 0, 1, 12, 0, 0);
+            
+            // Camera controls
+            let isDragging = false, canClick = true;
+            let previousMousePosition = { x: 0, y: 0 };
+                // current (rendered) camera state
+            let cameraTarget = new THREE.Vector3(0,0,0);
+            let cameraRadius = 200;
+            let cameraTheta = 0;
+            let cameraPhi = Math.PI / 4;
+                // desired target state (we lerp current -> desired for smoothness)
+                let desiredCameraTarget = cameraTarget.clone();
+                let desiredCameraRadius = cameraRadius;
+                let desiredCameraTheta = cameraTheta;
+                let desiredCameraPhi = cameraPhi;
+
+            // Ensure camera initial transforms come from desired state
+            cameraTheta = desiredCameraTheta;
+            cameraPhi = desiredCameraPhi;
+            cameraRadius = desiredCameraRadius;
+
+            // Fetch planet data and build scene (force desired order)
+            fetch('/api/planets')
+                .then(response => response.json())
+                .then(planetApiData => {
+                    // desired display order
+                    const desiredOrder = ['sun','mercury','venus','earth','mars','jupiter','saturn','uranus','neptune'];
+                    const map = {};
+                    planetApiData.forEach(p => map[p.key] = p);
+                    const orderedArray = desiredOrder.map(k => map[k]).filter(Boolean);
+                    // Fallback: include any planets not in the list at the end
+                    const extra = planetApiData.filter(p => !desiredOrder.includes(p.key));
+                    buildScene(orderedArray.concat(extra));
+                })
+                .catch(error => {
+                    console.error('Error fetching planet data:', error);
+                    document.querySelector('.loader-text').textContent = 'Could not load solar system data.';
+                });
+            
+            function buildScene(planetArray) {
+                planetArray.forEach(data => {
+                    const key = data.key;
+
+                    // Create orbital path
+                    let orbit;
+                    if (data.distance) {
+                        const orbitGeometry = new THREE.RingGeometry(data.distance - 0.2, data.distance + 0.2, 256);
+                        const orbitMaterial = new THREE.MeshBasicMaterial({ 
+                            color: 0xffffff, 
+                            side: THREE.DoubleSide, 
+                            transparent: true, 
+                            opacity: 0.1 
+                        });
+                        orbit = new THREE.Mesh(orbitGeometry, orbitMaterial);
+                        orbit.rotation.x = Math.PI / 2;
+                        scene.add(orbit);
+                    }
+
+                    // Create pivot for orbital motion
+                    const pivot = new THREE.Object3D();
+                    scene.add(pivot);
+
+                    const modelUrl = planetModelMap[key];
+                    if (modelUrl) {
+                        gltfLoader.load(modelUrl, (gltf) => {
+                            const group = new THREE.Group();
+                            group.add(gltf.scene);
+                            group.updateMatrixWorld(true);
+
+                            // Scale model to match target radius
+                            const box = new THREE.Box3().setFromObject(group);
+                            const size = new THREE.Vector3();
+                            box.getSize(size);
+                            const modelDiameter = Math.max(size.x, size.y, size.z) || 1;
+                            const targetDiameter = (data.radius || 1) * 2;
+                            const scaleFactor = targetDiameter / modelDiameter;
+                            group.scale.setScalar(scaleFactor);
+
+                            group.traverse(child => {
+                                if (child.isMesh) {
+                                    child.castShadow = key !== 'sun';
+                                    child.receiveShadow = key !== 'sun';
+                                    // If this is earth, boost emissive to increase visible brightness
+                                    if (key === 'earth') {
+                                        if (child.material) {
+                                            // Preserve existing emissive if present
+                                            if (child.material.emissive) {
+                                                child.material.emissive = child.material.emissive.clone();
+                                                child.material.emissiveIntensity = Math.max(child.material.emissiveIntensity || 0, 0.8);
+                                            } else {
+                                                child.material.emissive = new THREE.Color(0x4444ff);
+                                                child.material.emissiveIntensity = 0.8;
+                                            }
+                                            child.material.needsUpdate = true;
+                                        }
+                                    }
+                                }
+                            });
+
+                            group.userData = { ...data, key };
+                            pivot.add(group);
+                            group.position.x = data.distance || 0;
+
+                            // Add rings for Saturn when using model
+                            if (data.ringTextureUrl) {
+                                const ringInner = (data.radius || 1) + 2;
+                                const ringOuter = (data.radius || 1) + 8;
+                                const ringGeometry = new THREE.RingGeometry(ringInner, ringOuter, 64);
+                                const ringTexture = textureLoader.load(data.ringTextureUrl);
+                                const ringMaterial = new THREE.MeshBasicMaterial({ 
+                                    map: ringTexture, 
+                                    side: THREE.DoubleSide, 
+                                    transparent: true, 
+                                    opacity: 0.8 
+                                });
+                                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                                ring.rotation.x = -Math.PI / 2;
+                                ring.position.x = data.distance || 0;
+                                pivot.add(ring);
+                            }
+
+                            celestialObjects.set(key, { group, orbit, pivot });
+
+                            // Create navigation button
+                            const navBtn = document.createElement('button');
+                            navBtn.className = 'nav-btn';
+                            navBtn.textContent = data.name;
+                            navBtn.dataset.key = key;
+                            navBtn.addEventListener('click', () => {
+                                const obj = celestialObjects.get(key)?.group;
+                                if (obj) handleObjectSelection(obj);
+                            });
+                            navigationBar.appendChild(navBtn);
+                        }, undefined, (error) => {
+                            console.error('Error loading model', key, error);
+                        });
+                    } else {
+                        // Fallback: create sphere
+                        const geometry = new THREE.SphereGeometry(data.radius, 64, 64);
+                        const texture = textureLoader.load(data.textureUrl);
+                        const material = (key === 'sun')
+                            ? new THREE.MeshBasicMaterial({ map: texture })
+                            : new THREE.MeshStandardMaterial({ map: texture, roughness: 0.35, metalness: 0.2, emissive: new THREE.Color(0x111111), emissiveIntensity: 0.5 });
+
+                        // If earth fallback, increase emissive and emissiveIntensity for visibility
+                        if (key === 'earth') {
+                            material.emissive = new THREE.Color(0x4444ff);
+                            material.emissiveIntensity = 0.9;
+                        }
+                        const sphere = new THREE.Mesh(geometry, material);
+                        sphere.userData = { ...data, key };
+                        pivot.add(sphere);
+                        sphere.position.x = data.distance || 0;
+                        celestialObjects.set(key, { group: sphere, orbit, pivot });
+
+                        const navBtn = document.createElement('button');
+                        navBtn.className = 'nav-btn';
+                        navBtn.textContent = data.name;
+                        navBtn.dataset.key = key;
+                        navBtn.addEventListener('click', () => handleObjectSelection(sphere));
+                        navigationBar.appendChild(navBtn);
+                    }
+                });
+            }
+
+            // Mouse controls
+            let dragMode = null; // 'rotate' or 'pan'
+            let panStartWorld = null;
+
+            // Prevent default context menu so right-drag works for panning
+            window.addEventListener('contextmenu', (e) => e.preventDefault());
+
+            document.addEventListener('mousedown', e => { 
+                isDragging = true; 
+                canClick = true;
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+
+                // Determine drag mode: left button rotates, right/middle or Shift+left pans
+                if (e.button === 0 && !e.shiftKey) {
+                    dragMode = 'rotate';
+                    document.body.style.cursor = 'grab';
+                } else {
+                    dragMode = 'pan';
+                    document.body.style.cursor = 'grabbing';
+
+                    // initialize pan start world point by intersecting pointer ray with plane at desired target
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = - (e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    const camDir = new THREE.Vector3();
+                    camera.getWorldDirection(camDir);
+                    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camDir, desiredCameraTarget.clone());
+                    panStartWorld = new THREE.Vector3();
+                    raycaster.ray.intersectPlane(plane, panStartWorld);
+                }
+            });
+            
+            document.addEventListener('mouseup', () => { isDragging = false; dragMode = null; panStartWorld = null; document.body.style.cursor = ''; });
+            
+            document.addEventListener('mousemove', e => {
+                if (Math.abs(e.clientX - previousMousePosition.x) > 5 || Math.abs(e.clientY - previousMousePosition.y) > 5) {
+                    canClick = false;
+                }
+                if (!isDragging) return;
+
+                const deltaMove = { x: e.clientX - previousMousePosition.x, y: e.clientY - previousMousePosition.y };
+
+                if (dragMode === 'rotate') {
+                    // rotate around target
+                    desiredCameraTheta -= deltaMove.x * 0.005;
+                    desiredCameraPhi -= deltaMove.y * 0.005;
+                    desiredCameraPhi = Math.max(0.05, Math.min(Math.PI - 0.05, desiredCameraPhi));
+                } else if (dragMode === 'pan') {
+                    // pan: compute new intersection and move desiredCameraTarget by the delta in world space
+                    mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = - (e.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    const camDir = new THREE.Vector3();
+                    camera.getWorldDirection(camDir);
+                    const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camDir, desiredCameraTarget.clone());
+                    const currentWorld = new THREE.Vector3();
+                    const hit = raycaster.ray.intersectPlane(plane, currentWorld);
+                    if (hit && panStartWorld) {
+                        const offset = new THREE.Vector3().subVectors(currentWorld, panStartWorld);
+                        // Move desired target opposite to pointer movement to create natural panning
+                        desiredCameraTarget.sub(offset);
+                        // update panStartWorld for continuous panning
+                        panStartWorld.copy(currentWorld);
+                    }
+                }
+
+                previousMousePosition = { x: e.clientX, y: e.clientY };
+            });
+            
+            // Improved zoom: zoom toward pointer / any point under cursor (not only Sun)
+            document.addEventListener('wheel', e => {
+                // prevent page scrolling while interacting with canvas
+                e.preventDefault();
+
+                // compute zoom amount (scale down delta since browsers report large values)
+                const delta = e.deltaY;
+                // clamp for stability
+                const clamped = Math.max(-300, Math.min(300, delta));
+
+                // Map mouse position into NDC
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = - (e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+
+                // Create a plane that passes through the desired camera target and is perpendicular to camera direction
+                const camDir = new THREE.Vector3();
+                camera.getWorldDirection(camDir);
+                const plane = new THREE.Plane().setFromNormalAndCoplanarPoint(camDir, desiredCameraTarget.clone());
+
+                const intersectPoint = new THREE.Vector3();
+                const hasIntersection = raycaster.ray.intersectPlane(plane, intersectPoint);
+
+                // Determine zoom movement magnitude; negative clamped -> zoom in
+                const zoomStrength = 0.0009; // tweakable constant
+                const moveScalar = -clamped * zoomStrength * Math.max(1, desiredCameraRadius);
+
+                // If we hit something on that plane, move desiredCameraTarget a bit toward that point proportional to zoom
+                if (hasIntersection && intersectPoint) {
+                    const dirToPoint = new THREE.Vector3().subVectors(intersectPoint, desiredCameraTarget);
+                    const distanceToPoint = dirToPoint.length();
+                    if (distanceToPoint > 0.0001) {
+                        dirToPoint.normalize();
+                        // Move desired camera target toward or away from the intersect point depending on wheel direction
+                        desiredCameraTarget.add(dirToPoint.multiplyScalar(moveScalar));
+                    }
+                }
+
+                // Adjust desired radius (dolly) as well
+                desiredCameraRadius += clamped * 0.12; // sensible sensitivity
+                desiredCameraRadius = Math.max(10, Math.min(2000, desiredCameraRadius));
+
+                // Keep UI control in sync
+                const zControl = document.getElementById('zoomControl');
+                if (zControl) zControl.value = Math.round(desiredCameraRadius);
+            }, { passive: false });
+
+            // Object selection
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2();
+
+            document.addEventListener('click', (event) => {
+                if (!canClick || event.target.closest('#navigation-bar, #info-panel, .controls-panel')) return;
+                
+                mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                
+                const intersects = raycaster.intersectObjects([...celestialObjects.values()].map(o => o.group || o.mesh), true);
+                if (intersects.length > 0) {
+                    handleObjectSelection(intersects[0].object);
+                }
+            });
+
+            // Parallax pointer handling (UI layers)
+            window.addEventListener('pointermove', (e) => {
+                if (!parallaxEnabled) return;
+                const nx = (e.clientX / window.innerWidth - 0.5) * 2; // -1..1
+                const ny = (e.clientY / window.innerHeight - 0.5) * 2;
+                // translate starfield subtly opposite to pointer for depth
+                const sx = -nx * 20; // pixels
+                const sy = -ny * 12;
+                if (starfieldLayer) starfieldLayer.style.transform = `translate(${sx}px, ${sy}px)`;
+                if (overlayLayer) overlayLayer.style.transform = `translate(${sx*0.6}px, ${sy*0.6}px)`;
+                // slight tilt on controls-panel for parallax
+                const controls = document.querySelector('.controls-panel');
+                if (controls) controls.style.transform = `translate3d(${nx*6}px, ${-ny*6}px, 0)`;
+            });
+
+            // Toggle handlers
+            if (parallaxToggle) parallaxToggle.addEventListener('change', (e) => parallaxEnabled = e.target.checked);
+            if (overlayToggle) overlayToggle.addEventListener('change', (e) => {
+                overlayEnabled = e.target.checked;
+                overlayLayer.style.opacity = overlayEnabled ? '0.12' : '0';
+            });
+            if (lensflareToggle) lensflareToggle.addEventListener('change', (e) => lensflareEnabled = e.target.checked);
+            if (soundToggle) soundToggle.addEventListener('change', (e) => soundsEnabled = e.target.checked);
+
+
+                // Double-click to zoom in strongly to the clicked object
+                document.addEventListener('dblclick', (event) => {
+                    if (event.target.closest('#navigation-bar, #info-panel, .controls-panel')) return;
+                    mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+                    mouse.y = - (event.clientY / window.innerHeight) * 2 + 1;
+                    raycaster.setFromCamera(mouse, camera);
+                    const intersects = raycaster.intersectObjects([...celestialObjects.values()].map(o => o.group || o.mesh), true);
+                    if (intersects.length > 0) {
+                        // pass an option to indicate a stronger zoom
+                        handleObjectSelection(intersects[0].object, { strongZoom: true });
+                    }
+                });
+
+                // Single, corrected handler for object selection that tweens the desired camera state
+                function handleObjectSelection(selectedObject, opts = {}) {
+                    let root = selectedObject;
+                    while (root && (!root.userData || !root.userData.key)) {
+                        root = root.parent;
+                    }
+                    if (!root) return;
+                    const data = root.userData;
+                    const key = data.key;
+
+                    // Update info panel
+                    document.getElementById('panel-planet-img').src = data.textureUrl || '';
+                    document.getElementById('planet-name').innerText = data.name || '';
+                    document.getElementById('planet-info').innerHTML = data.info || '';
+
+                    // Show facts if available
+                    const factsSection = document.getElementById('factsSection');
+                    factsSection.innerHTML = '';
+                    if (data.facts && data.facts.length > 0) {
+                        factsSection.innerHTML = '<h3 style="color: #64FFDA; margin-bottom: 10px;">Interesting Facts:</h3>';
+                        data.facts.forEach(fact => {
+                            const factElement = document.createElement('div');
+                            factElement.className = 'fact-item';
+                            factElement.textContent = fact;
+                            factsSection.appendChild(factElement);
+                        });
+                        factsSection.style.display = 'block';
+                    } else {
+                        factsSection.style.display = 'none';
+                    }
+
+                    // Set up quiz button
+                    document.getElementById('planetQuizBtn').onclick = () => {
+                        window.location.href = `/quiz?planet=${key}`;
+                    };
+
+                    document.getElementById('info-panel').classList.add('visible');
+
+                    // Audio for UI selection removed; skip playing sounds.
+
+                    // Add visual pop to the selected root (if mesh/group)
+                    try {
+                        if (root && root.isMesh) {
+                            root.classList?.add('planet-pop');
+                        } else if (root && root.children) {
+                            // apply to first child mesh to show pop
+                            const meshChild = root.children.find(c => c.isMesh);
+                            if (meshChild) {
+                                meshChild.userData.__popTemp = meshChild.userData.__popTemp || 0;
+                                meshChild.scale.multiplyScalar(1.02);
+                                // use a timeout to revert scale
+                                setTimeout(() => meshChild.scale.multiplyScalar(1/1.02), 320);
+                            }
+                        }
+                    } catch(e) { /* ignore if not applicable */ }
+
+
+                    // Camera animation to selected object (tween desired state)
+                    const targetPosition = new THREE.Vector3();
+                    root.getWorldPosition(targetPosition);
+
+                    const zoomMultiplier = opts.strongZoom ? 3.5 : 6;
+                    const newDesiredRadius = Math.max(10, (data.radius || 1) * zoomMultiplier);
+                    const newDesiredPhi = Math.PI / 3;
+
+                    // Tween desiredCameraTarget for a smooth camera target movement
+                    new TWEEN.Tween({ x: desiredCameraTarget.x, y: desiredCameraTarget.y, z: desiredCameraTarget.z })
+                        .to({ x: targetPosition.x, y: targetPosition.y, z: targetPosition.z }, 900)
+                        .easing(TWEEN.Easing.Cubic.Out)
+                        .onUpdate(function(v) {
+                            desiredCameraTarget.set(v.x, v.y, v.z);
+                        })
+                        .start();
+
+                    // Tween desired radius and phi
+                    new TWEEN.Tween({ r: desiredCameraRadius, p: desiredCameraPhi })
+                        .to({ r: newDesiredRadius, p: newDesiredPhi }, 900)
+                        .easing(TWEEN.Easing.Cubic.Out)
+                        .onUpdate(function(val) {
+                            desiredCameraRadius = val.r;
+                            desiredCameraPhi = val.p;
+                        })
+                        .start();
+
+                    // Update UI
+                    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                    const activeBtn = document.querySelector(`.nav-btn[data-key="${key}"]`);
+                    if (activeBtn) activeBtn.classList.add('active');
+
+                    // Highlight selected orbit
+                    celestialObjects.forEach((obj, objKey) => {
+                        if(obj.orbit) {
+                            obj.orbit.material.opacity = (objKey === key) ? 0.6 : 0.1;
+                            obj.orbit.material.color.set((objKey === key) ? 0x64FFDA : 0xffffff);
+                        }
+                    });
+                }
+            
+            // Close info panel
+            document.getElementById('close-btn').addEventListener('click', () => {
+                document.getElementById('info-panel').classList.remove('visible');
+
+                // Tween desired state back to overview
+                new TWEEN.Tween({ x: desiredCameraTarget.x, y: desiredCameraTarget.y, z: desiredCameraTarget.z })
+                    .to({ x: 0, y: 0, z: 0 }, 900)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .onUpdate(function(v) { desiredCameraTarget.set(v.x, v.y, v.z); })
+                    .start();
+
+                new TWEEN.Tween({ r: desiredCameraRadius, p: desiredCameraPhi })
+                    .to({ r: 200, p: Math.PI / 4 }, 900)
+                    .easing(TWEEN.Easing.Cubic.Out)
+                    .onUpdate(function(val) { desiredCameraRadius = val.r; desiredCameraPhi = val.p; })
+                    .start();
+
+                document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
+                celestialObjects.forEach(obj => {
+                    if(obj.orbit) {
+                        obj.orbit.material.opacity = 0.1;
+                        obj.orbit.material.color.set(0xffffff);
+                    }
+                });
+            });
+
+            // Control panel functionality
+            document.getElementById('speedControl').addEventListener('input', function() {
+                animationSpeed = parseFloat(this.value);
+            });
+            
+            document.getElementById('zoomControl').addEventListener('input', function() {
+                desiredCameraRadius = parseFloat(this.value);
+            });
+
+            // Real-time alignment toggle (checkbox in control panel)
+            const rtToggleEl = document.getElementById('realTimeToggle');
+            if (rtToggleEl) {
+                rtToggleEl.addEventListener('change', function() {
+                    useRealTimeAlignment = !!this.checked;
+                    if (useRealTimeAlignment) {
+                        fetchAndApplyEphemeris();
+                        // refresh periodically while enabled
+                        ephemerisInterval = setInterval(fetchAndApplyEphemeris, 60 * 1000);
+                    } else {
+                        if (ephemerisInterval) {
+                            clearInterval(ephemerisInterval);
+                            ephemerisInterval = null;
+                        }
+                    }
+                });
+            }
+
+            let ephemerisInterval = null;
+
+            async function fetchAndApplyEphemeris() {
+                try {
+                    const resp = await fetch('/api/ephemeris');
+                    if (!resp.ok) return;
+                    const data = await resp.json();
+                    if (!data || !data.results) return;
+
+                    // Map results by key and apply positions to pivots if available
+                    const map = {};
+                    data.results.forEach(r => { map[r.key] = r; });
+
+                    celestialObjects.forEach((obj, key) => {
+                        const res = map[key];
+                        if (!res) return;
+                        // If the server returned a position, tween the pivot position/rotation
+                        if (res.position) {
+                            // Move pivot to the correct rotational angle around Y axis: compute desired rotation
+                            // Since pivot holds the object at x=distance, we can set pivot.rotation.y to match angle derived from x/z
+                            const desiredAngle = Math.atan2(res.position.z, res.position.x);
+                            // tween pivot.rotation.y smoothly
+                            new TWEEN.Tween({ r: obj.pivot.rotation.y })
+                                .to({ r: desiredAngle }, 800)
+                                .easing(TWEEN.Easing.Cubic.Out)
+                                .onUpdate(function(v) { obj.pivot.rotation.y = v.r; })
+                                .start();
+                        } else if (res.angle !== undefined) {
+                            const desiredAngle = res.angle;
+                            new TWEEN.Tween({ r: obj.pivot.rotation.y })
+                                .to({ r: desiredAngle }, 800)
+                                .easing(TWEEN.Easing.Cubic.Out)
+                                .onUpdate(function(v) { obj.pivot.rotation.y = v.r; })
+                                .start();
+                        }
+                    });
+                } catch (e) {
+                    console.warn('Failed to fetch ephemeris', e);
+                }
+            }
+            
+            document.getElementById('pauseBtn').addEventListener('click', function() {
+                isPaused = !isPaused;
+                this.textContent = isPaused ? 'Resume Animation' : 'Pause Animation';
+            });
+            
+            document.getElementById('resetViewBtn').addEventListener('click', function() {
+                cameraTarget.set(0, 0, 0);
+                cameraRadius = 200;
+                cameraTheta = 0;
+                cameraPhi = Math.PI / 4;
+                animationSpeed = 1;
+                document.getElementById('speedControl').value = 1;
+                document.getElementById('zoomControl').value = 200;
+                document.getElementById('info-panel').classList.remove('visible');
+            });
+
+            // Animation loop
+            const clock = new THREE.Clock();
+            function animate() {
+                requestAnimationFrame(animate);
+                
+                    if (!isPaused) {
+                        const elapsedTime = clock.getElapsedTime();
+
+                        // If real-time alignment is enabled, compute orbital angle from J2000 and orbital period
+                        const now = Date.now();
+                        const daysSinceJ2000 = (now - J2000) / (1000 * 60 * 60 * 24);
+
+                        celestialObjects.forEach(({ group, pivot }) => {
+                            const data = group.userData;
+
+                            // Orbital motion
+                            if (pivot && data.distance) {
+                                if (useRealTimeAlignment && orbitalPeriods[data.key]) {
+                                    // Compute fraction of orbit completed since J2000
+                                    const periodDays = orbitalPeriods[data.key];
+                                    const frac = (daysSinceJ2000 % periodDays) / periodDays;
+                                    // Convert to angle (radians)
+                                    pivot.rotation.y = frac * Math.PI * 2;
+                                } else {
+                                    // Fallback: incremental rotation for demo scene
+                                    const orbitalFactor = 1.5; // tweak to make orbits more visible
+                                    pivot.rotation.y += (data.speed || 0) * animationSpeed * 0.01 * orbitalFactor;
+                                }
+                            }
+
+                            // Rotation (spin)
+                            if (group && group.rotation) {
+                                group.rotation.y += (data.rotationSpeed || 0.002) * animationSpeed;
+                            }
+                        });
+                    
+                        // Animate stars
+                        stars.rotation.y += 0.0001 * animationSpeed;
+                }
+                
+                // Smoothly interpolate current camera state toward desired state
+                cameraTarget.lerp(desiredCameraTarget, 0.14);
+                cameraRadius = THREE.MathUtils.lerp(cameraRadius, desiredCameraRadius, 0.14);
+                cameraTheta = THREE.MathUtils.lerp(cameraTheta, desiredCameraTheta, 0.14);
+                cameraPhi = THREE.MathUtils.lerp(cameraPhi, desiredCameraPhi, 0.14);
+
+                // Update camera position based on smoothed state
+                camera.position.x = cameraTarget.x + cameraRadius * Math.sin(cameraPhi) * Math.sin(cameraTheta);
+                camera.position.y = cameraTarget.y + cameraRadius * Math.cos(cameraPhi);
+                camera.position.z = cameraTarget.z + cameraRadius * Math.sin(cameraPhi) * Math.cos(cameraTheta);
+                camera.lookAt(cameraTarget);
+
+                // Lens flare positioning: project Sun position to screen
+                if (lensflareEl && lensflareEnabled) {
+                    const sunObj = celestialObjects.get('sun')?.group || celestialObjects.get('sun')?.pivot;
+                    if (sunObj) {
+                        const sunWorld = new THREE.Vector3();
+                        sunObj.getWorldPosition(sunWorld);
+                        const vector = sunWorld.clone().project(camera);
+                        const sx = (vector.x * 0.5 + 0.5) * window.innerWidth;
+                        const sy = ( -vector.y * 0.5 + 0.5) * window.innerHeight;
+                        lensflareEl.style.left = Math.round(sx - 100) + 'px';
+                        lensflareEl.style.top = Math.round(sy - 100) + 'px';
+                        // fade based on whether sun is on-screen (z in front)
+                        lensflareEl.style.opacity = (vector.z < 1 && vector.z > -1) ? '1' : '0';
+                    } else {
+                        lensflareEl.style.opacity = '0';
+                    }
+                } else if (lensflareEl) {
+                    lensflareEl.style.opacity = '0';
+                }
+
+                TWEEN.update();
+                renderer.render(scene, camera);
+            }
+            
+            animate();
+
+            // Background music was removed; no autoplay attempt needed.
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        });
+    </script>
+</body>
+</html>
