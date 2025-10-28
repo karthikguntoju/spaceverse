@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaceverse - Explore the Solar System</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            color: white; 
+            overflow-x: hidden;
+        }
+        
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #ffb703;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: #ffb703;
+        }
+        
+        .auth-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1.5rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #ffb703;
+            color: #000;
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid #ffb703;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 183, 3, 0.3);
+        }
+        
+        .hero {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .hero-content {
+            z-index: 2;
+            max-width: 800px;
+            padding: 2rem;
+        }
+        
+        .hero h1 {
+            font-size: 4rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #ffb703, #fb8500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.9;
+        }
+        
+        .cta-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        
+        .features {
+            padding: 5rem 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        .features h2 {
+            text-align: center;
+            font-size: 2.5rem;
+            margin-bottom: 3rem;
+            color: #ffb703;
+        }
+        
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 2rem;
+        }
+        
+        .feature-card {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 2rem;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 183, 3, 0.2);
+            transition: transform 0.3s;
+        }
+        
+        .feature-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .feature-icon {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+        }
+        
+        .stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+        }
+        
+        .star {
+            position: absolute;
+            background: white;
+            border-radius: 50%;
+            animation: twinkle 2s infinite;
+        }
+        
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.8);
+        }
+        
+        .modal-content {
+            background: linear-gradient(135deg, #1a1a2e, #16213e);
+            margin: 5% auto;
+            padding: 2rem;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+            border: 1px solid #ffb703;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        .close:hover {
+            color: #ffb703;
+        }
+        
+        .form-group {
+            margin-bottom: 1rem;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #ffb703;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+        
+        .form-group input:focus {
+            outline: none;
+            border-color: #ffb703;
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 { font-size: 2.5rem; }
+            .nav-links { display: none; }
+            .cta-buttons { flex-direction: column; align-items: center; }
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="logo">🚀 Spaceverse</div>
+        <ul class="nav-links">
+            <li><a href="#home">Home</a></li>
+            <li><a href="#features">Features</a></li>
+            <li><a href="/about.html">About</a></li>
+        </ul>
+        <div class="auth-buttons" id="authButtons">
+            <button class="btn btn-secondary" onclick="openModal('loginModal')">Login</button>
+            <button class="btn btn-primary" onclick="openModal('registerModal')">Sign Up</button>
+        </div>
+        <div class="user-info" id="userInfo" style="display: none;">
+            <span id="welcomeText"></span>
+            <button class="btn btn-secondary" onclick="logout()">Logout</button>
+        </div>
+    </nav>
+
+    <section class="hero" id="home">
+        <div class="stars" id="stars"></div>
+        <div class="hero-content">
+            <h1>Welcome to Spaceverse</h1>
+            <p>Embark on an incredible journey through our solar system. Explore planets in stunning 3D, take interactive quizzes, and discover the wonders of space like never before.</p>
+            <div class="cta-buttons">
+                <a href="/solar-system" id="exploreLink" class="btn btn-primary">🌌 Explore Solar System</a>
+                <button class="btn btn-secondary" id="takeQuizBtn">🧠 Take Quiz</button>
+            </div>
+        </div>
+    </section>
+
+    <section class="features" id="features">
+        <h2>Amazing Features</h2>
+        <div class="feature-grid">
+            <div class="feature-card">
+                <div class="feature-icon">🌍</div>
+                <h3>3D Planet Models</h3>
+                <p>Explore detailed 3D models of all planets with realistic textures and accurate orbital mechanics.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🔄</div>
+                <h3>Orbital Mechanics</h3>
+                <p>Watch planets orbit the sun and rotate on their axes with scientifically accurate speeds and distances.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🤖</div>
+                <h3>Quiz Bot</h3>
+                <p>Test your knowledge with our intelligent quiz system featuring questions about each planet.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">👤</div>
+                <h3>User Accounts</h3>
+                <p>Create your account to track quiz scores and save your exploration progress.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">📱</div>
+                <h3>Interactive Experience</h3>
+                <p>Click on planets to learn detailed information, facts, and fascinating space trivia.</p>
+            </div>
+            <div class="feature-card">
+                <div class="feature-icon">🎓</div>
+                <h3>Educational Content</h3>
+                <p>Learn about space with scientifically accurate information and engaging presentations.</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Login to Spaceverse</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="loginUsername">Username:</label>
+                    <input type="text" id="loginUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">Password:</label>
+                    <input type="password" id="loginPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Register Modal -->
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>Join Spaceverse</h2>
+            <form id="registerForm">
+                <div class="form-group">
+                    <label for="registerUsername">Username:</label>
+                    <input type="text" id="registerUsername" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail">Email:</label>
+                    <input type="email" id="registerEmail" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">Password:</label>
+                    <input type="password" id="registerPassword" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Sign Up</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        // Helper: configure links/buttons that require authentication
+        function setupAuthLinks(user) {
+            const explore = document.getElementById('exploreLink');
+            const takeQuizBtn = document.getElementById('takeQuizBtn');
+            if (explore) {
+                if (user && user.loggedIn) {
+                    explore.href = '/solar-system';
+                    explore.onclick = null;
+                } else {
+                    explore.href = '#';
+                    explore.onclick = (e) => { e.preventDefault(); openModal('loginModal'); };
+                }
+            }
+
+            if (takeQuizBtn) {
+                if (user && user.loggedIn) {
+                    takeQuizBtn.onclick = () => { window.location.href = '/quiz'; };
+                } else {
+                    takeQuizBtn.onclick = () => { openModal('loginModal'); };
+                }
+            }
+        }
+        // Create animated stars
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 100; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.width = Math.random() * 3 + 1 + 'px';
+                star.style.height = star.style.width;
+                star.style.animationDelay = Math.random() * 2 + 's';
+                starsContainer.appendChild(star);
+            }
+        }
+
+        // Modal functions
+        function openModal(modalId) {
+            document.getElementById(modalId).style.display = 'block';
+        }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
+        }
+
+        // Close buttons
+        document.querySelectorAll('.close').forEach(closeBtn => {
+            closeBtn.onclick = function() {
+                this.closest('.modal').style.display = 'none';
+            }
+        });
+
+        // Authentication functions
+        async function login(username, password) {
+            try {
+                const response = await fetch('/api/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateUIForLoggedInUser(data.username);
+                    closeModal('loginModal');
+                    // reconfigure auth links immediately
+                    setupAuthLinks({ loggedIn: true, username: data.username });
+                    alert('Login successful!');
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('Login failed. Please try again.');
+            }
+        }
+
+        async function register(username, email, password) {
+            try {
+                const response = await fetch('/api/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, email, password })
+                });
+                const data = await response.json();
+                
+                if (data.success) {
+                    updateUIForLoggedInUser(username);
+                    closeModal('registerModal');
+                    alert('Registration successful!');
+                } else {
+                    alert(data.error);
+                }
+            } catch (error) {
+                alert('Registration failed. Please try again.');
+            }
+        }
+
+        async function logout() {
+            try {
+                await fetch('/api/logout', { method: 'POST' });
+                updateUIForLoggedOutUser();
+                alert('Logged out successfully!');
+            } catch (error) {
+                alert('Logout failed.');
+            }
+        }
+
+        function updateUIForLoggedInUser(username) {
+            document.getElementById('authButtons').style.display = 'none';
+            document.getElementById('userInfo').style.display = 'flex';
+            document.getElementById('welcomeText').textContent = `Welcome, ${username}!`;
+        }
+
+        function updateUIForLoggedOutUser() {
+            document.getElementById('authButtons').style.display = 'flex';
+            document.getElementById('userInfo').style.display = 'none';
+        }
+
+        // Form submissions
+        document.getElementById('loginForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('loginUsername').value;
+            const password = document.getElementById('loginPassword').value;
+            login(username, password);
+        });
+
+        document.getElementById('registerForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const username = document.getElementById('registerUsername').value;
+            const email = document.getElementById('registerEmail').value;
+            const password = document.getElementById('registerPassword').value;
+            register(username, email, password);
+        });
+
+        function startQuiz() {
+            window.location.href = '/quiz';
+        }
+
+        // Check if user is already logged in
+        async function checkAuthStatus() {
+            try {
+                const response = await fetch('/api/user');
+                const data = await response.json();
+                
+                if (data.loggedIn) {
+                    updateUIForLoggedInUser(data.username);
+                    setupAuthLinks({ loggedIn: true, username: data.username });
+                }
+            } catch (error) {
+                console.log('Not logged in');
+                setupAuthLinks({ loggedIn: false });
+            }
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            createStars();
+            checkAuthStatus();
+        });
+    </script>
+</body>
+</html>

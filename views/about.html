@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>About - Spaceverse</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            color: white; 
+            overflow-x: hidden;
+        }
+        
+        .navbar {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            padding: 1rem 2rem;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #ffb703;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            list-style: none;
+        }
+        
+        .nav-links a {
+            color: white;
+            text-decoration: none;
+            transition: color 0.3s;
+        }
+        
+        .nav-links a:hover {
+            color: #ffb703;
+        }
+        
+        .auth-buttons {
+            display: flex;
+            gap: 1rem;
+        }
+        
+        .btn {
+            padding: 0.5rem 1.5rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: #ffb703;
+            color: #000;
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid #ffb703;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 183, 3, 0.3);
+        }
+        
+        .hero {
+            padding: 120px 20px 60px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            min-height: 40vh;
+            background: rgba(0, 0, 0, 0.2);
+        }
+        
+        .hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(45deg, #ffb703, #fb8500);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            color: transparent;
+        }
+        
+        .hero p {
+            font-size: 1.05rem;
+            margin-bottom: 1.5rem;
+            opacity: 0.95;
+        }
+        
+        .content-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 32px;
+            margin: 0 auto;
+            max-width: 1200px;
+            padding: 0 24px;
+            margin-bottom: 64px;
+        }
+        
+        .content-card {
+            background: rgba(255, 255, 255, 0.06);
+            padding: 32px;
+            border-radius: 16px;
+            -webkit-backdrop-filter: blur(10px);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 183, 3, 0.06);
+        }
+        
+        .content-card h2 {
+            color: #ffb703;
+            margin-bottom: 12px;
+        }
+        
+        .team-section {
+            margin: 64px auto;
+            max-width: 1200px;
+            padding: 0 24px;
+        }
+        
+        .team-section h2 {
+            font-size: 2rem;
+            margin-bottom: 32px;
+            text-align: center;
+            color: #ffb703;
+        }
+        
+        .team-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 32px;
+            margin-top: 24px;
+        }
+        
+        .team-member {
+            background: rgba(255,255,255,0.04);
+            border-radius: 16px;
+            padding: 32px 24px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border: 1px solid rgba(255,183,3,0.08);
+        }
+        
+        .team-member:hover { 
+            transform: translateY(-8px); 
+            box-shadow: 0 16px 40px rgba(255,183,3,0.08);
+            background: rgba(255,255,255,0.06);
+        }
+        
+        .member-avatar { 
+            width: 120px; 
+            height: 120px; 
+            border-radius: 50%; 
+            margin: 0 auto 20px; 
+            overflow: hidden; 
+            border: 4px solid #ffb703;
+            box-shadow: 0 4px 20px rgba(255,183,3,0.2);
+        }
+        .member-avatar img { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover;
+            transition: transform 0.3s ease;
+        }
+        .team-member:hover .member-avatar img {
+            transform: scale(1.05);
+        }
+        .member-info h3 { 
+            color: #ffb703; 
+            margin-bottom: 8px;
+            font-size: 1.4rem;
+        }
+        .member-role { 
+            color: #fb8500; 
+            font-weight: 600; 
+            margin-bottom: 16px;
+            font-size: 1.1rem;
+        }
+        .member-bio { 
+            color: rgba(255,255,255,0.9); 
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+        
+        .reviews-section { 
+            margin: 64px auto;
+            max-width: 1200px;
+            padding: 0 24px;
+        }
+        .reviews-section h2 {
+            font-size: 2rem;
+            margin-bottom: 32px;
+            text-align: center;
+            color: #ffb703;
+        }
+        
+        .review-form {
+            background: rgba(255,255,255,0.05);
+            padding: 32px;
+            border-radius: 16px;
+            margin-bottom: 40px;
+            border: 1px solid rgba(255,183,3,0.1);
+        }
+        
+        .star-rating {
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .star-rating input {
+            display: none;
+        }
+        
+        .star-rating label {
+            font-size: 30px;
+            color: #555;
+            cursor: pointer;
+            transition: color 0.2s ease;
+        }
+        
+        .star-rating label:hover,
+        .star-rating label:hover ~ label,
+        .star-rating input:checked ~ label {
+            color: #ffb703;
+        }
+        
+        .review-input {
+            width: 100%;
+            padding: 16px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,183,3,0.2);
+            background: rgba(0,0,0,0.2);
+            color: white;
+            font-family: 'Inter', sans-serif;
+            font-size: 1rem;
+            margin-bottom: 16px;
+            resize: vertical;
+        }
+        
+        .review-input:focus {
+            outline: none;
+            border-color: #ffb703;
+        }
+        
+        .review-input:disabled, .submit-review:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            background-color: rgba(255,255,255,0.02) !important;
+        }
+        
+        .star-rating input:disabled + label {
+            opacity: 0.3;
+            cursor: not-allowed;
+            color: rgba(230,241,255,0.2) !important;
+        }
+        
+        .star-rating input:disabled + label:hover {
+            color: rgba(230,241,255,0.2) !important;
+        }
+        
+        .submit-review:disabled {
+            background: rgba(255, 183, 3, 0.3) !important;
+        }
+        
+        .review-form.disabled {
+            position: relative;
+        }
+        
+        .review-form.disabled::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.3);
+            z-index: 1;
+            pointer-events: none;
+            border-radius: 8px;
+        }
+        
+        .submit-review {
+            background: #ffb703;
+            color: #000;
+            font-weight: 600;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .submit-review:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255,183,3,0.3);
+        }
+        
+        .reviews-list {
+            display: grid;
+            gap: 24px;
+        }
+        
+        .review-card { 
+            background: rgba(255,255,255,0.03); 
+            padding: 24px;
+            border-radius: 16px; 
+            transition: transform 0.3s ease;
+            border: 1px solid rgba(255,183,3,0.05);
+        }
+        
+        .review-card:hover {
+            transform: translateY(-4px);
+            background: rgba(255,255,255,0.05);
+        }
+        
+        .review-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+        
+        .review-author { 
+            font-weight: 700; 
+            color: #ffb703;
+            font-size: 1.1rem;
+        }
+        
+        .review-rating { 
+            color: #ffb703;
+            font-size: 1.1rem;
+        }
+        
+        .review-date {
+            color: rgba(255,255,255,0.6);
+            font-size: 0.9rem;
+            margin-top: 4px;
+        }
+        
+        .review-content {
+            color: rgba(255,255,255,0.9);
+            line-height: 1.6;
+            font-size: 1rem;
+        }
+        
+        .review-message {
+            margin: 16px 0;
+            padding: 12px;
+            border-radius: 8px;
+            display: none;
+        }
+        
+        .review-message.success {
+            background: rgba(46, 213, 115, 0.2);
+            color: #2ed573;
+            display: block;
+        }
+        
+        .review-message.error {
+            background: rgba(255, 71, 87, 0.2);
+            color: #ff4757;
+            display: block;
+        }
+        
+        .section-subtitle {
+            color: #ffb703;
+            margin-bottom: 20px;
+            font-size: 1.4rem;
+        }
+        
+        .reviews-subtitle {
+            color: #ffb703;
+            margin-bottom: 24px;
+            font-size: 1.4rem;
+        }
+        
+        @media (max-width: 1024px) { .content-grid { grid-template-columns: 1fr } .team-grid { grid-template-columns: repeat(2,1fr) } }
+        @media (max-width: 768px) { .hero h1 { font-size: 2rem } .nav-links { display: none } }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="logo">🚀 Spaceverse</a>
+        <div class="nav-links">
+            <a href="/">Home</a>
+            <a href="/solar-system">Explore</a>
+            <a href="/quiz">Quiz</a>
+            <a href="/about.html" aria-current="page">About</a>
+        </div>
+    </nav>
+    
+    <main>
+        <section class="hero">
+            <h1>Welcome to Spaceverse</h1>
+            <p>An educational, interactive 3D experience built to inspire curiosity about our Solar System. We combine accurate planetary models, approachable explanations, and engaging quizzes to help learners of all ages explore space in a memorable way.</p>
+        </section>
+
+        <div class="content-grid">
+            <div class="content-card">
+                <h2>Our Mission</h2>
+                <p>Build an accessible, delightful web application that teaches core planetary science concepts through immersive 3D visuals and interactive activities. We strive to make learning about space both engaging and scientifically accurate.</p>
+                
+                <h2 class="vision">Our Vision</h2>
+                <p>We envision a world where learning about space is playful and accessible. Spaceverse aims to bridge the gap between scientific accuracy and delightful interaction — enabling anyone to explore the cosmos from their browser.</p>
+            </div>
+            
+            <div class="content-card">
+                <h2>Project Details</h2>
+                <ul class="project-list">
+                    <li>🚀 Version: 1.0.0</li>
+                    <li>📜 License: MIT</li>
+                    <li>🔗 Repository: WPMLAB / spaceverse-main</li>
+                </ul>
+            </div>
+        </div>
+
+        <section class="reviews-section">
+            <h2>User Reviews</h2>
+            
+            <!-- Review Form -->
+            <form id="review-form" class="review-form">
+                <h3 class="section-subtitle">Share Your Experience</h3>
+                <div class="star-rating">
+                    <input type="radio" id="star5" name="rating" value="5" />
+                    <label for="star5" title="5 stars">★</label>
+                    <input type="radio" id="star4" name="rating" value="4" />
+                    <label for="star4" title="4 stars">★</label>
+                    <input type="radio" id="star3" name="rating" value="3" />
+                    <label for="star3" title="3 stars">★</label>
+                    <input type="radio" id="star2" name="rating" value="2" />
+                    <label for="star2" title="2 stars">★</label>
+                    <input type="radio" id="star1" name="rating" value="1" />
+                    <label for="star1" title="1 star">★</label>
+                </div>
+                <textarea name="comment" class="review-input" placeholder="Share your thoughts about Spaceverse..." rows="4" maxlength="500"></textarea>
+                <div id="review-message" class="review-message"></div>
+                <button type="submit" class="submit-review">Submit Review</button>
+            </form>
+
+            <!-- Recent Reviews -->
+            <div class="content-card">
+                <h3 class="reviews-subtitle">Recent Reviews</h3>
+                <div id="reviews-list" class="reviews-list">
+                    <div class="no-reviews">
+                        <div class="no-reviews-icon">★</div>
+                        <p>No reviews yet. Be the first to share your experience!</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="team-section">
+            <h2>Meet the Team</h2>
+            <div class="team-grid">
+                <div class="team-member">
+                    <div class="member-avatar">
+                        <img src="/images/GSFC_20171208_Archive_e001435~orig.jpg" alt="Priyanshu Kumar">
+                    </div>
+                    <div class="member-info">
+                        <h3>Priyanshu Kumar</h3>
+                        <div class="member-role">Lead Developer</div>
+                        <p class="member-bio">Architect of the app, responsible for backend integration, build pipelines, and overall engineering leadership.</p>
+                    </div>
+                </div>
+
+                <div class="team-member">
+                    <div class="member-avatar">
+                        <img src="/images/jupiter.png" alt="Karthik Guntoju">
+                    </div>
+                    <div class="member-info">
+                        <h3>Karthik Guntoju</h3>
+                        <div class="member-role">3D Graphics Specialist</div>
+                        <p class="member-bio">Expert in Three.js and WebGL, creating stunning planetary visualizations and interactive 3D elements.</p>
+                    </div>
+                </div>
+
+                <div class="team-member">
+                    <div class="member-avatar">
+                        <img src="/images/venus.jpg" alt="K. Harshitha">
+                    </div>
+                    <div class="member-info">
+                        <h3>K. Harshitha</h3>
+                        <div class="member-role">UX Designer</div>
+                        <p class="member-bio">Leads user experience design, ensuring an intuitive and engaging learning journey through the cosmos.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Reviews Functionality -->
+    <template id="review-template">
+        <div class="review-card">
+            <div class="review-header">
+                <span class="review-author"></span>
+                <span class="review-rating"></span>
+            </div>
+            <div class="review-content"></div>
+            <div class="review-date"></div>
+        </div>
+    </template>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const reviewForm = document.getElementById('review-form');
+        const reviewsList = document.getElementById('reviews-list');
+        const messageDiv = document.getElementById('review-message');
+        const template = document.getElementById('review-template');
+
+        let submissionTimer = null;
+        let isLoggedIn = false;
+        
+        // Function to disable form completely
+        function disableForm() {
+            const form = document.getElementById('review-form');
+            const submitBtn = document.querySelector('.submit-review');
+            const textarea = document.querySelector('textarea[name="comment"]');
+            const radioInputs = document.querySelectorAll('input[name="rating"]');
+            
+            if (form) {
+                form.style.opacity = '0.5';
+                form.style.pointerEvents = 'none';
+                form.style.position = 'relative';
+                
+                // Add overlay
+                let overlay = form.querySelector('.auth-overlay');
+                if (!overlay) {
+                    overlay = document.createElement('div');
+                    overlay.className = 'auth-overlay';
+                    overlay.style.cssText = `
+                        position: absolute;
+                        top: 0;
+                        left: 0;
+                        right: 0;
+                        bottom: 0;
+                        background: rgba(0, 0, 0, 0.7);
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        border-radius: 8px;
+                        z-index: 10;
+                    `;
+                    overlay.innerHTML = '<div style="color: white; text-align: center; padding: 20px;"><h3>Login Required</h3><p>Please <a href="/" style="color: #64ffda;">log in</a> to submit a review</p></div>';
+                    form.appendChild(overlay);
+                }
+            }
+            
+            if (submitBtn) {
+                submitBtn.disabled = true;
+                submitBtn.style.opacity = '0.3';
+                submitBtn.style.cursor = 'not-allowed';
+            }
+            if (textarea) {
+                textarea.disabled = true;
+                textarea.placeholder = 'Please log in to submit a review...';
+                textarea.style.backgroundColor = 'rgba(100, 100, 100, 0.2)';
+            }
+            radioInputs.forEach(input => {
+                input.disabled = true;
+            });
+            
+            // Show login message
+            if (messageDiv) {
+                messageDiv.innerHTML = 'Please <a href="/" style="color: #64ffda; text-decoration: underline;">log in</a> to submit a review.';
+                messageDiv.className = 'review-message error';
+                messageDiv.style.display = 'block';
+            }
+        }
+        
+        // Function to enable form
+        function enableForm() {
+            const form = document.getElementById('review-form');
+            const submitBtn = document.querySelector('.submit-review');
+            const textarea = document.querySelector('textarea[name="comment"]');
+            const radioInputs = document.querySelectorAll('input[name="rating"]');
+            
+            if (form) {
+                form.style.opacity = '1';
+                form.style.pointerEvents = 'auto';
+                
+                // Remove overlay
+                const overlay = form.querySelector('.auth-overlay');
+                if (overlay) {
+                    overlay.remove();
+                }
+            }
+            
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.style.opacity = '1';
+                submitBtn.style.cursor = 'pointer';
+            }
+            if (textarea) {
+                textarea.disabled = false;
+                textarea.placeholder = 'Share your thoughts about Spaceverse...';
+                textarea.style.backgroundColor = '';
+            }
+            radioInputs.forEach(input => {
+                input.disabled = false;
+            });
+            
+            // Clear message
+            if (messageDiv) {
+                messageDiv.textContent = '';
+                messageDiv.className = 'review-message';
+                messageDiv.style.display = 'none';
+            }
+        }
+
+        // Check if user is logged in
+        async function checkAuth() {
+            try {
+                const response = await fetch('/api/user');
+                const data = await response.json();
+                isLoggedIn = data.loggedIn;
+                
+                if (!isLoggedIn) {
+                    disableForm();
+                } else {
+                    enableForm();
+                }
+            } catch (err) {
+                console.error('Error checking auth:', err);
+                isLoggedIn = false;
+                disableForm();
+            }
+        }
+
+        // Load existing reviews
+        async function loadReviews() {
+            try {
+                const response = await fetch('/api/reviews');
+                const reviews = await response.json();
+                
+                reviewsList.innerHTML = '';
+                
+                if (reviews.length === 0) {
+                    reviewsList.innerHTML = '<p style="text-align: center; color: rgba(255,255,255,0.5); padding: 20px;">No reviews yet. Be the first to share your thoughts!</p>';
+                    return;
+                }
+                
+                reviews.forEach(review => {
+                    const clone = template.content.cloneNode(true);
+                    clone.querySelector('.review-author').textContent = review.userId?.username || 'Anonymous';
+                    clone.querySelector('.review-rating').textContent = '★'.repeat(review.rating);
+                    clone.querySelector('.review-content').textContent = review.comment;
+                    clone.querySelector('.review-date').textContent = new Date(review.createdAt).toLocaleDateString();
+                    reviewsList.appendChild(clone);
+                });
+            } catch (err) {
+                console.error('Error loading reviews:', err);
+                reviewsList.innerHTML = '<p style="text-align: center; color: #ff6464; padding: 20px;">Failed to load reviews. Please try again later.</p>';
+            }
+        }
+
+        // Handle form submission
+        if (reviewForm) {
+            reviewForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                // Check if user is logged in
+                if (!isLoggedIn) {
+                    showMessage('Please login first to submit a review. Go to the Home page to login or register.', 'error');
+                    return;
+                }
+                
+                const rating = document.querySelector('input[name="rating"]:checked')?.value;
+                const comment = document.querySelector('textarea[name="comment"]').value;
+                
+                if (!rating || !comment) {
+                    showMessage('Please provide both a rating and comment', 'error');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/reviews', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ rating: parseInt(rating), comment })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (response.ok) {
+                        showMessage(result.message, 'success');
+                        reviewForm.reset();
+                        loadReviews(); // Reload the reviews list
+                    } else {
+                        // Handle authentication error specifically
+                        if (response.status === 401) {
+                            showMessage('Please log in to submit a review.', 'error');
+                            // Add a login link to the message
+                            setTimeout(() => {
+                                if (messageDiv) {
+                                    messageDiv.innerHTML = 'Please log in to submit a review. <a href="/" style="color: #64ffda; text-decoration: underline;">Go to Home Page to Login</a>';
+                                }
+                            }, 100);
+                        } else {
+                            showMessage(result.message, 'error');
+                        }
+                    }
+                } catch (err) {
+                    showMessage('Error submitting review. Please try again later.', 'error');
+                }
+            });
+        }
+
+        function showMessage(text, type) {
+            if (messageDiv) {
+                messageDiv.textContent = text;
+                messageDiv.className = `review-message ${type}`;
+                
+                // Clear previous timer
+                if (submissionTimer) clearTimeout(submissionTimer);
+                
+                // Clear message after 5 seconds
+                submissionTimer = setTimeout(() => {
+                    messageDiv.textContent = '';
+                    messageDiv.className = 'review-message';
+                }, 5000);
+            }
+        }
+
+        // Initial load with delay to ensure DOM is ready
+        setTimeout(() => {
+            checkAuth();
+            loadReviews();
+        }, 500);
+        
+        // Also run checkAuth when the page becomes visible (in case of navigation)
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) {
+                checkAuth();
+            }
+        });
+    });
+    </script>
+</body>
+</html>

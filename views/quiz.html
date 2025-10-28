@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaceverse Quiz Bot</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Inter', sans-serif; 
+            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+            color: white; 
+            min-height: 100vh;
+            padding: 2rem;
+        }
+        
+        .quiz-container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 2rem;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 183, 3, 0.2);
+        }
+        
+        .quiz-header {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+        
+        .quiz-header h1 {
+            font-size: 2.5rem;
+            color: #ffb703;
+            margin-bottom: 0.5rem;
+        }
+        
+        .quiz-bot {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+        
+        .bot-avatar {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(45deg, #ffb703, #fb8500);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        .bot-message {
+            background: rgba(255, 183, 3, 0.1);
+            padding: 1rem;
+            border-radius: 15px;
+            border-left: 4px solid #ffb703;
+            max-width: 400px;
+        }
+        
+        .planet-selector {
+            margin-bottom: 2rem;
+        }
+        
+        .planet-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .planet-card {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            border-radius: 15px;
+            padding: 1rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .planet-card:hover {
+            border-color: #ffb703;
+            transform: translateY(-5px);
+        }
+        
+        .planet-card.selected {
+            border-color: #ffb703;
+            background: rgba(255, 183, 3, 0.2);
+        }
+        
+        .planet-icon {
+            font-size: 2rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        .quiz-section {
+            display: none;
+        }
+        
+        .quiz-section.active {
+            display: block;
+        }
+        
+        .question-card {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 183, 3, 0.3);
+        }
+        
+        .question-number {
+            color: #ffb703;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .question-text {
+            font-size: 1.2rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+        }
+        
+        .options {
+            display: grid;
+            gap: 1rem;
+        }
+        
+        .option {
+            background: rgba(255, 255, 255, 0.1);
+            border: 2px solid transparent;
+            border-radius: 10px;
+            padding: 1rem;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-align: left;
+        }
+        
+        .option:hover {
+            border-color: #ffb703;
+            background: rgba(255, 183, 3, 0.1);
+        }
+        
+        .option.selected {
+            border-color: #ffb703;
+            background: rgba(255, 183, 3, 0.2);
+        }
+        
+        .option.correct {
+            border-color: #28a745;
+            background: rgba(40, 167, 69, 0.2);
+        }
+        
+        .option.incorrect {
+            border-color: #dc3545;
+            background: rgba(220, 53, 69, 0.2);
+        }
+        
+        .quiz-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 2rem;
+        }
+        
+        .btn {
+            padding: 0.75rem 2rem;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 1rem;
+        }
+        
+        .btn-primary {
+            background: #ffb703;
+            color: #000;
+        }
+        
+        .btn-secondary {
+            background: transparent;
+            color: white;
+            border: 2px solid #ffb703;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(255, 183, 3, 0.3);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 2rem;
+        }
+        
+        .progress {
+            height: 100%;
+            background: linear-gradient(90deg, #ffb703, #fb8500);
+            transition: width 0.3s ease;
+        }
+        
+        .score-display {
+            text-align: center;
+            font-size: 1.1rem;
+            margin-bottom: 1rem;
+        }
+        
+        .results-section {
+            display: none;
+            text-align: center;
+        }
+        
+        .results-section.active {
+            display: block;
+        }
+        
+        .final-score {
+            font-size: 3rem;
+            color: #ffb703;
+            margin: 2rem 0;
+        }
+        
+        .score-message {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .back-btn {
+            position: fixed;
+            top: 2rem;
+            left: 2rem;
+            background: rgba(255, 183, 3, 0.2);
+            border: 2px solid #ffb703;
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            text-decoration: none;
+            transition: all 0.3s;
+        }
+        
+        .back-btn:hover {
+            background: rgba(255, 183, 3, 0.4);
+            transform: translateY(-2px);
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <a href="/" class="back-btn">← Back to Home</a>
+    
+    <div class="quiz-container">
+        <div class="quiz-header">
+            <h1>🤖 Spaceverse Quiz Bot</h1>
+            <div class="quiz-bot">
+                <div class="bot-avatar">🤖</div>
+                <div class="bot-message">
+                    <p id="botMessage">Hello! I'm your space quiz companion. Select a planet to test your knowledge!</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Planet Selection -->
+        <div id="planetSelection" class="planet-selector">
+            <h2>Choose a Planet to Quiz About:</h2>
+            <div class="planet-grid">
+                <div class="planet-card" data-planet="sun">
+                    <div class="planet-icon">☀️</div>
+                    <div>Sun</div>
+                </div>
+                <div class="planet-card" data-planet="mercury">
+                    <div class="planet-icon">☿️</div>
+                    <div>Mercury</div>
+                </div>
+                <div class="planet-card" data-planet="venus">
+                    <div class="planet-icon">♀️</div>
+                    <div>Venus</div>
+                </div>
+                <div class="planet-card" data-planet="earth">
+                    <div class="planet-icon">🌍</div>
+                    <div>Earth</div>
+                </div>
+                <div class="planet-card" data-planet="mars">
+                    <div class="planet-icon">♂️</div>
+                    <div>Mars</div>
+                </div>
+            </div>
+            <div class="quiz-controls">
+                <div></div>
+                <button class="btn btn-primary" id="startQuizBtn" disabled>Start Quiz</button>
+            </div>
+        </div>
+        
+        <!-- Quiz Section -->
+        <div id="quizSection" class="quiz-section">
+            <div class="progress-bar">
+                <div class="progress" id="progressBar"></div>
+            </div>
+            <div class="score-display">
+                Score: <span id="currentScore">0</span> / <span id="totalQuestions">0</span>
+            </div>
+            
+            <div id="questionCard" class="question-card">
+                <div class="question-number" id="questionNumber"></div>
+                <div class="question-text" id="questionText"></div>
+                <div class="options" id="optionsContainer"></div>
+            </div>
+            
+            <div class="quiz-controls">
+                <button class="btn btn-secondary" id="prevBtn">Previous</button>
+                <button class="btn btn-primary" id="nextBtn" disabled>Next</button>
+            </div>
+        </div>
+        
+        <!-- Results Section -->
+        <div id="resultsSection" class="results-section">
+            <h2>Quiz Complete! 🎉</h2>
+            <div class="final-score" id="finalScore"></div>
+            <div class="score-message" id="scoreMessage"></div>
+            <div id="wrongAnswersContainer" style="margin-top: 1.5rem; text-align: left; max-height: 40vh; overflow-y: auto;">
+                <!-- Wrong questions will be injected here -->
+            </div>
+            <div class="quiz-controls">
+                <button class="btn btn-secondary" onclick="restartQuiz()">Take Another Quiz</button>
+                <a href="/solar-system" id="exploreLinkQuiz" class="btn btn-primary">Explore Solar System</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Update explore link depending on authentication
+        fetch('/api/user').then(r => r.json()).then(data => {
+            const explore = document.getElementById('exploreLinkQuiz');
+            if (!explore) return;
+            if (data && data.loggedIn) {
+                explore.href = '/solar-system';
+            } else {
+                explore.href = '#';
+                explore.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    alert('Please login to explore the Solar System.');
+                });
+            }
+        }).catch(() => {});
+        let currentPlanet = null;
+        let questions = [];
+        let currentQuestionIndex = 0;
+        let userAnswers = [];
+        let score = 0;
+
+        // Planet selection
+        document.querySelectorAll('.planet-card').forEach(card => {
+            card.addEventListener('click', function() {
+                document.querySelectorAll('.planet-card').forEach(c => c.classList.remove('selected'));
+                this.classList.add('selected');
+                currentPlanet = this.dataset.planet;
+                document.getElementById('startQuizBtn').disabled = false;
+                
+                const planetName = this.textContent.trim();
+                document.getElementById('botMessage').textContent = `Great choice! Ready to test your knowledge about ${planetName}?`;
+            });
+        });
+
+        // Start quiz
+        document.getElementById('startQuizBtn').addEventListener('click', async function() {
+            if (!currentPlanet) return;
+            
+            try {
+                const response = await fetch(`/api/planets/${currentPlanet}/quiz`);
+                const data = await response.json();
+                
+                if (data.questions && data.questions.length > 0) {
+                    questions = data.questions;
+                    userAnswers = new Array(questions.length).fill(null);
+                    startQuiz();
+                } else {
+                    alert('No quiz questions available for this planet yet!');
+                }
+            } catch (error) {
+                alert('Failed to load quiz questions. Please try again.');
+            }
+        });
+
+        function startQuiz() {
+            document.getElementById('planetSelection').style.display = 'none';
+            document.getElementById('quizSection').classList.add('active');
+            document.getElementById('totalQuestions').textContent = questions.length;
+            document.getElementById('botMessage').textContent = "Let's test your space knowledge! Take your time and think carefully.";
+            
+            currentQuestionIndex = 0;
+            score = 0;
+            // clear any previous wrong-answers display
+            const wrongContainer = document.getElementById('wrongAnswersContainer');
+            if (wrongContainer) wrongContainer.innerHTML = '';
+            showQuestion();
+        }
+
+        function showQuestion() {
+            const question = questions[currentQuestionIndex];
+            
+            document.getElementById('questionNumber').textContent = `Question ${currentQuestionIndex + 1} of ${questions.length}`;
+            document.getElementById('questionText').textContent = question.question;
+            
+            const optionsContainer = document.getElementById('optionsContainer');
+            optionsContainer.innerHTML = '';
+            
+            question.options.forEach((option, index) => {
+                const optionElement = document.createElement('div');
+                optionElement.className = 'option';
+                optionElement.textContent = option;
+                optionElement.addEventListener('click', () => selectOption(index));
+                
+                if (userAnswers[currentQuestionIndex] === index) {
+                    optionElement.classList.add('selected');
+                }
+                
+                optionsContainer.appendChild(optionElement);
+            });
+            
+            updateProgress();
+            updateNavigationButtons();
+        }
+
+        function selectOption(optionIndex) {
+            userAnswers[currentQuestionIndex] = optionIndex;
+            
+            document.querySelectorAll('.option').forEach((option, index) => {
+                option.classList.remove('selected');
+                if (index === optionIndex) {
+                    option.classList.add('selected');
+                }
+            });
+            
+            document.getElementById('nextBtn').disabled = false;
+        }
+
+        function updateProgress() {
+            const progress = ((currentQuestionIndex + 1) / questions.length) * 100;
+            document.getElementById('progressBar').style.width = progress + '%';
+        }
+
+        function updateNavigationButtons() {
+            document.getElementById('prevBtn').disabled = currentQuestionIndex === 0;
+            document.getElementById('nextBtn').disabled = userAnswers[currentQuestionIndex] === null;
+            
+            if (currentQuestionIndex === questions.length - 1) {
+                document.getElementById('nextBtn').textContent = 'Finish Quiz';
+            } else {
+                document.getElementById('nextBtn').textContent = 'Next';
+            }
+        }
+
+        // Navigation
+        document.getElementById('prevBtn').addEventListener('click', function() {
+            if (currentQuestionIndex > 0) {
+                currentQuestionIndex--;
+                showQuestion();
+            }
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', function() {
+            if (currentQuestionIndex < questions.length - 1) {
+                currentQuestionIndex++;
+                showQuestion();
+            } else {
+                finishQuiz();
+            }
+        });
+
+        async function finishQuiz() {
+            // Calculate score
+            score = 0;
+            questions.forEach((question, index) => {
+                if (userAnswers[index] === question.correctAnswer) {
+                    score++;
+                }
+            });
+            
+            // Save score to backend
+            try {
+                await fetch('/api/quiz/submit', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        score: score, 
+                        totalQuestions: questions.length,
+                        planet: currentPlanet 
+                    })
+                });
+            } catch (error) {
+                console.log('Could not save score (user might not be logged in)');
+            }
+            
+            showResults();
+        }
+
+        function showResults() {
+            document.getElementById('quizSection').classList.remove('active');
+            document.getElementById('resultsSection').classList.add('active');
+            
+            const percentage = Math.round((score / questions.length) * 100);
+            document.getElementById('finalScore').textContent = `${score}/${questions.length} (${percentage}%)`;
+            
+            let message = '';
+            if (percentage >= 90) {
+                message = "Outstanding! You're a true space expert! 🌟";
+            } else if (percentage >= 70) {
+                message = "Great job! You know your space facts well! 🚀";
+            } else if (percentage >= 50) {
+                message = "Good effort! Keep exploring to learn more! 🌙";
+            } else {
+                message = "Keep studying the cosmos! There's so much to discover! 🔭";
+            }
+            
+            document.getElementById('scoreMessage').textContent = message;
+            document.getElementById('botMessage').textContent = `Quiz complete! You scored ${score} out of ${questions.length}. ${message}`;
+
+            // Show wrong questions details
+            const wrongContainer = document.getElementById('wrongAnswersContainer');
+            wrongContainer.innerHTML = '';
+            const wrongIndices = [];
+            questions.forEach((q, i) => { if (userAnswers[i] !== q.correctAnswer) wrongIndices.push(i); });
+
+            if (wrongIndices.length === 0) {
+                wrongContainer.innerHTML = '<div style="color:#28a745; font-weight:600; margin-top:10px;">All answers correct — well done!</div>';
+            } else {
+                const heading = document.createElement('div');
+                heading.style.fontWeight = '700';
+                heading.style.color = '#ffb703';
+                heading.style.marginBottom = '10px';
+                heading.textContent = `Questions answered incorrectly (${wrongIndices.length}):`;
+                wrongContainer.appendChild(heading);
+
+                wrongIndices.forEach(idx => {
+                    const q = questions[idx];
+                    const userAns = userAnswers[idx];
+
+                    const card = document.createElement('div');
+                    card.style.background = 'rgba(255,255,255,0.04)';
+                    card.style.border = '1px solid rgba(255,183,3,0.12)';
+                    card.style.padding = '10px';
+                    card.style.borderRadius = '8px';
+                    card.style.marginBottom = '8px';
+
+                    const qText = document.createElement('div');
+                    qText.style.marginBottom = '8px';
+                    qText.style.fontWeight = '600';
+                    qText.textContent = `Q${idx+1}: ${q.question}`;
+                    card.appendChild(qText);
+
+                    q.options.forEach((opt, oi) => {
+                        const optDiv = document.createElement('div');
+                        optDiv.textContent = opt;
+                        optDiv.style.padding = '6px 8px';
+                        optDiv.style.borderRadius = '6px';
+                        optDiv.style.marginBottom = '4px';
+                        if (oi === q.correctAnswer) {
+                            optDiv.style.background = 'rgba(40,167,69,0.12)';
+                            optDiv.style.borderLeft = '4px solid #28a745';
+                            optDiv.style.fontWeight = '700';
+                        } else if (oi === userAns) {
+                            optDiv.style.background = 'rgba(220,53,69,0.08)';
+                            optDiv.style.borderLeft = '4px solid #dc3545';
+                        } else {
+                            optDiv.style.opacity = '0.85';
+                        }
+                        card.appendChild(optDiv);
+                    });
+
+                    wrongContainer.appendChild(card);
+                });
+            }
+        }
+
+        function restartQuiz() {
+            document.getElementById('resultsSection').classList.remove('active');
+            document.getElementById('planetSelection').style.display = 'block';
+            document.getElementById('quizSection').classList.remove('active');
+            
+            // Reset state
+            currentPlanet = null;
+            questions = [];
+            currentQuestionIndex = 0;
+            userAnswers = [];
+            score = 0;
+
+            // clear wrong answers UI
+            const wrongContainer = document.getElementById('wrongAnswersContainer');
+            if (wrongContainer) wrongContainer.innerHTML = '';
+            
+            document.querySelectorAll('.planet-card').forEach(c => c.classList.remove('selected'));
+            document.getElementById('startQuizBtn').disabled = true;
+            document.getElementById('botMessage').textContent = "Ready for another challenge? Select a planet to quiz about!";
+        }
+    </script>
+</body>
+</html>

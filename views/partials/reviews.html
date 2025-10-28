@@ -1,0 +1,132 @@
+<!-- Reviews CSS -->
+<style>
+.reviews-section { margin-top: 48px; }
+.review-form { margin-bottom: 24px; }
+.star-rating { display: flex; gap: 8px; margin: 12px 0; }
+.star-rating input[type="radio"] { display: none; }
+.star-rating label { cursor: pointer; font-size: 24px; color: rgba(230,241,255,0.2); }
+.star-rating input[type="radio"]:checked ~ label { color: var(--accent); }
+.star-rating label:hover, .star-rating label:hover ~ label { color: var(--accent); }
+.review-input { width: 100%; padding: 12px; background: rgba(230,241,255,0.03); border: 1px solid rgba(148,87,235,0.1); border-radius: 8px; color: var(--text); margin: 8px 0; resize: vertical; }
+.review-input:focus { outline: none; border-color: var(--accent); }
+.submit-review { background: var(--accent); color: var(--bg); border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-weight: 600; }
+.submit-review:hover { background: #50ccae; }
+.submit-review:disabled { opacity: 0.5; cursor: not-allowed; }
+.review-list { display: grid; gap: 16px; margin-top: 24px; }
+.review-card { background: var(--panel); border-radius: 12px; padding: 16px; }
+.review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.review-author { font-weight: 600; }
+.review-rating { color: var(--accent); }
+.review-date { font-size: 0.9em; color: rgba(230,241,255,0.5); }
+.review-content { line-height: 1.5; }
+.review-message { padding: 12px; border-radius: 8px; margin: 8px 0; }
+.review-message.success { background: rgba(100,255,218,0.1); color: var(--accent); }
+.review-message.error { background: rgba(255,100,100,0.1); color: #ff6464; }
+</style>
+
+<!-- Reviews Template -->
+<template id="review-template">
+    <div class="review-card">
+        <div class="review-header">
+            <span class="review-author"></span>
+            <span class="review-rating"></span>
+        </div>
+        <div class="review-content"></div>
+        <div class="review-date"></div>
+    </div>
+</template>
+
+<!-- Reviews JavaScript -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const reviewForm = document.getElementById('review-form');
+    const reviewsList = document.getElementById('reviews-list');
+    const messageDiv = document.getElementById('review-message');
+    const template = document.getElementById('review-template');
+
+    let submissionTimer = null;
+
+    // Load existing reviews
+    async function loadReviews() {
+        try {
+            const response = await fetch('/api/reviews');
+            const reviews = await response.json();
+            
+            reviewsList.innerHTML = '';
+            
+            if (reviews.length === 0) {
+                reviewsList.innerHTML = '<p style="text-align: center; color: rgba(230,241,255,0.5); padding: 20px;">No reviews yet. Be the first to share your thoughts!</p>';
+                return;
+            }
+            
+            reviews.forEach(review => {
+                const clone = template.content.cloneNode(true);
+                clone.querySelector('.review-author').textContent = review.userId?.username || 'Anonymous';
+                clone.querySelector('.review-rating').textContent = '★'.repeat(review.rating);
+                clone.querySelector('.review-content').textContent = review.comment;
+                clone.querySelector('.review-date').textContent = new Date(review.createdAt).toLocaleDateString();
+                reviewsList.appendChild(clone);
+            });
+        } catch (err) {
+            console.error('Error loading reviews:', err);
+            reviewsList.innerHTML = '<p style="text-align: center; color: #ff6464; padding: 20px;">Failed to load reviews. Please try again later.</p>';
+        }
+    }
+
+    // Handle form submission
+    if (reviewForm) {
+        reviewForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const rating = document.querySelector('input[name="rating"]:checked')?.value;
+            const comment = document.querySelector('textarea[name="comment"]').value;
+            
+            if (!rating || !comment) {
+                showMessage('Please provide both a rating and comment', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/reviews', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ rating: parseInt(rating), comment })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showMessage(result.message, 'success');
+                    reviewForm.reset();
+                    loadReviews(); // Reload the reviews list
+                } else {
+                    showMessage(result.message, 'error');
+                }
+            } catch (err) {
+                showMessage('Error submitting review. Please try again later.', 'error');
+            }
+        });
+    }
+
+    function showMessage(text, type) {
+        if (messageDiv) {
+            messageDiv.textContent = text;
+            messageDiv.className = `review-message ${type}`;
+            
+            // Clear previous timer
+            if (submissionTimer) clearTimeout(submissionTimer);
+            
+            // Clear message after 5 seconds
+            submissionTimer = setTimeout(() => {
+                messageDiv.textContent = '';
+                messageDiv.className = 'review-message';
+            }, 5000);
+        }
+    }
+
+    // Initial load
+    loadReviews();
+});
+</script>
