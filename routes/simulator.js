@@ -443,6 +443,7 @@ router.post('/run', ensureAuthenticated, async (req, res) => {
     }
 
     let density = calculateOrbitalDensity(altitude, inclination, realCounts);
+    density = Math.max(0, density); // guard against tiny negative floats from orbital perturbations
 
     // Try to enhance simulation with real-time NASA data
     try {
