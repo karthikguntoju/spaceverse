@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Historic Space Launches - NASA & ISRO</title>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@500;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --space-dark: #050510;
+            --space-light: #1a1a3a;
+            --neon-blue: #00f3ff;
+            --neon-purple: #bc13fe;
+            --neon-amber: #ffb703;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            --text-main: #e2e8f0;
+            --danger: #ff4d4d;
+            --warning: #ffcc00;
+            --success: #4caf50;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #000000;
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Canvas Space Background */
+        #space-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            display: block;
+        }
+
+                .navbar {
+            position: fixed;
+            top: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 98%;
+            max-width: 1800px;
+            
+            /* Sci-Fi Geometry (Chamfered Tech Box) */
+            clip-path: polygon(25px 0, calc(100% - 25px) 0, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 25px 100%, 0 calc(100% - 25px), 0 25px);
+            
+            /* Frosty Glassmorphism */
+            background: rgba(5, 10, 20, 0.7);
+            backdrop-filter: blur(24px) saturate(200%);
+            -webkit-backdrop-filter: blur(24px) saturate(200%);
+            
+            padding: 0.8rem 2.5rem;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            
+            /* Inner telemetry glow and structural pseudo-bordering through shadows */
+            box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.15), inset 0 0 60px rgba(0, 0, 0, 0.9);
+            transition: all 0.4s ease;
+            border: none;
+        }
+
+        /* Nav Brackets matching the clip-path angles perfectly */
+        .nav-bracket {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 35px;
+            background: transparent;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .nav-bracket.left {
+            left: 0;
+            border-left: 2px solid var(--neon-blue);
+            clip-path: polygon(0 25px, 25px 0, 100% 0, 100% 100%, 25px 100%, 0 calc(100% - 25px));
+            box-shadow: inset 10px 0 20px -5px rgba(0, 243, 255, 0.4);
+        }
+        .nav-bracket.right {
+            right: 0;
+            border-right: 2px solid var(--neon-blue);
+            clip-path: polygon(0 0, calc(100% - 25px) 0, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 0 100%);
+            box-shadow: inset -10px 0 20px -5px rgba(0, 243, 255, 0.4);
+        }
+
+        .navbar:hover {
+            box-shadow: inset 0 0 30px rgba(0, 243, 255, 0.25), inset 0 0 80px rgba(0, 0, 0, 0.95);
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--neon-blue);
+            text-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .logo-icon {
+            width: 45px;
+            height: 45px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-planet {
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #005b99);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.8), inset -5px -5px 10px rgba(0, 0, 0, 0.4);
+            animation: planetRotate 10s linear infinite;
+        }
+
+        .logo-ring {
+            position: absolute;
+            width: 48px;
+            height: 14px;
+            border: 2px solid var(--neon-purple);
+            border-radius: 50%;
+            transform: rotateX(70deg);
+            box-shadow: 0 0 15px rgba(188, 19, 254, 0.8);
+            animation: ringPulse 3s infinite alternate;
+        }
+
+        @keyframes planetRotate {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes ringPulse {
+            100% {
+                box-shadow: 0 0 25px rgba(188, 19, 254, 1);
+                border-width: 3px;
+            }
+        }
+
+        .nav-content {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-grow: 1;
+            margin-left: 2rem;
+            position: static;
+        }
+
+        .nav-links {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 2.5rem;
+            list-style: none;
+            margin: 0;
+        }
+
+        .nav-links li, .nav-links a {
+            display: inline-block;
+        }
+
+        .nav-links a {
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+            position: relative;
+            padding: 0.5rem 0;
+            transition: color 0.3s;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.4s cubic-bezier(0.86, 0, 0.07, 1);
+        }
+
+        .nav-links a:hover {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
+        }
+
+        .nav-links a:hover::after {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+
+        /* Scanning laser above the link */
+        .nav-links a::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: 0;
+            width: 15px;
+            height: 2px;
+            background: #fff;
+            box-shadow: 0 0 10px #fff, 0 0 20px var(--neon-blue);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .nav-links a:hover::before {
+            opacity: 1;
+            animation: scanLaser 1s infinite linear;
+        }
+
+        @keyframes scanLaser {
+            0% { left: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { left: 100%; opacity: 0; }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 140px 2rem 50px;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .header h1 {
+            font-family: 'Orbitron', Arial, sans-serif;
+            font-size: 3.5rem;
+            font-weight: 900;
+            background: linear-gradient(180deg, #ffffff 0%, var(--neon-amber) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            filter: drop-shadow(0 0 15px rgba(255, 183, 3, 0.4));
+            margin-bottom: 1rem;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: var(--neon-amber);
+            font-weight: 600;
+        }
+
+        .agency-tabs {
+            display: flex;
+            gap: 1.5rem;
+            justify-content: center;
+            margin-bottom: 3rem;
+            background: rgba(255, 255, 255, 0.03);
+            padding: 0.8rem;
+            border-radius: 20px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn {
+            padding: 0.8rem 2rem;
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 12px;
+            color: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: 'Orbitron', sans-serif;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .tab-btn.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .launches-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+            gap: 2.5rem;
+        }
+
+        .launch-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-top: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 24px;
+            overflow: hidden;
+            transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+        }
+
+        .launch-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(0, 243, 255, 0.1), transparent);
+            transition: left 0.5s ease;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .launch-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(0, 243, 255, 0.6);
+            box-shadow: 0 15px 35px rgba(0, 243, 255, 0.2);
+        }
+
+        .launch-card:hover::before {
+            left: 100%;
+        }
+
+        .launch-thumbnail {
+            width: 100%;
+            height: 220px;
+            object-fit: cover;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            cursor: pointer;
+            border-bottom: 2px solid rgba(0, 243, 255, 0.2);
+        }
+
+        .play-button {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            z-index: 5;
+        }
+
+        .play-button:hover {
+            transform: scale(1.15);
+            background: rgba(255, 255, 255, 0.2);
+            border-color: #fff;
+            box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
+        }
+
+        .play-button::after {
+            content: '';
+            width: 0;
+            height: 0;
+            border-left: 18px solid white;
+            border-top: 10px solid transparent;
+            border-bottom: 10px solid transparent;
+            margin-left: 4px;
+        }
+
+        .launch-content {
+            padding: 1.5rem;
+            position: relative;
+            z-index: 2;
+        }
+
+        .launch-date {
+            color: var(--neon-amber);
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+            text-shadow: 0 0 10px rgba(255, 183, 3, 0.3);
+        }
+
+        .launch-title {
+            color: var(--neon-blue);
+            font-size: 1.4rem;
+            margin-bottom: 0.75rem;
+            font-weight: 700;
+            font-family: 'Orbitron', sans-serif;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
+            line-height: 1.3;
+        }
+
+        .launch-mission {
+            color: var(--text-main);
+            margin-bottom: 1.5rem;
+            line-height: 1.6;
+            font-size: 1rem;
+        }
+
+        .launch-details {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(0, 243, 255, 0.2);
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .detail-label {
+            color: #a0aec0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+
+        .detail-value {
+            color: #fff;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .watch-btn {
+            width: 100%;
+            padding: 0.8rem;
+            background: transparent;
+            border: 1px solid var(--neon-blue);
+            border-radius: 30px;
+            color: var(--neon-blue);
+            font-size: 0.9rem;
+            font-weight: 700;
+            font-family: 'Inter', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            cursor: pointer;
+            transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.8rem;
+            margin-top: 1rem;
+        }
+
+        .watch-btn:hover {
+            background: var(--neon-blue);
+            color: #000;
+            box-shadow: 0 0 30px rgba(0, 243, 255, 0.5);
+            transform: translateY(-3px);
+        }
+
+        .youtube-icon {
+            font-size: 1.2rem;
+            filter: drop-shadow(0 0 5px rgba(255, 0, 0, 0.5));
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        @media (max-width: 768px) {
+            .launches-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 2.2rem;
+            }
+
+            .agency-tabs {
+                flex-direction: column;
+            }
+
+            .navbar {
+                padding: 1rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .container {
+                padding: 100px 1rem 30px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="space-bg"></canvas>
+    <a href="/" class="back-home-btn">
+        <span>🏠</span>
+        <span>Back to Home</span>
+    </a>
+
+        <nav class="navbar">
+        <div class="nav-bracket left"></div>
+        <div class="logo">
+            <div class="logo-icon">
+                <div class="logo-planet"></div>
+                <div class="logo-ring"></div>
+            </div>
+            <span>Spaceverse</span>
+        </div>
+        <div class="nav-content" id="navContent">
+            <ul class="nav-links" id="navLinks">
+                <li><a href="/solar-system">Solar System</a></li>
+                <li><a href="/space-traffic-simulator">Traffic</a></li>
+                <li><a href="/mission-tracker">Missions</a></li>
+                <li><a href="/space-launches">Videos</a></li>
+            </ul>
+            <a href="/" class="nav-back-btn" style="background: rgba(0,243,255,0.15); padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #00f3ff; color: #00f3ff; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; box-shadow: 0 0 10px rgba(0,243,255,0.3); text-decoration: none; display: inline-block; margin-right: 15px; transition: all 0.3s ease;" onmouseover="this.style.background='#00f3ff'; this.style.color='#000'; this.style.boxShadow='0 0 20px #00f3ff';" onmouseout="this.style.background='rgba(0,243,255,0.15)'; this.style.color='#00f3ff'; this.style.boxShadow='0 0 10px rgba(0,243,255,0.3)';">⬅ Back to Home</a>
+            <div class="user-info" id="userInfo">
+                <button class="logout-btn" onclick="logout()" style="background: rgba(255, 77, 77, 0.1); color: #ff4d4d; border: 1px solid #ff4d4d; padding: 0.5rem 1.2rem; border-radius: 20px; cursor: pointer; font-weight: 600; font-family: 'Inter', sans-serif; transition: all 0.3s; box-shadow: 0 0 5px rgba(255,0,0,0.2);">Logout</button>
+            </div>
+        </div>
+        <div class="nav-bracket right"></div>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <h1>🎬 Historic Space Launches</h1>
+            <p>Watch iconic rocket launches from NASA and ISRO</p>
+        </div>
+
+        <div class="agency-tabs">
+            <button class="tab-btn active" onclick="filterByAgency('all')">
+                🌍 All Launches
+            </button>
+            <button class="tab-btn" onclick="filterByAgency('nasa')">
+                🇺🇸 NASA
+            </button>
+            <button class="tab-btn" onclick="filterByAgency('isro')">
+                🇮🇳 ISRO
+            </button>
+        </div>
+
+        <div id="launchesContainer" class="launches-grid"></div>
+    </div>
+
+    <script>
+        const launchesData = [
+            // NASA Launches
+            {
+                id: 1,
+                agency: 'nasa',
+                title: 'Apollo 11 Launch',
+                date: 'July 16, 1969',
+                mission: 'First crewed mission to land on the Moon',
+                vehicle: 'Saturn V',
+                site: 'Kennedy Space Center, Florida',
+                youtube: 'https://www.youtube.com/watch?v=UExTN3_UOIY',
+                thumbnail: 'https://img.youtube.com/vi/UExTN3_UOIY/maxresdefault.jpg'
+            },
+            {
+                id: 2,
+                agency: 'nasa',
+                title: 'Space Shuttle Discovery STS-133',
+                date: 'February 24, 2011',
+                mission: 'Final flight of Discovery to the ISS',
+                vehicle: 'Space Shuttle Discovery',
+                site: 'Kennedy Space Center, Florida',
+                youtube: 'https://www.youtube.com/watch?v=xRVHylmxUk8',
+                thumbnail: 'https://img.youtube.com/vi/xRVHylmxUk8/maxresdefault.jpg'
+            },
+            {
+                id: 3,
+                agency: 'nasa',
+                title: 'Artemis 1 Launch',
+                date: 'November 16, 2022',
+                mission: 'Uncrewed test flight of SLS and Orion spacecraft',
+                vehicle: 'Space Launch System',
+                site: 'Kennedy Space Center, Florida',
+                youtube: 'https://www.youtube.com/watch?v=jrDv0OdMt5s',
+                thumbnail: 'https://img.youtube.com/vi/jrDv0OdMt5s/maxresdefault.jpg'
+            },
+            {
+                id: 4,
+                agency: 'nasa',
+                title: 'Mars Perseverance Launch',
+                date: 'July 30, 2020',
+                mission: 'Mars rover mission to search for signs of life',
+                vehicle: 'Atlas V 541',
+                site: 'Cape Canaveral, Florida',
+                youtube: 'https://www.youtube.com/watch?v=gm0b_SADdz0',
+                thumbnail: 'https://img.youtube.com/vi/gm0b_SADdz0/maxresdefault.jpg'
+            },
+            {
+                id: 5,
+                agency: 'nasa',
+                title: 'James Webb Space Telescope Launch',
+                date: 'December 25, 2021',
+                mission: 'Revolutionary infrared space observatory',
+                vehicle: 'Ariane 5',
+                site: 'Kourou, French Guiana',
+                youtube: 'https://www.youtube.com/watch?v=7nT7JGZMbtM',
+                thumbnail: 'https://img.youtube.com/vi/7nT7JGZMbtM/maxresdefault.jpg'
+            },
+            {
+                id: 6,
+                agency: 'nasa',
+                title: 'SpaceX Demo-2 Launch',
+                date: 'May 30, 2020',
+                mission: 'First crewed commercial spacecraft to ISS',
+                vehicle: 'Falcon 9',
+                site: 'Kennedy Space Center, Florida',
+                youtube: 'https://www.youtube.com/watch?v=xY96v0OIcK4',
+                thumbnail: 'https://img.youtube.com/vi/xY96v0OIcK4/maxresdefault.jpg'
+            },
+
+            // ISRO Launches
+            {
+                id: 7,
+                agency: 'isro',
+                title: 'Chandrayaan-3 Launch',
+                date: 'July 14, 2023',
+                mission: 'Successful lunar landing near south pole',
+                vehicle: 'LVM3 (GSLV Mk III)',
+                site: 'Satish Dhawan Space Centre',
+                youtube: 'https://www.youtube.com/watch?v=6bHiXdAHFWw',
+                thumbnail: 'https://img.youtube.com/vi/6bHiXdAHFWw/maxresdefault.jpg'
+            },
+            {
+                id: 8,
+                agency: 'isro',
+                title: 'Chandrayaan-2 Launch',
+                date: 'July 22, 2019',
+                mission: 'Lunar orbiter and lander mission',
+                vehicle: 'GSLV Mk III',
+                site: 'Satish Dhawan Space Centre',
+                youtube: 'https://www.youtube.com/watch?v=2f_e_L7K95Q',
+                thumbnail: 'https://img.youtube.com/vi/2f_e_L7K95Q/maxresdefault.jpg'
+            },
+            {
+                id: 9,
+                agency: 'isro',
+                title: 'Mars Orbiter Mission (Mangalyaan) Launch',
+                date: 'November 5, 2013',
+                mission: "India's first interplanetary mission to Mars",
+                vehicle: 'PSLV-XL C25',
+                site: 'Satish Dhawan Space Centre',
+                youtube: 'https://www.youtube.com/watch?v=ZeNe3nMQhxo',
+                thumbnail: 'https://img.youtube.com/vi/ZeNe3nMQhxo/maxresdefault.jpg'
+            },
+            {
+                id: 10,
+                agency: 'isro',
+                title: 'PSLV-C37 Record 104 Satellites',
+                date: 'February 15, 2017',
+                mission: 'World record for most satellites in single launch',
+                vehicle: 'PSLV-XL',
+                site: 'Satish Dhawan Space Centre',
+                youtube: 'https://www.youtube.com/watch?v=c0BpjPUT5FE',
+                thumbnail: 'https://img.youtube.com/vi/c0BpjPUT5FE/maxresdefault.jpg'
+            },
+            {
+                id: 11,
+                agency: 'isro',
+                title: 'Chandrayaan-1 Launch',
+                date: 'October 22, 2008',
+                mission: "India's first lunar probe, discovered water on Moon",
+                vehicle: 'PSLV-XL',
+                site: 'Satish Dhawan Space Centre',
+                youtube: 'https://www.youtube.com/watch?v=C1eLG7m6WdI',
+                thumbnail: 'https://img.youtube.com/vi/C1eLG7m6WdI/maxresdefault.jpg'
+            },
+            {
+                id: 12,
+                agency: 'isro',
+                title: 'Aditya-L1 Solar Mission Launch',
+                date: 'September 2, 2023',
+                mission: 'India\'s first solar observation mission',
+                vehicle: 'PSLV-XL',
+                site: 'Satish Dhawan Space Centre',
+                youtube: 'https://www.youtube.com/watch?v=_IcgGYZTXQw',
+                thumbnail: 'https://img.youtube.com/vi/_IcgGYZTXQw/maxresdefault.jpg'
+            }
+        ];
+
+        let currentFilter = 'all';
+
+        function displayLaunches(launches) {
+            const container = document.getElementById('launchesContainer');
+
+            container.innerHTML = launches.map(launch => `
+                <div class="launch-card" data-agency="${launch.agency}">
+                    <div class="launch-thumbnail" onclick="openYouTube('${launch.youtube}')" style="background-image: url('${launch.thumbnail}'); background-size: cover; background-position: center;">
+                        <div class="play-button"></div>
+                    </div>
+                    <div class="launch-content">
+                        <div class="launch-date">📅 ${launch.date}</div>
+                        <div class="launch-title">${launch.title}</div>
+                        <div class="launch-mission">${launch.mission}</div>
+                        <div class="launch-details">
+                            <div class="detail-row">
+                                <span class="detail-label">Vehicle:</span>
+                                <span class="detail-value">${launch.vehicle}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Launch Site:</span>
+                                <span class="detail-value">${launch.site}</span>
+                            </div>
+                            <div class="detail-row">
+                                <span class="detail-label">Agency:</span>
+                                <span class="detail-value">${launch.agency.toUpperCase()}</span>
+                            </div>
+                        </div>
+                        <button class="watch-btn" onclick="openYouTube('${launch.youtube}')">
+                            <span class="youtube-icon">▶️</span>
+                            Watch on YouTube
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterByAgency(agency) {
+            currentFilter = agency;
+
+            // Update active button
+            document.querySelectorAll('.tab-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Filter and display
+            const filtered = agency === 'all'
+                ? launchesData
+                : launchesData.filter(l => l.agency === agency);
+
+            displayLaunches(filtered);
+        }
+
+        function openYouTube(url) {
+            window.open(url, '_blank');
+        }
+
+        function logout() {
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => window.location.href = '/');
+        }
+
+        /* ====================================================
+           REALISTIC SPACE BACKGROUND — Canvas Star Engine
+           ==================================================== */
+        (function () {
+            const canvas = document.getElementById('space-bg');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            // Resize canvas to fill viewport
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resize();
+            window.addEventListener('resize', () => { resize(); initStars(); });
+
+            // Star color palette – realistic spectral tints
+            const STAR_COLORS = [
+                { r: 255, g: 255, b: 255 },  // pure white
+                { r: 200, g: 220, b: 255 },  // blue-white
+                { r: 180, g: 200, b: 255 },  // blue
+                { r: 255, g: 245, b: 220 },  // warm white
+                { r: 255, g: 220, b: 160 },  // yellow
+                { r: 255, g: 180, b: 100 },  // orange
+                { r: 255, g: 150, b: 120 },  // red dwarf
+            ];
+
+            // Layer config: count, speed multiplier, max radius
+            const LAYERS = [
+                { count: 250, speed: 0.0, maxR: 0.6 },  // far – tiny, static
+                { count: 180, speed: 0.0, maxR: 1.1 },  // mid
+                { count: 90, speed: 0.0, maxR: 1.8 },  // near – large, bright
+            ];
+
+            let stars = [];
+            let shooters = [];
+            let nebulae = [];
+
+            function randRange(min, max) { return Math.random() * (max - min) + min; }
+            function randInt(min, max) { return Math.floor(randRange(min, max)); }
+
+            function initStars() {
+                stars = [];
+                const W = canvas.width, H = canvas.height;
+
+                LAYERS.forEach((layer, li) => {
+                    for (let i = 0; i < layer.count; i++) {
+                        const col = STAR_COLORS[randInt(0, STAR_COLORS.length)];
+                        stars.push({
+                            x: randRange(0, W),
+                            y: randRange(0, H),
+                            r: randRange(0.15, layer.maxR),
+                            baseAlpha: randRange(0.4, 1.0),
+                            alpha: 0,
+                            twinkleSpeed: randRange(0.003, 0.025),
+                            twinkleOffset: randRange(0, Math.PI * 2),
+                            color: col,
+                            layer: li,
+                            glowMult: li === 2 ? randRange(2.5, 5) : (li === 1 ? randRange(1.5, 3) : 1),
+                        });
+                    }
+                });
+
+                // Pre-bake a few nebula blobs
+                nebulae = [];
+                const nebulaConfigs = [
+                    { cx: 0.15, cy: 0.50, r: 0.25, col: '188,19,254', a: 0.045 },
+                    { cx: 0.85, cy: 0.30, r: 0.28, col: '0,180,255', a: 0.040 },
+                    { cx: 0.50, cy: 0.85, r: 0.20, col: '255,120,20', a: 0.030 },
+                    { cx: 0.70, cy: 0.10, r: 0.18, col: '80,220,180', a: 0.025 },
+                ];
+                nebulaConfigs.forEach(n => nebulae.push({
+                    cx: n.cx * W, cy: n.cy * H,
+                    r: n.r * Math.max(W, H),
+                    col: n.col, a: n.a,
+                }));
+            }
+
+            function spawnShooter() {
+                const W = canvas.width, H = canvas.height;
+                const angle = randRange(-0.6, -0.2);  // mostly downward right
+                shooters.push({
+                    x: randRange(0, W),
+                    y: randRange(0, H * 0.5),
+                    len: randRange(60, 180),
+                    speed: randRange(6, 14),
+                    alpha: 1,
+                    dx: Math.cos(angle),
+                    dy: Math.sin(angle) * 0.5 + 0.5,
+                    life: 1,
+                });
+            }
+
+            let t = 0;
+            let lastShooter = 0;
+
+            function draw(ts) {
+                t = ts * 0.001;
+                const W = canvas.width, H = canvas.height;
+
+                // Background fill
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, W, H);
+
+                // Nebula blobs
+                nebulae.forEach(n => {
+                    const grad = ctx.createRadialGradient(n.cx, n.cy, 0, n.cx, n.cy, n.r);
+                    grad.addColorStop(0, `rgba(${n.col}, ${n.a})`);
+                    grad.addColorStop(0.5, `rgba(${n.col}, ${n.a * 0.4})`);
+                    grad.addColorStop(1, `rgba(${n.col}, 0)`);
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                // Stars
+                stars.forEach(s => {
+                    const flicker = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed * 60 + s.twinkleOffset);
+                    s.alpha = s.baseAlpha * (0.55 + 0.45 * flicker);
+
+                    const r = s.r;
+                    const { r: cr, g: cg, b: cb } = s.color;
+
+                    // Glow halo
+                    if (s.glowMult > 1) {
+                        const gVal = Math.max(0, s.alpha - 0.2);
+                        const glowR = r * s.glowMult;
+                        const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
+                        grd.addColorStop(0, `rgba(${cr},${cg},${cb},${gVal * 0.6})`);
+                        grd.addColorStop(0.4, `rgba(${cr},${cg},${cb},${gVal * 0.15})`);
+                        grd.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+                        ctx.fillStyle = grd;
+                        ctx.beginPath();
+                        ctx.arc(s.x, s.y, glowR, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    // Star core
+                    ctx.globalAlpha = s.alpha;
+                    ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // Cross-diffraction spike
+                    if (s.layer === 2 && s.r > 1.3 && s.alpha > 0.7) {
+                        ctx.globalAlpha = s.alpha * 0.3;
+                        ctx.strokeStyle = `rgb(${cr},${cg},${cb})`;
+                        ctx.lineWidth = 0.5;
+                        const sLen = r * 4;
+                        ctx.beginPath();
+                        ctx.moveTo(s.x - sLen, s.y); ctx.lineTo(s.x + sLen, s.y);
+                        ctx.moveTo(s.x, s.y - sLen); ctx.lineTo(s.x, s.y + sLen);
+                        ctx.stroke();
+                    }
+                });
+                ctx.globalAlpha = 1;
+
+                // Shooting stars
+                if (ts - lastShooter > randRange(1800, 5000)) {
+                    spawnShooter();
+                    lastShooter = ts;
+                }
+                shooters = shooters.filter(s => s.life > 0);
+                shooters.forEach(s => {
+                    s.life -= 0.015;
+                    s.x += s.dx * s.speed;
+                    s.y += s.dy * s.speed;
+                    const tail = ctx.createLinearGradient(
+                        s.x - s.dx * s.len, s.y - s.dy * s.len, s.x, s.y
+                    );
+                    tail.addColorStop(0, `rgba(255,255,255,0)`);
+                    tail.addColorStop(1, `rgba(255,255,255,${s.life * 0.9})`);
+                    ctx.strokeStyle = tail;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(s.x - s.dx * s.len, s.y - s.dy * s.len);
+                    ctx.lineTo(s.x, s.y);
+                    ctx.stroke();
+                });
+
+                requestAnimationFrame(draw);
+            }
+
+            initStars();
+            requestAnimationFrame(draw);
+        })();
+
+        // Initialize on page load
+        window.onload = () => {
+            displayLaunches(launchesData);
+        };
+    </script>
+</body>
+
+</html>

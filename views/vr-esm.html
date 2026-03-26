@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceVerse - VR Solar System Explorer (ESM)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #0D1117;
+        }
+        
+        #vr-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #E6F1FF;
+            font-size: 18px;
+        }
+        
+        #error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6b6b;
+            font-size: 18px;
+            text-align: center;
+            display: none;
+        }
+        
+        #retry-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: #64FFDA;
+            color: #0D1117;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="vr-container"></div>
+    <div id="loading">Initializing VR Experience...</div>
+    <div id="error">
+        <p>Error loading VR experience. Please check the browser console for details.</p>
+        <button id="retry-btn" onclick="retryLoad()">Retry</button>
+    </div>
+    
+    <!-- Import maps for dependencies -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js",
+            "@react-three/fiber": "https://cdn.jsdelivr.net/npm/@react-three/fiber@9.4.2/dist/react-three-fiber.esm.js",
+            "@react-three/xr": "https://cdn.jsdelivr.net/npm/@react-three/xr@6.6.28/dist/index.js",
+            "react": "https://cdn.jsdelivr.net/npm/react@18.2.0/+esm",
+            "react-dom": "https://cdn.jsdelivr.net/npm/react-dom@18.2.0/+esm"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        // Global error handling
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        });
+        
+        function retryLoad() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            loadVRComponents();
+        }
+        
+        async function loadVRComponents() {
+            try {
+                console.log('Loading VR components...');
+                
+                // Dynamically import the VRSolarSystem component
+                const module = await import('/src/VRSolarSystem.esm.jsx');
+                const VRSolarSystem = module.default;
+                
+                console.log('VRSolarSystem component loaded successfully');
+                
+                // Make it available globally
+                window.VRSolarSystem = VRSolarSystem;
+                
+                renderApp();
+            } catch (error) {
+                console.error('Failed to load VR components:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+        
+        async function renderApp() {
+            try {
+                console.log('Attempting to render app...');
+                
+                // Dynamically import React and ReactDOM
+                const React = await import('react');
+                const ReactDOM = await import('react-dom/client');
+                
+                // Check if VRSolarSystem component is available
+                if (typeof window.VRSolarSystem === 'undefined') {
+                    throw new Error('VRSolarSystem component not loaded');
+                }
+                
+                console.log('All dependencies loaded, rendering app...');
+                
+                // Create app component
+                const App = () => React.createElement(window.VRSolarSystem);
+                
+                // Render the app
+                const container = document.getElementById('vr-container');
+                const root = ReactDOM.createRoot(container);
+                root.render(React.createElement(App));
+                
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                console.log('App rendered successfully');
+            } catch (error) {
+                console.error('Error rendering app:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+        
+        // Start loading when page is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadVRComponents);
+        } else {
+            loadVRComponents();
+        }
+    </script>
+</body>
+</html>

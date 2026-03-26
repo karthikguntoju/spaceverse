@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceVerse - Simplified VR Experience</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        header {
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #64FFDA, #00FFFF);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 20px rgba(100, 255, 218, 0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 2rem auto;
+            max-width: 800px;
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        
+        .status-item {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .status-label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 0.5rem;
+        }
+        
+        .status-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .success { color: #64FFDA; }
+        .warning { color: #FFD700; }
+        .error { color: #FF6B6B; }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 10px;
+            background: rgba(100, 255, 218, 0.1);
+            color: #64FFDA;
+            border: 2px solid #64FFDA;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: rgba(100, 255, 218, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(100, 255, 218, 0.2);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, #64FFDA, #00FFFF);
+            color: #0D1117;
+            border: none;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(90deg, #5ae6c8, #00e5e5);
+            box-shadow: 0 5px 15px rgba(100, 255, 218, 0.4);
+        }
+        
+        .info-box {
+            background: rgba(255, 255, 255, 0.08);
+            border-left: 4px solid #64FFDA;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: left;
+            border-radius: 0 10px 10px 0;
+        }
+        
+        .solar-system {
+            position: relative;
+            height: 400px;
+            margin: 2rem auto;
+            max-width: 800px;
+        }
+        
+        .sun {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #ffd700 0%, #ff8c00 70%, #ff4500 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 50px #ff4500, 0 0 100px #ff8c00;
+            z-index: 10;
+            animation: pulse 3s infinite alternate;
+        }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 50px #ff4500, 0 0 100px #ff8c00; }
+            100% { box-shadow: 0 0 70px #ff4500, 0 0 140px #ff8c00; }
+        }
+        
+        .orbit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .planet {
+            position: absolute;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .mercury { background: linear-gradient(45deg, #a9a9a9, #696969); width: 15px; height: 15px; }
+        .venus { background: linear-gradient(45deg, #e39e1c, #b87333); width: 20px; height: 20px; }
+        .earth { background: linear-gradient(45deg, #1e90ff, #228b22); width: 22px; height: 22px; }
+        .mars { background: linear-gradient(45deg, #ff4500, #8b0000); width: 18px; height: 18px; }
+        .jupiter { background: linear-gradient(45deg, #d2b48c, #cd853f); width: 35px; height: 35px; }
+        .saturn { 
+            background: linear-gradient(45deg, #f0e68c, #daa520); 
+            width: 30px; 
+            height: 30px;
+            position: relative;
+        }
+        .saturn::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 45px;
+            height: 45px;
+            border: 2px solid rgba(218, 165, 32, 0.5);
+            border-radius: 50%;
+            z-index: -1;
+        }
+        .uranus { background: linear-gradient(45deg, #afeeee, #5f9ea0); width: 25px; height: 25px; }
+        .neptune { background: linear-gradient(45deg, #4169e1, #000080); width: 25px; height: 25px; }
+        
+        .back-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(100, 255, 218, 0.06);
+            color: #E6F1FF;
+            border: 2px solid #64FFDA;
+            border-radius: 25px;
+            text-decoration: none;
+            z-index: 1000;
+        }
+        
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 17, 23, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(100, 255, 218, 0.3);
+            border-top: 5px solid #64FFDA;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden { display: none; }
+        
+        .planet-info {
+            margin-top: 20px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+        }
+        
+        .instructions {
+            margin-top: 30px;
+            padding: 20px;
+            background: rgba(100, 255, 218, 0.1);
+            border-radius: 10px;
+            text-align: left;
+        }
+        
+        .instructions h3 {
+            margin-bottom: 15px;
+            color: #64FFDA;
+        }
+        
+        .instructions ul {
+            padding-left: 20px;
+        }
+        
+        .instructions li {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← Back to Home</a>
+    
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Initializing Space Experience...</p>
+    </div>
+    
+    <div id="main-content" class="container hidden">
+        <header>
+            <h1>SpaceVerse Solar System</h1>
+            <p class="subtitle">Interactive 3D Experience</p>
+        </header>
+        
+        <div class="card">
+            <h2>Experience Status</h2>
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label">WebXR Support</div>
+                    <div id="webxr-status" class="status-value warning">Checking...</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">VR Libraries</div>
+                    <div id="libraries-status" class="status-value error">Not Loaded</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">3D Engine</div>
+                    <div id="engine-status" class="status-value error">Unavailable</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">Experience Mode</div>
+                    <div id="mode-status" class="status-value warning">2D Simulation</div>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h3>Current Experience</h3>
+                <p>We've detected that the advanced VR libraries couldn't be loaded properly. As a fallback, we're showing this interactive 2D simulation of our solar system.</p>
+                <p>This simplified experience still allows you to explore the planets and their orbits, but without the full 3D VR capabilities.</p>
+            </div>
+            
+            <button id="enter-vr-btn" class="btn btn-primary" disabled>👓 VR Mode Unavailable</button>
+            <a href="/" class="btn">← Back to Home</a>
+        </div>
+        
+        <div class="card">
+            <h2>Solar System Explorer</h2>
+            <div class="solar-system">
+                <div class="sun"></div>
+                <!-- Orbits and planets will be added by JavaScript -->
+            </div>
+            <div class="planet-info" id="planet-info">
+                <h3>Welcome to SpaceVerse</h3>
+                <p>Click on any planet to learn more about it</p>
+            </div>
+        </div>
+        
+        <div class="card instructions">
+            <h3>How to Use This Experience</h3>
+            <ul>
+                <li><strong>Explore:</strong> Click on any planet to see information about it</li>
+                <li><strong>Observe:</strong> Watch the planets orbit the sun in real-time</li>
+                <li><strong>Navigate:</strong> Scroll to zoom in/out of the solar system</li>
+                <li><strong>VR Mode:</strong> Currently unavailable due to library loading issues</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        // Planet data
+        const planets = [
+            { 
+                name: "Mercury", 
+                radius: 15, 
+                distance: 120, 
+                speed: 0.02, 
+                color: "mercury", 
+                angle: 0,
+                info: "Mercury is the smallest and innermost planet in the Solar System. It has no atmosphere and experiences extreme temperature variations."
+            },
+            { 
+                name: "Venus", 
+                radius: 20, 
+                distance: 160, 
+                speed: 0.015, 
+                color: "venus", 
+                angle: Math.PI/3,
+                info: "Venus is the second planet from the Sun and is similar in size to Earth. It has a thick toxic atmosphere and is the hottest planet."
+            },
+            { 
+                name: "Earth", 
+                radius: 22, 
+                distance: 200, 
+                speed: 0.01, 
+                color: "earth", 
+                angle: Math.PI/1.5,
+                info: "Earth is our home planet and the only known celestial body to harbor life. It has a diverse ecosystem and a protective atmosphere."
+            },
+            { 
+                name: "Mars", 
+                radius: 18, 
+                distance: 240, 
+                speed: 0.008, 
+                color: "mars", 
+                angle: Math.PI,
+                info: "Mars is the fourth planet from the Sun and is often called the 'Red Planet' due to its reddish appearance. It has the largest volcano in the Solar System."
+            },
+            { 
+                name: "Jupiter", 
+                radius: 35, 
+                distance: 300, 
+                speed: 0.005, 
+                color: "jupiter", 
+                angle: Math.PI/0.75,
+                info: "Jupiter is the largest planet in our Solar System. It's a gas giant with a prominent Great Red Spot storm and at least 79 moons."
+            },
+            { 
+                name: "Saturn", 
+                radius: 30, 
+                distance: 360, 
+                speed: 0.004, 
+                color: "saturn", 
+                angle: Math.PI/0.6,
+                info: "Saturn is famous for its spectacular ring system. It's a gas giant with at least 82 moons and a density lower than water."
+            },
+            { 
+                name: "Uranus", 
+                radius: 25, 
+                distance: 420, 
+                speed: 0.003, 
+                color: "uranus", 
+                angle: Math.PI/0.5,
+                info: "Uranus is an ice giant that rotates on its side. It has a blue-green color due to methane in its atmosphere and a complex ring system."
+            },
+            { 
+                name: "Neptune", 
+                radius: 25, 
+                distance: 480, 
+                speed: 0.002, 
+                color: "neptune", 
+                angle: Math.PI/0.4,
+                info: "Neptune is the farthest known planet from the Sun. It's an ice giant with the strongest winds in the Solar System and a deep blue color."
+            }
+        ];
+        
+        // Check WebXR support
+        function checkWebXRSupport() {
+            if (navigator.xr) {
+                document.getElementById('webxr-status').textContent = 'Supported';
+                document.getElementById('webxr-status').className = 'status-value success';
+                return true;
+            } else {
+                document.getElementById('webxr-status').textContent = 'Not Supported';
+                document.getElementById('webxr-status').className = 'status-value error';
+                return false;
+            }
+        }
+        
+        // Create a simple 2D solar system visualization
+        function createSolarSystem() {
+            const container = document.querySelector('.solar-system');
+            
+            // Create orbits
+            planets.forEach(planet => {
+                const orbitElement = document.createElement('div');
+                orbitElement.className = 'orbit';
+                orbitElement.style.width = `${planet.distance * 2}px`;
+                orbitElement.style.height = `${planet.distance * 2}px`;
+                container.appendChild(orbitElement);
+                
+                const planetElement = document.createElement('div');
+                planetElement.className = `planet ${planet.color}`;
+                planetElement.style.left = `${50 + (planet.distance * Math.cos(planet.angle) / 480 * 100)}%`;
+                planetElement.style.top = `${50 + (planet.distance * Math.sin(planet.angle) / 480 * 100)}%`;
+                planetElement.dataset.index = planets.indexOf(planet);
+                planetElement.title = planet.name;
+                
+                // Add click event
+                planetElement.addEventListener('click', () => {
+                    showPlanetInfo(planet);
+                });
+                
+                container.appendChild(planetElement);
+            });
+            
+            // Animate planets
+            function animate() {
+                const planetElements = document.querySelectorAll('.planet');
+                planetElements.forEach((element, index) => {
+                    const planet = planets[index];
+                    planet.angle += planet.speed;
+                    const x = 50 + (planet.distance * Math.cos(planet.angle) / 480 * 100);
+                    const y = 50 + (planet.distance * Math.sin(planet.angle) / 480 * 100);
+                    
+                    element.style.left = `${x}%`;
+                    element.style.top = `${y}%`;
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            
+            animate();
+        }
+        
+        // Show planet information
+        function showPlanetInfo(planet) {
+            const infoBox = document.getElementById('planet-info');
+            infoBox.innerHTML = `
+                <h3>${planet.name}</h3>
+                <p>${planet.info}</p>
+                <p><strong>Distance from Sun:</strong> ${planet.distance} million km</p>
+                <p><strong>Orbital Speed:</strong> ${(planet.speed * 1000).toFixed(2)} units/sec</p>
+            `;
+        }
+        
+        // Initialize the page
+        function init() {
+            // Check WebXR support
+            checkWebXRSupport();
+            
+            // Create solar system visualization
+            createSolarSystem();
+            
+            // Set up VR button
+            document.getElementById('enter-vr-btn').addEventListener('click', function() {
+                alert('VR mode is currently unavailable due to library loading issues. Please try again later or check the diagnostics page.');
+            });
+            
+            // Hide loading screen and show content
+            setTimeout(function() {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+            }, 1500);
+        }
+        
+        // Start when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

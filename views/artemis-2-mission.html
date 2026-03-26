@@ -1,0 +1,2430 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Artemis 2 Mission - Real-Time Launch Experience</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://unpkg.com/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@500;700;900&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --space-dark: #050510;
+            --space-light: #1a1a3a;
+            --neon-blue: #00f3ff;
+            --neon-purple: #bc13fe;
+            --neon-amber: #ffb703;
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            /* Updated for highly transparent glass */
+            --glass-border: rgba(255, 255, 255, 0.1);
+            /* Updated border */
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            --text-main: #e2e8f0;
+            --danger: #ff4d4d;
+            --warning: #ffcc00;
+            --success: #4caf50;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            height: 100%;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #000000;
+            color: var(--text-main);
+            overflow: hidden;
+            margin: 0;
+            padding: 0;
+            position: relative;
+        }
+
+        /* Canvas Space Background */
+        #space-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            display: block;
+        }
+
+                .navbar {
+            position: fixed;
+            top: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 98%;
+            max-width: 1800px;
+            
+            /* Sci-Fi Geometry (Chamfered Tech Box) */
+            clip-path: polygon(25px 0, calc(100% - 25px) 0, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 25px 100%, 0 calc(100% - 25px), 0 25px);
+            
+            /* Frosty Glassmorphism */
+            background: rgba(5, 10, 20, 0.7);
+            backdrop-filter: blur(24px) saturate(200%);
+            -webkit-backdrop-filter: blur(24px) saturate(200%);
+            
+            padding: 0.8rem 2.5rem;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            
+            /* Inner telemetry glow and structural pseudo-bordering through shadows */
+            box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.15), inset 0 0 60px rgba(0, 0, 0, 0.9);
+            transition: all 0.4s ease;
+            border: none;
+        }
+
+        /* Nav Brackets matching the clip-path angles perfectly */
+        .nav-bracket {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 35px;
+            background: transparent;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .nav-bracket.left {
+            left: 0;
+            border-left: 2px solid var(--neon-blue);
+            clip-path: polygon(0 25px, 25px 0, 100% 0, 100% 100%, 25px 100%, 0 calc(100% - 25px));
+            box-shadow: inset 10px 0 20px -5px rgba(0, 243, 255, 0.4);
+        }
+        .nav-bracket.right {
+            right: 0;
+            border-right: 2px solid var(--neon-blue);
+            clip-path: polygon(0 0, calc(100% - 25px) 0, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 0 100%);
+            box-shadow: inset -10px 0 20px -5px rgba(0, 243, 255, 0.4);
+        }
+
+        .navbar:hover {
+            box-shadow: inset 0 0 30px rgba(0, 243, 255, 0.25), inset 0 0 80px rgba(0, 0, 0, 0.95);
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--neon-blue);
+            text-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .logo-icon {
+            width: 45px;
+            height: 45px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-planet {
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #005b99);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.8), inset -5px -5px 10px rgba(0, 0, 0, 0.4);
+            animation: planetRotate 10s linear infinite;
+        }
+
+        .logo-ring {
+            position: absolute;
+            width: 48px;
+            height: 14px;
+            border: 2px solid var(--neon-purple);
+            border-radius: 50%;
+            transform: rotateX(70deg);
+            box-shadow: 0 0 15px rgba(188, 19, 254, 0.8);
+            animation: ringPulse 3s infinite alternate;
+        }
+
+        @keyframes planetRotate {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes ringPulse {
+            100% {
+                box-shadow: 0 0 25px rgba(188, 19, 254, 1);
+                border-width: 3px;
+            }
+        }
+
+        .nav-content {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-grow: 1;
+            margin-left: 2rem;
+            position: static;
+        }
+
+        .nav-links {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 2.5rem;
+            list-style: none;
+            margin: 0;
+        }
+
+        .nav-links li, .nav-links a {
+            display: inline-block;
+        }
+
+        .nav-links a {
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+            position: relative;
+            padding: 0.5rem 0;
+            transition: color 0.3s;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.4s cubic-bezier(0.86, 0, 0.07, 1);
+        }
+
+        .nav-links a:hover {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
+        }
+
+        .nav-links a:hover::after {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+
+        /* Scanning laser above the link */
+        .nav-links a::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: 0;
+            width: 15px;
+            height: 2px;
+            background: #fff;
+            box-shadow: 0 0 10px #fff, 0 0 20px var(--neon-blue);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .nav-links a:hover::before {
+            opacity: 1;
+            animation: scanLaser 1s infinite linear;
+        }
+
+        @keyframes scanLaser {
+            0% { left: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { left: 100%; opacity: 0; }
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 350px;
+            gap: 1.5rem;
+            padding: 120px 1.5rem 1.5rem 1.5rem;
+            min-height: calc(100vh - 80px);
+            box-sizing: border-box;
+            margin: 0 auto;
+            width: calc(100% - 3rem);
+            max-width: 100%;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Rocket Canvas */
+        #rocketCanvas {
+            width: 100%;
+            height: 100%;
+            min-height: 500px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 243, 255, 0.2);
+            border: 1px solid rgba(0, 243, 255, 0.1);
+            position: relative;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            image-rendering: optimizeQuality;
+        }
+
+        /* Side Panel */
+        .side-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            overflow-y: auto;
+            max-height: calc(100vh - 120px);
+            padding-right: 0.75rem;
+            scrollbar-width: thin;
+            scrollbar-color: var(--neon-blue) transparent;
+        }
+
+        .side-panel::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .side-panel::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .side-panel::-webkit-scrollbar-thumb {
+            background: var(--neon-blue);
+            border-radius: 3px;
+        }
+
+        /* Card Styles */
+        .card {
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            padding: 1.5rem;
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            box-shadow: var(--glass-shadow);
+            transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 30px rgba(0, 243, 255, 0.15);
+            border-color: rgba(0, 243, 255, 0.5);
+        }
+
+        .card h3 {
+            color: var(--neon-blue);
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+            font-family: 'Orbitron', sans-serif;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
+        }
+
+        .card-content {
+            font-size: 0.95rem;
+            line-height: 1.7;
+            color: var(--text-main);
+        }
+
+        /* Mission Status */
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-right: 0.5rem;
+            animation: pulse 2s infinite;
+        }
+
+        .status-indicator.go {
+            background: var(--success);
+            box-shadow: 0 0 10px var(--success);
+        }
+
+        .status-indicator.nominal {
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        .status-indicator.warning {
+            background: var(--warning);
+            box-shadow: 0 0 10px var(--warning);
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.7;
+                transform: scale(1.2);
+            }
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.5rem;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+            box-shadow: 0 0 10px var(--neon-blue);
+            transition: width 0.5s ease;
+        }
+
+        /* Countdown */
+        .countdown {
+            font-size: 1.5rem;
+            font-weight: 900;
+            color: var(--neon-amber);
+            font-family: 'Orbitron', monospace;
+            text-align: center;
+            margin: 1.5rem 0;
+            text-shadow: 0 0 15px rgba(255, 183, 3, 0.7);
+            letter-spacing: 2px;
+            padding: 0.75rem;
+            background: rgba(255, 183, 3, 0.05);
+            border-radius: 12px;
+            border: 1px solid rgba(255, 183, 3, 0.3);
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .btn {
+            padding: 0.8rem;
+            border: 1px solid var(--neon-blue);
+            background: rgba(0, 243, 255, 0.05);
+            color: var(--neon-blue);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+        }
+
+        .btn:hover {
+            background: rgba(0, 243, 255, 0.15);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+            border-color: rgba(0, 243, 255, 0.8);
+        }
+
+        .btn.primary {
+            background: rgba(188, 19, 254, 0.1);
+            border-color: var(--neon-purple);
+            color: var(--neon-purple);
+        }
+
+        .btn.primary:hover {
+            background: rgba(188, 19, 254, 0.2);
+            box-shadow: 0 0 15px rgba(188, 19, 254, 0.4);
+            border-color: var(--neon-purple);
+        }
+
+        /* Crew Display */
+        .crew-member {
+            padding: 0.75rem;
+            background: rgba(0, 243, 255, 0.05);
+            border-left: 3px solid var(--neon-blue);
+            margin: 0.5rem 0;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.9rem;
+            transition: all 0.3s;
+            border-top: 1px solid transparent;
+            border-right: 1px solid transparent;
+            border-bottom: 1px solid transparent;
+        }
+
+        .crew-member:hover {
+            background: rgba(0, 243, 255, 0.1);
+            border-color: rgba(0, 243, 255, 0.2);
+            border-left-color: var(--neon-blue);
+        }
+
+        .crew-name {
+            color: #fff;
+            font-weight: bold;
+        }
+
+        .crew-role {
+            color: var(--neon-amber);
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        /* Mission Timeline */
+        .timeline-item {
+            padding: 0.75rem;
+            border-left: 2px solid rgba(188, 19, 254, 0.3);
+            margin-left: 0.5rem;
+            padding-left: 1.25rem;
+            font-size: 0.85rem;
+            opacity: 0.8;
+            transition: all 0.3s;
+            position: relative;
+        }
+
+        .timeline-item::before {
+            content: '';
+            position: absolute;
+            left: -5px;
+            top: 1rem;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--neon-purple);
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .timeline-item.active {
+            opacity: 1;
+            border-left-color: var(--neon-blue);
+            background: rgba(0, 243, 255, 0.05);
+            border-radius: 0 8px 8px 0;
+        }
+
+        .timeline-item.active::before {
+            background: var(--neon-blue);
+            opacity: 1;
+            box-shadow: 0 0 10px var(--neon-blue);
+        }
+
+        /* Notifications */
+        .notification {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--neon-blue);
+            padding: 1rem 1.5rem;
+            border-radius: 12px;
+            max-width: 320px;
+            z-index: 2000;
+            animation: slideIn 0.5s cubic-bezier(0.23, 1, 0.320, 1);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(0, 243, 255, 0.1);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(400px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification.success {
+            border-color: var(--success);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(76, 175, 80, 0.1);
+        }
+
+        .notification.warning {
+            border-color: var(--warning);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 0 15px rgba(255, 204, 0, 0.1);
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--space-dark);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            gap: 2rem;
+            font-family: 'Orbitron', sans-serif;
+            color: var(--neon-blue);
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+        }
+
+        .loading-screen.hidden {
+            display: none;
+        }
+
+        .loading-spinner {
+            border: 4px solid rgba(0, 243, 255, 0.1);
+            border-top: 4px solid var(--neon-blue);
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+        }
+
+        @keyframes spin {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* Game Score/Stats */
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.75rem;
+        }
+
+        .stat-item {
+            background: rgba(188, 19, 254, 0.05);
+            border: 1px solid rgba(188, 19, 254, 0.2);
+            padding: 0.75rem;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 0.85rem;
+            transition: all 0.3s;
+        }
+
+        .stat-item:hover {
+            background: rgba(188, 19, 254, 0.1);
+            box-shadow: 0 5px 15px rgba(188, 19, 254, 0.2);
+        }
+
+        .stat-value {
+            color: var(--neon-purple);
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            font-size: 1.2rem;
+            text-shadow: 0 0 10px rgba(188, 19, 254, 0.4);
+        }
+
+        .stat-label {
+            color: #a0aec0;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            margin-top: 0.25rem;
+        }
+
+        /* Mission Objectives */
+        .objectives-list {
+            list-style-type: none;
+            padding: 0;
+            margin: 0.5rem 0;
+        }
+
+        .objective-item {
+            padding: 0.5rem 0;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            border-bottom: 1px dashed rgba(255, 255, 255, 0.1);
+        }
+
+        .objective-item:last-child {
+            border-bottom: none;
+        }
+
+        .objective-item::before {
+            content: "•";
+            color: var(--neon-amber);
+            font-size: 1.2rem;
+            line-height: 1;
+        }
+
+        /* Mission Timeline */
+        .timeline-card {
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .timeline-card::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .timeline-card::-webkit-scrollbar-track {
+            background: transparent;
+        }
+
+        .timeline-card::-webkit-scrollbar-thumb {
+            background: rgba(188, 19, 254, 0.5);
+            border-radius: 3px;
+        }
+
+        /* Mission Summary */
+        .mission-summary {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-main);
+        }
+
+        /* System Health */
+        .system-health-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.4rem;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .system-health-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+            transition: width 0.3s ease;
+        }
+
+        .system-status {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            margin-top: 0.3rem;
+            color: #a0aec0;
+        }
+
+        /* Fuel Gauge */
+        .fuel-gauge {
+            width: 100%;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-top: 0.4rem;
+            box-shadow: inset 0 0 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .fuel-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--warning), var(--neon-amber));
+            box-shadow: 0 0 10px rgba(255, 183, 3, 0.6);
+            transition: width 0.3s ease;
+        }
+
+        /* 3D View Controls */
+        .view-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-top: 0.75rem;
+        }
+
+        .view-btn {
+            flex: 1;
+            padding: 0.5rem;
+            background: rgba(188, 19, 254, 0.05);
+            border: 1px solid rgba(188, 19, 254, 0.3);
+            color: var(--neon-purple);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.75rem;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            transition: all 0.2s;
+        }
+
+        .view-btn:hover {
+            background: rgba(188, 19, 254, 0.2);
+            border-color: var(--neon-purple);
+            box-shadow: 0 0 10px rgba(188, 19, 254, 0.3);
+        }
+
+        /* Mission Patch */
+        .mission-patch {
+            text-align: center;
+            padding: 1rem 0.5rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 1rem;
+        }
+
+        .patch-image {
+            width: 90px;
+            height: 90px;
+            background: radial-gradient(circle at 30% 30%, var(--neon-purple), var(--space-dark));
+            border-radius: 50%;
+            margin: 0 auto 1rem auto;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            color: white;
+            box-shadow: 0 0 20px rgba(188, 19, 254, 0.5), inset 0 0 15px rgba(0, 0, 0, 0.8);
+            border: 2px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Mission Badge */
+        .mission-badge {
+            background: rgba(255, 183, 3, 0.1);
+            color: var(--neon-amber);
+            border: 1px solid var(--neon-amber);
+            padding: 0.3rem 0.8rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            display: inline-block;
+            margin-top: 0.5rem;
+            box-shadow: 0 0 10px rgba(255, 183, 3, 0.2);
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr 300px;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            .side-panel {
+                display: none;
+            }
+
+            .navbar {
+                padding: 1rem;
+            }
+
+            .nav-links {
+                display: none;
+            }
+        }
+
+        /* 3D Scene Text Overlay */
+        .mission-info-overlay {
+            position: absolute;
+            top: 100px;
+            left: 20px;
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            padding: 2rem;
+            border-radius: 20px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6), inset 0 0 15px rgba(0, 243, 255, 0.1);
+            max-width: 380px;
+            z-index: 500;
+            transition: all 0.3s ease;
+            min-width: 340px;
+        }
+
+        .mission-title-overlay {
+            font-family: 'Orbitron', sans-serif;
+            font-size: 2rem;
+            font-weight: 900;
+            color: #fff;
+            margin-bottom: 0.5rem;
+            text-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
+            letter-spacing: 2px;
+        }
+
+        .mission-subtitle-overlay {
+            color: var(--neon-amber);
+            font-size: 1rem;
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+        }
+
+        .live-data {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+            margin: 0.5rem 0;
+            align-items: center;
+        }
+
+        .data-label {
+            color: #a0aec0;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+        }
+
+        .data-value {
+            color: #fff;
+            font-weight: bold;
+            font-family: 'Orbitron', sans-serif;
+        }
+    </style>
+</head>
+
+<body>
+    <canvas id="space-bg"></canvas>
+    <!-- Navbar -->
+        <nav class="navbar">
+        <div class="nav-bracket left"></div>
+        <div class="logo">
+            <div class="logo-icon">
+                <div class="logo-planet"></div>
+                <div class="logo-ring"></div>
+            </div>
+            <span>Spaceverse</span>
+        </div>
+        <div class="nav-content" id="navContent">
+            <ul class="nav-links" id="navLinks">
+                
+                <li><a href="/solar-system">Solar System</a></li>
+                <li><a href="/space-traffic-simulator">Traffic</a></li>
+                <li><a href="/mission-tracker">Missions</a></li>
+                <li><a href="/space-launches">Videos</a></li>
+            </ul>
+            <a href="/" class="nav-back-btn" style="background: rgba(0,243,255,0.15); padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #00f3ff; color: #00f3ff; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; box-shadow: 0 0 10px rgba(0,243,255,0.3); text-decoration: none; display: inline-block; margin-right: 15px; transition: all 0.3s ease;" onmouseover="this.style.background='#00f3ff'; this.style.color='#000'; this.style.boxShadow='0 0 20px #00f3ff';" onmouseout="this.style.background='rgba(0,243,255,0.15)'; this.style.color='#00f3ff'; this.style.boxShadow='0 0 10px rgba(0,243,255,0.3)';">⬅ Back to Home</a>\n            <div class="user-info" id="userInfo">
+                <button class="logout-btn" onclick="logout()" style="background: rgba(255, 77, 77, 0.1); color: #ff4d4d; border: 1px solid #ff4d4d; padding: 0.5rem 1.2rem; border-radius: 20px; cursor: pointer; font-weight: 600; font-family: 'Inter', sans-serif; transition: all 0.3s; box-shadow: 0 0 5px rgba(255,0,0,0.2);">Logout</button>
+            </div>
+        </div>
+        <div class="nav-bracket right"></div>
+    </nav>
+
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-spinner"></div>
+        <div>Initializing Mission Control...</div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="container">
+        <!-- 3D Rocket Canvas -->
+        <div id="rocketCanvas"></div>
+
+        <!-- Mission Info Overlay -->
+        <div class="mission-info-overlay">
+            <div class="mission-title-overlay">ARTEMIS II</div>
+            <div class="mission-subtitle-overlay">Crewed Lunar Flyby Mission</div>
+
+            <div class="countdown" id="countdown">T- --:--:--</div>
+
+            <div class="live-data">
+                <div>
+                    <div class="data-row">
+                        <span class="data-label">Altitude</span>
+                        <span class="data-value" id="altitudeValue">0 km</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="data-label">Velocity</span>
+                        <span class="data-value" id="velocityValue">0 km/s</span>
+                    </div>
+                </div>
+                <div>
+                    <div class="data-row">
+                        <span class="data-label">Phase</span>
+                        <span class="data-value" id="phaseValue">Pre-Launch</span>
+                    </div>
+                    <div class="data-row">
+                        <span class="data-label">Status</span>
+                        <span class="data-value">
+                            <span class="status-indicator go"></span>GO
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Side Panel -->
+        <div class="side-panel">
+            <!-- Mission Patch and Summary -->
+            <div class="card">
+                <div class="mission-patch">
+                    <div class="patch-image">🚀</div>
+                    <div class="mission-title-overlay" style="margin-bottom: 0;">ARTEMIS II</div>
+                    <div class="mission-subtitle-overlay" style="margin-bottom: 0.5rem; font-size: 0.9rem;">Crewed Lunar
+                        Flyby Mission</div>
+                    <div class="mission-badge">MANNED MISSION</div>
+                </div>
+                <div class="card-content">
+                    <div class="mission-summary">
+                        First crewed mission of the Artemis program, scheduled to fly astronauts around the Moon and
+                        back to Earth.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cost Breakdown Card -->
+            <div class="card">
+                <h3>💰 Mission Cost Breakdown</h3>
+                <div class="card-content">
+                    <div class="mission-summary" style="margin-bottom: 1rem;">
+                        <strong>Total Artemis Program Cost:</strong> $93 Billion (2012-2025)
+                    </div>
+                    <div class="data-row" style="font-size: 0.8rem; padding: 0.3rem 0;">
+                        <span>SLS Development</span>
+                        <span style="color: var(--accent);">$23.8B</span>
+                    </div>
+                    <div class="data-row" style="font-size: 0.8rem; padding: 0.3rem 0;">
+                        <span>Orion Spacecraft</span>
+                        <span style="color: var(--accent);">$20.4B</span>
+                    </div>
+                    <div class="data-row" style="font-size: 0.8rem; padding: 0.3rem 0;">
+                        <span>Ground Systems</span>
+                        <span style="color: var(--accent);">$8.7B</span>
+                    </div>
+                    <div class="data-row" style="font-size: 0.8rem; padding: 0.3rem 0;">
+                        <span>HLS (Human Landing System)</span>
+                        <span style="color: var(--accent);">$4.2B</span>
+                    </div>
+                    <div class="data-row" style="font-size: 0.8rem; padding: 0.3rem 0;">
+                        <span>Artemis 2 Mission Operations</span>
+                        <span style="color: var(--accent);">$1.5B</span>
+                    </div>
+                    <div class="data-row" style="font-size: 0.8rem; padding: 0.3rem 0;">
+                        <span>Other (Lunar Gateway, etc.)</span>
+                        <span style="color: var(--accent);">$34.4B</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Official Website Link -->
+            <div class="card">
+                <h3>🌐 Official Resources</h3>
+                <div class="card-content">
+                    <a href="https://www.nasa.gov/artemis-2/" target="_blank" style="display: block; padding: 0.75rem; background: linear-gradient(135deg, var(--accent2), var(--accent)); 
+                              border-radius: 8px; text-align: center; color: white; text-decoration: none; 
+                              font-weight: bold; transition: transform 0.3s, box-shadow 0.3s;"
+                        onmouseover="this.style.transform='translateY(-2px)'; this.style.boxShadow='0 8px 20px rgba(100,255,218,0.4)'"
+                        onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='none'">
+                        🚀 Visit NASA Artemis 2 Official Page
+                    </a>
+                    <div style="margin-top: 0.75rem; font-size: 0.75rem; text-align: center; opacity: 0.7;">
+                        Get the latest updates, crew info, and mission details directly from NASA
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mission Objectives -->
+            <div class="card">
+                <h3>🎯 Mission Objectives</h3>
+                <div class="card-content">
+                    <ul class="objectives-list" id="objectivesList">
+                        <li class="objective-item">Loading mission objectives...</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Mission Status Card -->
+            <div class="card">
+                <h3>📊 Mission Status</h3>
+                <div class="card-content">
+                    <div class="data-row">
+                        <span>Progress</span>
+                        <span id="progressPercent">0%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressBar"></div>
+                    </div>
+                    <div class="data-row" style="margin-top: 0.5rem; font-size: 0.75rem;">
+                        <span>Current Phase</span>
+                        <span id="currentPhase">Pre-Launch</span>
+                    </div>
+                    <div class="data-row" style="margin-top: 0.5rem; font-size: 0.75rem;">
+                        <span>System Health</span>
+                        <span id="systemHealthValue">100%</span>
+                    </div>
+                    <div class="system-health-bar">
+                        <div class="system-health-fill" id="systemHealthBar" style="width: 100%;"></div>
+                    </div>
+                    <div class="data-row" style="margin-top: 0.5rem; font-size: 0.75rem;">
+                        <span>Fuel Level</span>
+                        <span id="fuelLevelValue">100%</span>
+                    </div>
+                    <div class="fuel-gauge">
+                        <div class="fuel-fill" id="fuelLevelBar" style="width: 100%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Crew Card -->
+            <div class="card">
+                <h3>👨‍🚀 Crew (4)</h3>
+                <div class="card-content" id="crewList">
+                    <div class="crew-member">
+                        <div class="crew-name">Loading crew...</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Weather Card -->
+            <div class="card">
+                <h3>🌤️ Launch Site Weather</h3>
+                <div class="card-content" id="weatherCard">
+                    <div class="data-row">
+                        <span>Temp</span>
+                        <span id="tempValue">--°C</span>
+                    </div>
+                    <div class="data-row">
+                        <span>Wind</span>
+                        <span id="windValue">-- km/h</span>
+                    </div>
+                    <div class="data-row">
+                        <span>Status</span>
+                        <span style="color: var(--success);">✓ GO</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Mission Timeline -->
+            <div class="card timeline-card">
+                <h3>⏱️ Mission Timeline</h3>
+                <div class="card-content">
+                    <div id="missionTimeline" style="font-size: 0.75rem;">
+                        <div class="timeline-item active">Pre-Launch: Systems Check</div>
+                        <div class="timeline-item">T+00:00:00: SLS Core Stage Ignition</div>
+                        <div class="timeline-item">T+00:02:00: Max Q - Max Dynamic Pressure</div>
+                        <div class="timeline-item">T+00:08:00: SRB Separation</div>
+                        <div class="timeline-item">T+00:15:00: Core Stage Separation</div>
+                        <div class="timeline-item">T+00:30:00: Trans-Lunar Injection</div>
+                        <div class="timeline-item">T+06:00:00: Lunar Flyby</div>
+                        <div class="timeline-item">T+10:00:00: Earth Reentry</div>
+                        <div class="timeline-item">T+10:15:00: Splashdown</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3D View Controls -->
+            <div class="card">
+                <h3>🎮 3D View Controls</h3>
+                <div class="card-content">
+                    <div class="view-controls">
+                        <button class="view-btn" onclick="zoomToRocket()">Zoom</button>
+                        <button class="view-btn" onclick="toggleAutoRotate()">Auto</button>
+                        <button class="view-btn" onclick="toggleMissionTimeline()">Info</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Launch Controls -->
+            <div class="card controls">
+                <button class="btn primary" onclick="startLaunchAnimation()">🚀 Start Launch</button>
+            </div>
+
+            <!-- Statistics -->
+            <div class="card">
+                <h3>📈 Mission Stats</h3>
+                <div class="stats">
+                    <div class="stat-item">
+                        <div class="stat-value" id="altitudeMax">0 km</div>
+                        <div class="stat-label">Max Alt</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="velocityMax">0 km/s</div>
+                        <div class="stat-label">Max Vel</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="missionTime">0:00:00</div>
+                        <div class="stat-label">Elapsed</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-value" id="gameScore">0</div>
+                        <div class="stat-label">Score</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer"></div>
+
+    <!-- Scripts -->
+    <script>
+        // Global state
+        const gameState = {
+            launchActive: false,
+            autoRotate: true,
+            missionStartTime: null,
+            altitude: 0,
+            velocity: 0,
+            maxAltitude: 0,
+            maxVelocity: 0,
+            score: 0,
+            phase: 'Pre-Launch',
+            missionData: null,
+            rocketPosition: { x: 0, y: 0, z: 0 },
+            fuelPercent: 100,
+            systemHealth: 100,
+            events: {
+                srbSeparated: false,
+                coreSeparated: false,
+                orbitInserted: false,
+                tliBurn: false
+            }
+        };
+
+        // Three.js Scene Setup
+        let scene, camera, renderer, rocket, particles, controls, engineLight, jettisonObjects = [];
+        let launchStartTime = null;
+        let missionTimeline = [];
+
+        function initScene() {
+            // Canvas container
+            const container = document.getElementById('rocketCanvas');
+
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x0D1117);
+            scene.fog = new THREE.Fog(0x0D1117, 1000, 10000);
+
+            // Camera - Better initial position for viewing the rocket on the launch pad
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 100000);
+            camera.position.set(0, 20, 80); // Closer initial position to see rocket on pad
+            camera.lookAt(0, 0, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Limit pixel ratio for performance
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
+            container.appendChild(renderer.domElement);
+
+            // OrbitControls for interactive 3D navigation
+            try {
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.07;
+                controls.enablePan = true;
+                controls.enableZoom = true;
+                controls.maxPolarAngle = Math.PI - 0.1;
+                controls.minDistance = 10;
+                controls.maxDistance = 5000;
+                controls.autoRotate = gameState.autoRotate;
+                controls.autoRotateSpeed = 0.6;
+                controls.target.set(0, 0, 0);
+                controls.update();
+            } catch (e) {
+                console.warn('OrbitControls not available:', e.message);
+                controls = null; // Ensure controls is properly set to null if not available
+            }
+
+            // Enhanced lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(50, 80, 30);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 500;
+            directionalLight.shadow.camera.left = -100;
+            directionalLight.shadow.camera.right = 100;
+            directionalLight.shadow.camera.top = 100;
+            directionalLight.shadow.camera.bottom = -100;
+            scene.add(directionalLight);
+
+            // Orange launch pad lighting
+            const launchPadLight = new THREE.PointLight(0xFFA500, 0.7, 150);
+            launchPadLight.position.set(0, 10, 0);
+            scene.add(launchPadLight);
+
+            // Blue engine exhaust lighting (will activate during launch)
+            engineLight = new THREE.PointLight(0x00FFFF, 0.3, 80);
+            engineLight.position.set(0, -40, 0);
+            engineLight.intensity = 0; // Start at 0, will increase during launch
+            scene.add(engineLight);
+
+            // Additional lights for better scene illumination
+            const fillLight = new THREE.HemisphereLight(0x444466, 0x222233, 0.2);
+            scene.add(fillLight);
+
+            // Starfield background
+            createStarfield();
+
+            // Create rocket
+            createRocket();
+
+            // Create launch pad
+            createLaunchPad();
+
+            // Handle window resize
+            window.addEventListener('resize', onWindowResize);
+
+            // Start animation loop
+            animate();
+
+            // Hide loading screen
+            setTimeout(() => {
+                document.getElementById('loadingScreen').classList.add('hidden');
+            }, 1500);
+        }
+
+        function createStarfield() {
+            const starsGeometry = new THREE.BufferGeometry();
+            const starsMaterial = new THREE.PointsMaterial({
+                color: 0xFFFFFF,
+                size: 0.7,
+                sizeAttenuation: true
+            });
+
+            const starsVertices = [];
+            for (let i = 0; i < 1000; i++) {
+                const x = (Math.random() - 0.5) * 4000;
+                const y = (Math.random() - 0.5) * 4000;
+                const z = (Math.random() - 0.5) * 4000;
+                starsVertices.push(x, y, z);
+            }
+
+            starsGeometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(starsVertices), 3));
+            const stars = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(stars);
+        }
+
+        function createRocket() {
+            // Create rocket group
+            rocket = new THREE.Group();
+
+            // Main body (cylinder) - Enhanced with better materials
+            const bodyGeometry = new THREE.CylinderGeometry(4.5, 4.5, 65, 64);
+            const bodyMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0xFFFFFF,
+                metalness: 0.8,
+                roughness: 0.2,
+                clearcoat: 0.5,
+                clearcoatRoughness: 0.1
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.castShadow = true;
+            body.receiveShadow = true;
+            rocket.add(body);
+
+            // Nose cone - More detailed with gradient
+            const noseGeometry = new THREE.ConeGeometry(4.5, 25, 64);
+            const noseMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0xFF4136,
+                emissive: 0x882222,
+                emissiveIntensity: 0.3,
+                metalness: 0.7,
+                roughness: 0.3
+            });
+            const nose = new THREE.Mesh(noseGeometry, noseMaterial);
+            nose.position.y = 45;
+            nose.castShadow = true;
+            rocket.add(nose);
+
+            // Service Module - Enhanced metallic finish
+            const serviceModuleGeometry = new THREE.CylinderGeometry(5.5, 5.5, 12, 64);
+            const serviceModuleMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0xF0F0F0,
+                metalness: 0.9,
+                roughness: 0.1
+            });
+            const serviceModule = new THREE.Mesh(serviceModuleGeometry, serviceModuleMaterial);
+            serviceModule.position.y = -38.5;
+            serviceModule.castShadow = true;
+            rocket.add(serviceModule);
+
+            // Orion Capsule - More realistic spherical shape
+            const capsuleGeometry = new THREE.SphereGeometry(5, 64, 64, 0, Math.PI * 2, 0, Math.PI / 2);
+            const capsuleMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0xEEEEEE,
+                metalness: 0.6,
+                roughness: 0.2,
+                clearcoat: 0.8
+            });
+            const capsule = new THREE.Mesh(capsuleGeometry, capsuleMaterial);
+            capsule.position.y = 32;
+            capsule.rotation.x = Math.PI;
+            capsule.castShadow = true;
+            rocket.add(capsule);
+
+            // Heat Shield - Enhanced with realistic material
+            const heatShieldGeometry = new THREE.ConeGeometry(5.5, 4, 64);
+            const heatShieldMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x8B4513,
+                emissive: 0x331100,
+                emissiveIntensity: 0.2,
+                metalness: 0.3,
+                roughness: 0.8
+            });
+            const heatShield = new THREE.Mesh(heatShieldGeometry, heatShieldMaterial);
+            heatShield.position.y = -38.5;
+            heatShield.rotation.x = Math.PI;
+            heatShield.castShadow = true;
+            rocket.add(heatShield);
+
+            // Fins - Enhanced with better geometry and materials
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const finGeometry = new THREE.BoxGeometry(3.5, 30, 0.8);
+                const finMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x00FFFF,
+                    emissive: 0x008888,
+                    emissiveIntensity: 0.2,
+                    metalness: 0.8,
+                    roughness: 0.1
+                });
+                const fin = new THREE.Mesh(finGeometry, finMaterial);
+                fin.position.set(
+                    Math.cos(angle) * 6,
+                    -18,
+                    Math.sin(angle) * 6
+                );
+                fin.rotation.z = angle;
+                fin.castShadow = true;
+                rocket.add(fin);
+            }
+
+            // Engine nozzles - More detailed with inner structure
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+
+                // Outer nozzle
+                const outerNozzleGeometry = new THREE.CylinderGeometry(2, 1.2, 6, 32);
+                const outerNozzleMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x222222,
+                    emissive: 0x111111,
+                    metalness: 0.9,
+                    roughness: 0.1
+                });
+                const outerNozzle = new THREE.Mesh(outerNozzleGeometry, outerNozzleMaterial);
+                outerNozzle.position.set(
+                    Math.cos(angle) * 3.5,
+                    -40,
+                    Math.sin(angle) * 3.5
+                );
+                outerNozzle.rotation.x = Math.PI / 2;
+                outerNozzle.castShadow = true;
+                rocket.add(outerNozzle);
+
+                // Inner nozzle throat
+                const innerNozzleGeometry = new THREE.CylinderGeometry(0.8, 0.4, 4, 16);
+                const innerNozzleMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x111111,
+                    emissive: 0x333333,
+                    emissiveIntensity: 0.5
+                });
+                const innerNozzle = new THREE.Mesh(innerNozzleGeometry, innerNozzleMaterial);
+                innerNozzle.position.set(
+                    Math.cos(angle) * 3.5,
+                    -42,
+                    Math.sin(angle) * 3.5
+                );
+                innerNozzle.rotation.x = Math.PI / 2;
+                rocket.add(innerNozzle);
+            }
+
+            // Engine bells - Additional detail
+            for (let i = 0; i < 4; i++) {
+                const angle = (i / 4) * Math.PI * 2;
+                const bellGeometry = new THREE.ConeGeometry(2.5, 8, 32);
+                const bellMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x333333,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+                const bell = new THREE.Mesh(bellGeometry, bellMaterial);
+                bell.position.set(
+                    Math.cos(angle) * 3.5,
+                    -46,
+                    Math.sin(angle) * 3.5
+                );
+                bell.rotation.x = Math.PI / 2;
+                bell.castShadow = true;
+                rocket.add(bell);
+            }
+
+            // Rocket position
+            rocket.position.y = 0;
+            scene.add(rocket);
+        }
+
+        function createLaunchPad() {
+            // Platform - Scaled appropriately
+            const platformGeometry = new THREE.CylinderGeometry(25, 25, 4, 64);
+            const platformMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x444444,
+                metalness: 0.2,
+                roughness: 0.7
+            });
+            const platform = new THREE.Mesh(platformGeometry, platformMaterial);
+            platform.position.y = -45; // Position rocket at ground level
+            platform.receiveShadow = true;
+            scene.add(platform);
+
+            // Flame trench - Added for realism
+            const trenchGeometry = new THREE.BoxGeometry(30, 3, 10);
+            const trenchMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x222222,
+                metalness: 0.1,
+                roughness: 0.9
+            });
+            const trench = new THREE.Mesh(trenchGeometry, trenchMaterial);
+            trench.position.set(0, -46, -15);
+            scene.add(trench);
+
+            // Support tower - More detailed structure
+            const towerBaseGeometry = new THREE.BoxGeometry(6, 50, 6);
+            const towerBaseMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x555555,
+                metalness: 0.6,
+                roughness: 0.4
+            });
+            const towerBase = new THREE.Mesh(towerBaseGeometry, towerBaseMaterial);
+            towerBase.position.set(-25, 3, 0);
+            towerBase.castShadow = true;
+            towerBase.receiveShadow = true;
+            scene.add(towerBase);
+
+            // Tower arms - Multiple levels
+            for (let i = 0; i < 4; i++) {
+                const armGeometry = new THREE.BoxGeometry(20, 1, 2);
+                const armMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x666666,
+                    metalness: 0.7,
+                    roughness: 0.3
+                });
+                const arm = new THREE.Mesh(armGeometry, armMaterial);
+                arm.position.set(-5, 8 + i * 10, 0);
+                arm.castShadow = true;
+                scene.add(arm);
+            }
+
+            // Lightning protection masts
+            for (let i = 0; i < 2; i++) {
+                const mastGeometry = new THREE.CylinderGeometry(0.5, 0.3, 40, 16);
+                const mastMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x888888,
+                    metalness: 0.9,
+                    roughness: 0.1
+                });
+                const mast = new THREE.Mesh(mastGeometry, mastMaterial);
+                mast.position.set(-35 + i * 70, 20, 0);
+                mast.castShadow = true;
+                scene.add(mast);
+            }
+
+            // Ground grid/floor details
+            const gridGroup = new THREE.Group();
+            for (let i = -20; i <= 20; i += 5) {
+                // Horizontal lines
+                const hLineGeometry = new THREE.BoxGeometry(40, 0.2, 0.4);
+                const lineMaterial = new THREE.MeshPhysicalMaterial({
+                    color: 0x333333,
+                    metalness: 0.1,
+                    roughness: 0.9
+                });
+                const hLine = new THREE.Mesh(hLineGeometry, lineMaterial);
+                hLine.position.set(0, -44.5, i);
+                gridGroup.add(hLine);
+
+                // Vertical lines
+                const vLineGeometry = new THREE.BoxGeometry(0.4, 0.2, 40);
+                const vLine = new THREE.Mesh(vLineGeometry, lineMaterial);
+                vLine.position.set(i, -44.5, 0);
+                gridGroup.add(vLine);
+            }
+            scene.add(gridGroup);
+
+            // Service structure around rocket base
+            const serviceStructure = new THREE.Mesh(
+                new THREE.CylinderGeometry(12, 12, 30, 16),
+                new THREE.MeshPhysicalMaterial({
+                    color: 0x777777,
+                    metalness: 0.5,
+                    roughness: 0.5
+                })
+            );
+            serviceStructure.position.set(0, -15, 0);
+            serviceStructure.castShadow = true;
+            scene.add(serviceStructure);
+        }
+
+        function createParticles() {
+            // Remove old particles
+            if (particles) scene.remove(particles);
+
+            // Enhanced particle system with multiple types
+            const particleGroup = new THREE.Group();
+
+            // Main exhaust plume
+            const plumeGeometry = new THREE.BufferGeometry();
+            const plumeMaterial = new THREE.PointsMaterial({
+                color: 0xFF4500,
+                size: 4,
+                sizeAttenuation: true,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending
+            });
+
+            const plumeCount = 2000;
+            const plumePositions = new Float32Array(plumeCount * 3);
+
+            for (let i = 0; i < plumeCount; i++) {
+                const radius = Math.random() * 3;
+                const angle = Math.random() * Math.PI * 2;
+                const height = Math.random() * -40;
+
+                plumePositions[i * 3] = Math.cos(angle) * radius;
+                plumePositions[i * 3 + 1] = height;
+                plumePositions[i * 3 + 2] = Math.sin(angle) * radius;
+            }
+
+            plumeGeometry.setAttribute('position', new THREE.BufferAttribute(plumePositions, 3));
+            const plumeParticles = new THREE.Points(plumeGeometry, plumeMaterial);
+            particleGroup.add(plumeParticles);
+
+            // Secondary flame particles
+            const flameGeometry = new THREE.BufferGeometry();
+            const flameMaterial = new THREE.PointsMaterial({
+                color: 0xFFFF00,
+                size: 2.5,
+                sizeAttenuation: true,
+                transparent: true,
+                opacity: 0.8,
+                blending: THREE.AdditiveBlending
+            });
+
+            const flameCount = 1500;
+            const flamePositions = new Float32Array(flameCount * 3);
+
+            for (let i = 0; i < flameCount; i++) {
+                const radius = Math.random() * 2;
+                const angle = Math.random() * Math.PI * 2;
+                const height = Math.random() * -30;
+
+                flamePositions[i * 3] = Math.cos(angle) * radius;
+                flamePositions[i * 3 + 1] = height;
+                flamePositions[i * 3 + 2] = Math.sin(angle) * radius;
+            }
+
+            flameGeometry.setAttribute('position', new THREE.BufferAttribute(flamePositions, 3));
+            const flameParticles = new THREE.Points(flameGeometry, flameMaterial);
+            particleGroup.add(flameParticles);
+
+            // Smoke particles
+            const smokeGeometry = new THREE.BufferGeometry();
+            const smokeMaterial = new THREE.PointsMaterial({
+                color: 0xAAAAAA,
+                size: 6,
+                sizeAttenuation: true,
+                transparent: true,
+                opacity: 0.4,
+                blending: THREE.NormalBlending
+            });
+
+            const smokeCount = 800;
+            const smokePositions = new Float32Array(smokeCount * 3);
+            const smokeVelocities = new Float32Array(smokeCount * 3);
+
+            for (let i = 0; i < smokeCount; i++) {
+                const radius = Math.random() * 5;
+                const angle = Math.random() * Math.PI * 2;
+
+                smokePositions[i * 3] = Math.cos(angle) * radius;
+                smokePositions[i * 3 + 1] = -25;
+                smokePositions[i * 3 + 2] = Math.sin(angle) * radius;
+
+                smokeVelocities[i * 3] = (Math.random() - 0.5) * 0.2;
+                smokeVelocities[i * 3 + 1] = Math.random() * 0.5 + 0.1;
+                smokeVelocities[i * 3 + 2] = (Math.random() - 0.5) * 0.2;
+            }
+
+            smokeGeometry.setAttribute('position', new THREE.BufferAttribute(smokePositions, 3));
+            const smokeParticles = new THREE.Points(smokeGeometry, smokeMaterial);
+            smokeParticles.userData.velocities = smokeVelocities;
+            particleGroup.add(smokeParticles);
+
+            particles = particleGroup;
+            scene.add(particles);
+        }
+
+        // --- Stage Events & Visuals ---
+        function handleStageEvents(elapsed) {
+            // SRB separation at ~2 minutes (120s)
+            if (elapsed >= 120 && !gameState.events.srbSeparated) {
+                gameState.events.srbSeparated = true;
+                spawnSRBSeparation();
+                showNotification('SRBs separated', 'nominal');
+            }
+
+            // Core stage separation / staging at ~8 minutes (480s)
+            if (elapsed >= 480 && !gameState.events.coreSeparated) {
+                gameState.events.coreSeparated = true;
+                spawnCoreStageSeparation();
+                showNotification('Core stage separation', 'nominal');
+            }
+
+            // Orbit insertion & TLI indicators
+            if (elapsed >= 600 && !gameState.events.orbitInserted) {
+                gameState.events.orbitInserted = true;
+                showNotification('Orbit insertion in progress', 'nominal');
+            }
+
+            if (elapsed >= 1800 && !gameState.events.tliBurn) {
+                gameState.events.tliBurn = true;
+                showNotification('Trans-Lunar Injection burn started', 'nominal');
+            }
+        }
+
+        function spawnSRBSeparation() {
+            const srbMaterial = new THREE.MeshPhysicalMaterial({ color: 0xDDDDDD, metalness: 0.6, roughness: 0.4, transparent: true });
+            const srbGeo = new THREE.CylinderGeometry(1.2, 1.2, 18, 16);
+
+            for (let i = 0; i < 2; i++) {
+                const srb = new THREE.Mesh(srbGeo, srbMaterial.clone());
+                const side = i === 0 ? -10 : 10;
+                srb.position.set(side, rocket.position.y - 20, 0);
+                srb.userData = { vx: (Math.random() - 0.5) * 0.6 + (i === 0 ? -0.6 : 0.6), vy: Math.random() * 0.8 + 0.6, vz: (Math.random() - 0.5) * 0.6 };
+                srb.material.transparent = true;
+                scene.add(srb);
+                jettisonObjects.push(srb);
+            }
+
+            // Hide lower visible parts on rocket to simulate separation
+            rocket.children.forEach(child => {
+                if (child.position.y < -30) child.visible = false;
+            });
+        }
+
+        function spawnCoreStageSeparation() {
+            const coreMaterial = new THREE.MeshPhysicalMaterial({ color: 0x444444, metalness: 0.4, roughness: 0.6, transparent: true });
+            const coreGeo = new THREE.CylinderGeometry(6, 6, 28, 24);
+            const coreChunk = new THREE.Mesh(coreGeo, coreMaterial);
+            coreChunk.position.copy(rocket.position);
+            coreChunk.position.y -= 20;
+            coreChunk.userData = { vx: 0.6 * (Math.random() > 0.5 ? 1 : -1), vy: 0.8, vz: (Math.random() - 0.5) * 0.4 };
+            coreChunk.material.transparent = true;
+            scene.add(coreChunk);
+            jettisonObjects.push(coreChunk);
+
+            // Remove lower engine parts from rocket for visual staging
+            rocket.children.forEach(child => {
+                if (child.position.y < -35) {
+                    child.visible = false;
+                }
+            });
+        }
+
+        // --- End Stage Events ---
+
+        function startLaunchAnimation() {
+            if (gameState.launchActive) {
+                showNotification('Launch sequence already in progress!', 'warning');
+                return;
+            }
+
+            gameState.launchActive = true;
+            gameState.phase = 'Launch';
+            launchStartTime = Date.now();
+            gameState.missionStartTime = launchStartTime;
+            // reset event flags and jettison debris collection on new launch
+            gameState.events.srbSeparated = false;
+            gameState.events.coreSeparated = false;
+            gameState.events.orbitInserted = false;
+            gameState.events.tliBurn = false;
+            jettisonObjects = [];
+            createParticles();
+            showNotification('🚀 IGNITION! Launch sequence initiated!', 'success');
+        }
+
+        function updateRocketPhysics() {
+            if (!gameState.launchActive) return;
+
+            const elapsed = (Date.now() - launchStartTime) / 1000; // seconds
+
+            // Phases of flight
+            if (elapsed < 120) {  // 2 minutes
+                // Launch phase - linear ascent
+                gameState.altitude = (elapsed / 120) * 65;
+                gameState.velocity = (elapsed / 120) * 2.5;
+                gameState.phase = 'Launch Phase';
+                gameState.fuelPercent = 100 - (elapsed / 120) * 90;
+                gameState.systemHealth = 100 - (elapsed / 120) * 2; // Minor degradation
+            } else if (elapsed < 480) {  // 8 minutes
+                // Max Q and staging
+                const t = (elapsed - 120) / 360;
+                gameState.altitude = 65 + t * 135;
+                gameState.velocity = 2.5 + t * 4.5;
+                gameState.phase = 'Max Q & Staging';
+                gameState.fuelPercent = 10 - t * 8;
+                gameState.systemHealth = 98 - (elapsed / 480) * 3;
+            } else if (elapsed < 600) {  // 10 minutes
+                // Reaching orbit
+                const t = (elapsed - 480) / 120;
+                gameState.altitude = 200 + t * 300;
+                gameState.velocity = 7.0 + t * 0.8;
+                gameState.phase = 'Reaching Orbit';
+                gameState.fuelPercent = 2;
+                gameState.systemHealth = 95 - (elapsed / 600) * 5;
+            } else if (elapsed < 1800) {  // 30 minutes
+                // Orbital insertion
+                const t = (elapsed - 600) / 1200;
+                gameState.altitude = 500 + t * 500;
+                gameState.velocity = 7.8;
+                gameState.phase = 'Orbital Insertion';
+                gameState.fuelPercent = 0; // Fuel depleted
+                gameState.systemHealth = 90 - (elapsed / 1800) * 8;
+            } else if (elapsed < 10800) {  // 3 hours
+                // Trans-lunar injection burn
+                const t = (elapsed - 1800) / 9000;
+                gameState.altitude = 1000 + t * 100000;
+                gameState.velocity = 7.8 + t * 2.0;
+                gameState.phase = 'Trans-Lunar Injection';
+                gameState.fuelPercent = 0; // Secondary fuel
+                gameState.systemHealth = 82 - (elapsed / 10800) * 10;
+            } else if (elapsed < 259200) {  // 3 days
+                // Coasting to moon
+                const t = (elapsed - 10800) / (259200 - 10800);
+                gameState.altitude = 101000 + t * 100000;
+                gameState.velocity = 9.8;
+                gameState.phase = 'Coasting to Moon';
+                gameState.fuelPercent = 0;
+                gameState.systemHealth = 72 - (elapsed / 259200) * 15;
+            } else if (elapsed < 475200) {  // 5.5 days
+                // Lunar flyby
+                const t = (elapsed - 259200) / (475200 - 259200);
+                gameState.altitude = 221000 - Math.abs(t - 0.5) * 200000;
+                gameState.velocity = 10.2;
+                gameState.phase = 'Lunar Flyby';
+                gameState.fuelPercent = 0;
+                gameState.systemHealth = 57 - (elapsed / 475200) * 20;
+            } else if (elapsed < 864000) {  // 10 days
+                // Return to Earth
+                const t = (elapsed - 475200) / (864000 - 475200);
+                gameState.altitude = 21000 + (1 - t) * 200000;
+                gameState.velocity = 10.8 - t * 3.0;
+                gameState.phase = 'Return to Earth';
+                gameState.fuelPercent = 0;
+                gameState.systemHealth = 37 - (elapsed - 475200) / (864000 - 475200) * 15;
+            } else {
+                // Mission complete
+                gameState.phase = 'Mission Complete';
+                gameState.altitude = 0;
+                gameState.velocity = 0;
+            }
+
+            // Handle stage events for visual separations and burns
+            handleStageEvents(elapsed);
+
+            // Update max values
+            gameState.maxAltitude = Math.max(gameState.maxAltitude, gameState.altitude);
+            gameState.maxVelocity = Math.max(gameState.maxVelocity, gameState.velocity);
+
+            // Visual scaling for rocket (improved scaling for better visibility)
+            const visualAltitude = gameState.altitude / 1000; // Better scaling factor for realistic movement
+            rocket.position.y = visualAltitude;
+
+            // Engine visual intensity based on thrust/fuel
+            if (engineLight) {
+                if (gameState.fuelPercent > 0 && gameState.launchActive) {
+                    engineLight.intensity = Math.min(2.5, 0.3 + ((100 - gameState.fuelPercent) / 100) * 2.2);
+                } else {
+                    engineLight.intensity = 0.05;
+                }
+            }
+
+            // Rocket rotation - slight wobble
+            rocket.rotation.z = Math.sin(elapsed / 10) * 0.05;
+
+            // Camera follow / update orbit controls target (use visualAltitude for visible behavior)
+            const baseDistance = 80;
+            const altitudeFactor = Math.max(1, visualAltitude / 40);
+            camera.position.y = Math.max(20, 20 + visualAltitude / 2);
+            camera.position.z = Math.max(80, baseDistance * altitudeFactor);
+            camera.lookAt(0, visualAltitude, 0);
+
+            // Update controls if available
+            if (controls) {
+                controls.target.set(0, visualAltitude, 0);
+                controls.maxDistance = Math.max(200, baseDistance * altitudeFactor * 2);
+                controls.minDistance = 20;
+                controls.autoRotate = gameState.autoRotate;
+                controls.update();
+            }
+
+            // Particle animation - Fixed for enhanced particle system
+            if (particles && gameState.fuelPercent > 0) {
+                particles.children.forEach(child => {
+                    const positions = child.geometry.attributes.position.array;
+
+                    if (child.material.color.getHex() === 0xAAAAAA) {
+                        // Smoke particles - rise and disperse
+                        const velocities = child.userData.velocities;
+                        if (velocities) {
+                            for (let i = 0; i < positions.length; i += 3) {
+                                positions[i] += velocities[i] * 0.5; // X movement
+                                positions[i + 1] += velocities[i + 1] * 0.8; // Y movement (rise)
+                                positions[i + 2] += velocities[i + 2] * 0.5; // Z movement
+                            }
+                        }
+                    } else {
+                        // Flame/exhaust particles - more dynamic movement
+                        for (let i = 0; i < positions.length; i += 3) {
+                            positions[i + 1] -= 0.8 + Math.random() * 0.4; // Faster downward movement
+
+                            // Add some horizontal drift
+                            positions[i] += (Math.random() - 0.5) * 0.1;
+                            positions[i + 2] += (Math.random() - 0.5) * 0.1;
+
+                            // Respawn particles that fall too far
+                            if (positions[i + 1] < -100) {
+                                const radius = Math.random() * 3;
+                                const angle = Math.random() * Math.PI * 2;
+                                positions[i] = Math.cos(angle) * radius;
+                                positions[i + 1] = -35;
+                                positions[i + 2] = Math.sin(angle) * radius;
+                            }
+                        }
+                    }
+
+                    child.geometry.attributes.position.needsUpdate = true;
+                });
+            }
+
+            // Scoring
+            gameState.score = Math.floor(gameState.maxAltitude * 5 + gameState.maxVelocity * 50 + gameState.systemHealth * 10);
+
+            // End mission
+            if (elapsed > 864000) {
+                endMission();
+            }
+        }
+
+        function endMission() {
+            gameState.launchActive = false;
+            gameState.phase = 'Mission Complete';
+            showNotification(`Mission successful! Final score: ${gameState.score}`, 'success');
+        }
+
+        function updateTimelineHighlight() {
+            const timelineItems = document.querySelectorAll('#missionTimeline .timeline-item');
+
+            // Clear all active classes
+            timelineItems.forEach(item => item.classList.remove('active'));
+
+            // Determine current phase index
+            let currentIndex = 0;
+            const phase = gameState.phase;
+
+            if (phase.includes('Launch')) {
+                currentIndex = 1;
+            } else if (phase.includes('Max Q')) {
+                currentIndex = 2;
+            } else if (phase.includes('Staging')) {
+                currentIndex = 3;
+            } else if (phase.includes('Orbit')) {
+                currentIndex = 4;
+            } else if (phase.includes('Trans-Lunar')) {
+                currentIndex = 5;
+            } else if (phase.includes('Flyby')) {
+                currentIndex = 6;
+            } else if (phase.includes('Return')) {
+                currentIndex = 7;
+            } else if (phase.includes('Complete')) {
+                currentIndex = 8;
+            }
+
+            // Highlight current phase
+            if (timelineItems[currentIndex]) {
+                timelineItems[currentIndex].classList.add('active');
+            }
+        }
+
+        function updateUI() {
+            // Countdown
+            if (gameState.missionStartTime) {
+                const elapsed = Math.floor((Date.now() - gameState.missionStartTime) / 1000);
+                const hours = Math.floor(elapsed / 3600);
+                const minutes = Math.floor((elapsed % 3600) / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('countdown').textContent =
+                    `T+ ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            // Telemetry
+            document.getElementById('altitudeValue').textContent = gameState.altitude.toFixed(1) + ' km';
+            document.getElementById('velocityValue').textContent = gameState.velocity.toFixed(2) + ' km/s';
+            document.getElementById('phaseValue').textContent = gameState.phase;
+
+            // Side panel
+            document.getElementById('progressPercent').textContent =
+                Math.min(100, Math.floor(gameState.maxAltitude / 121000 * 100)) + '%';
+            document.getElementById('progressBar').style.width =
+                Math.min(100, Math.floor(gameState.maxAltitude / 121000 * 100)) + '%';
+            document.getElementById('currentPhase').textContent = gameState.phase;
+
+            // System health and fuel
+            document.getElementById('systemHealthValue').textContent = Math.floor(gameState.systemHealth) + '%';
+            document.getElementById('systemHealthBar').style.width = Math.floor(gameState.systemHealth) + '%';
+            document.getElementById('fuelLevelValue').textContent = Math.floor(gameState.fuelPercent) + '%';
+            document.getElementById('fuelLevelBar').style.width = Math.floor(gameState.fuelPercent) + '%';
+
+            // Stats
+            document.getElementById('altitudeMax').textContent = gameState.maxAltitude.toFixed(0) + ' km';
+            document.getElementById('velocityMax').textContent = gameState.maxVelocity.toFixed(2) + ' km/s';
+            document.getElementById('gameScore').textContent = gameState.score.toLocaleString();
+
+            // Elapsed time
+            if (gameState.missionStartTime) {
+                const elapsed = Math.floor((Date.now() - gameState.missionStartTime) / 1000);
+                const hours = Math.floor(elapsed / 3600);
+                const minutes = Math.floor((elapsed % 3600) / 60);
+                const seconds = elapsed % 60;
+                document.getElementById('missionTime').textContent =
+                    `${hours}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }
+
+            // Update mission timeline highlighting
+            updateTimelineHighlight();
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            // Rocket rotation - enhanced with launch wobble
+            if (rocket) {
+                rocket.rotation.y += 0.002;
+                if (gameState.launchActive) {
+                    rocket.rotation.x = Math.sin(Date.now() * 0.001) * 0.02; // Slight wobble during launch
+                }
+            }
+
+            // Update controls (damping, auto-rotate, etc.)
+            if (controls) controls.update();
+
+            // Update enhanced particle system
+            if (particles && gameState.launchActive) {
+                const elapsed = (Date.now() - launchStartTime) / 1000;
+
+                // Update each particle system
+                particles.children.forEach(child => {
+                    const positions = child.geometry.attributes.position.array;
+
+                    if (child.material.color.getHex() === 0xAAAAAA) {
+                        // Smoke particles - rise and disperse
+                        const velocities = child.userData.velocities;
+                        if (velocities) {
+                            for (let i = 0; i < positions.length; i += 3) {
+                                positions[i] += velocities[i] * 0.5; // X movement
+                                positions[i + 1] += velocities[i + 1] * 0.8; // Y movement (rise)
+                                positions[i + 2] += velocities[i + 2] * 0.5; // Z movement
+
+                                // Fade out over time
+                                child.material.opacity = Math.max(0, 0.4 - elapsed * 0.02);
+                            }
+                        }
+                    } else {
+                        // Flame/exhaust particles - more dynamic movement
+                        for (let i = 0; i < positions.length; i += 3) {
+                            positions[i + 1] -= 0.8 + Math.random() * 0.4; // Faster downward movement
+
+                            // Add some horizontal drift
+                            positions[i] += (Math.random() - 0.5) * 0.1;
+                            positions[i + 2] += (Math.random() - 0.5) * 0.1;
+
+                            // Respawn particles that fall too far
+                            if (positions[i + 1] < -100) {
+                                const radius = Math.random() * 3;
+                                const angle = Math.random() * Math.PI * 2;
+                                positions[i] = Math.cos(angle) * radius;
+                                positions[i + 1] = -35;
+                                positions[i + 2] = Math.sin(angle) * radius;
+                            }
+                        }
+                    }
+
+                    child.geometry.attributes.position.needsUpdate = true;
+                });
+            }
+
+            // Update jettisoned parts / debris
+            for (let i = jettisonObjects.length - 1; i >= 0; i--) {
+                const obj = jettisonObjects[i];
+                obj.position.x += obj.userData.vx;
+                obj.position.y += obj.userData.vy;
+                obj.position.z += obj.userData.vz;
+                // Simulate gentle gravity / drag
+                obj.userData.vy -= 0.02;
+                if (obj.material && obj.material.opacity !== undefined) obj.material.opacity *= 0.995;
+                // Remove when faded or far below scene
+                if (obj.position.y < -200 || (obj.material && obj.material.opacity < 0.03)) {
+                    scene.remove(obj);
+                    jettisonObjects.splice(i, 1);
+                }
+            }
+
+            // Update physics
+            updateRocketPhysics();
+
+            // Update UI
+            updateUI();
+
+            // Render
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('rocketCanvas');
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+            renderer.setSize(width, height);
+        }
+
+        function toggleAutoRotate() {
+            gameState.autoRotate = !gameState.autoRotate;
+            if (controls) controls.autoRotate = gameState.autoRotate;
+            showNotification(gameState.autoRotate ? 'Auto-rotation enabled' : 'Auto-rotation disabled', 'nominal');
+        }
+
+        function zoomToRocket() {
+            const visualAltitude = gameState.altitude / 1000; // Consistent with physics scaling
+            const altitudeFactor = Math.max(1, visualAltitude / 40);
+            if (controls) {
+                if (gameState.launchActive) {
+                    controls.object.position.set(0, visualAltitude + 30, 80 * altitudeFactor);
+                    controls.target.set(0, visualAltitude, 0);
+                } else {
+                    controls.object.position.set(0, 20, 80);
+                    controls.target.set(0, 0, 0);
+                }
+                controls.update();
+            } else {
+                if (gameState.launchActive) {
+                    camera.position.set(0, visualAltitude + 30, 80 * altitudeFactor);
+                    camera.lookAt(0, visualAltitude, 0);
+                } else {
+                    camera.position.set(0, 20, 80);
+                    camera.lookAt(0, 0, 0);
+                }
+            }
+        }
+
+        function toggleMissionTimeline() {
+            showNotification('📋 ARTEMIS II MISSION TIMELINE:\n' +
+                'T+00:00:00: SLS Core Stage Ignition\n' +
+                'T+00:01:00: Max Q - Maximum Dynamic Pressure\n' +
+                'T+00:02:00: Solid Rocket Booster Separation\n' +
+                'T+00:08:00: Core Stage Separation\n' +
+                'T+00:09:00: ICPS 1st Burn - Earth Parking Orbit\n' +
+                'T+00:15:00: ICPS 2nd Burn - Trans-Lunar Injection\n' +
+                'T+00:30:00: Orion Spacecraft Separation\n' +
+                'T+03:00:00: Mid-Course Correction 1\n' +
+                'T+05:00:00: Mid-Course Correction 2\n' +
+                'T+06:00:00: Closest Approach to Moon\n' +
+                'T+08:00:00: Mid-Course Correction 3\n' +
+                'T+10:00:00: Entry Interface - Earth Reentry\n' +
+                'T+10:10:00: Parachute Deployment\n' +
+                'T+10:15:00: Splashdown - Recovery', 'nominal');
+        }
+
+        function showNotification(message, type = 'nominal') {
+            const container = document.getElementById('notificationContainer');
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            container.appendChild(notification);
+
+            setTimeout(() => {
+                notification.remove();
+            }, 4000);
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                window.location.href = '/logout';
+            }
+        }
+
+        // Load mission data
+        async function loadMissionData() {
+            try {
+                const [statusRes, crewRes, weatherRes, detailsRes] = await Promise.all([
+                    fetch('/api/artemis-mission/status'),
+                    fetch('/api/artemis-mission/crew'),
+                    fetch('/api/artemis-mission/weather'),
+                    fetch('/api/artemis-mission/details')
+                ]);
+
+                const statusData = await statusRes.json();
+                const crewData = await crewRes.json();
+                const weatherData = await weatherRes.json();
+                const detailsData = await detailsRes.json();
+
+                gameState.missionData = statusData;
+
+                // Update crew
+                const crewList = document.getElementById('crewList');
+                crewList.innerHTML = '';
+                crewData.crew.forEach(member => {
+                    const crewEl = document.createElement('div');
+                    crewEl.className = 'crew-member';
+                    crewEl.innerHTML = `
+                        <div class="crew-name">${member.name}</div>
+                        <div class="crew-role">${member.role}</div>
+                    `;
+                    crewList.appendChild(crewEl);
+                });
+
+                // Update mission objectives
+                const objectivesList = document.getElementById('objectivesList');
+                objectivesList.innerHTML = '';
+                detailsData.mission.missionObjectives.forEach(objective => {
+                    const objectiveEl = document.createElement('li');
+                    objectiveEl.className = 'objective-item';
+                    objectiveEl.textContent = objective;
+                    objectivesList.appendChild(objectiveEl);
+                });
+
+                // Update weather
+                const weather = weatherData.weather;
+                document.getElementById('tempValue').textContent = weather.temperature.toFixed(1) + '°C';
+                document.getElementById('windValue').textContent = weather.windSpeed.toFixed(1) + ' km/h';
+
+            } catch (error) {
+                console.error('Error loading mission data:', error);
+                showNotification('Error loading mission data', 'warning');
+            }
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            initScene();
+            loadMissionData();
+
+            // Update every 10 seconds
+            setInterval(loadMissionData, 10000);
+        });
+
+        /* ====================================================
+           REALISTIC SPACE BACKGROUND — Canvas Star Engine (2D Background)
+           ==================================================== */
+        (function () {
+            const canvas = document.getElementById('space-bg');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            // Resize canvas to fill viewport
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resize();
+            window.addEventListener('resize', () => { resize(); initStars(); });
+
+            // Star color palette
+            const STAR_COLORS = [
+                { r: 255, g: 255, b: 255 },
+                { r: 200, g: 220, b: 255 },
+                { r: 180, g: 200, b: 255 },
+                { r: 255, g: 245, b: 220 },
+                { r: 255, g: 220, b: 160 },
+                { r: 255, g: 180, b: 100 },
+                { r: 255, g: 150, b: 120 },
+            ];
+
+            const LAYERS = [
+                { count: 250, maxR: 0.6 },
+                { count: 180, maxR: 1.1 },
+                { count: 90, maxR: 1.8 },
+            ];
+
+            let stars = [];
+            let shooters = [];
+            let nebulae = [];
+
+            function randRange(min, max) { return Math.random() * (max - min) + min; }
+            function randInt(min, max) { return Math.floor(randRange(min, max)); }
+
+            function initStars() {
+                stars = [];
+                const W = canvas.width, H = canvas.height;
+
+                LAYERS.forEach((layer, li) => {
+                    for (let i = 0; i < layer.count; i++) {
+                        const col = STAR_COLORS[randInt(0, STAR_COLORS.length)];
+                        stars.push({
+                            x: randRange(0, W),
+                            y: randRange(0, H),
+                            r: randRange(0.15, layer.maxR),
+                            baseAlpha: randRange(0.4, 1.0),
+                            alpha: 0,
+                            twinkleSpeed: randRange(0.003, 0.025),
+                            twinkleOffset: randRange(0, Math.PI * 2),
+                            color: col,
+                            layer: li,
+                            glowMult: li === 2 ? randRange(2.5, 5) : (li === 1 ? randRange(1.5, 3) : 1),
+                        });
+                    }
+                });
+
+                nebulae = [
+                    { cx: 0.15 * W, cy: 0.50 * H, r: 0.25 * Math.max(W, H), col: '188,19,254', a: 0.045 },
+                    { cx: 0.85 * W, cy: 0.30 * H, r: 0.28 * Math.max(W, H), col: '0,180,255', a: 0.040 },
+                    { cx: 0.50 * W, cy: 0.85 * H, r: 0.20 * Math.max(W, H), col: '255,120,20', a: 0.030 },
+                    { cx: 0.70 * W, cy: 0.10 * H, r: 0.18 * Math.max(W, H), col: '80,220,180', a: 0.025 },
+                ];
+            }
+
+            function spawnShooter() {
+                const W = canvas.width, H = canvas.height;
+                const angle = randRange(-0.6, -0.2);
+                shooters.push({
+                    x: randRange(0, W),
+                    y: randRange(0, H * 0.5),
+                    len: randRange(60, 180),
+                    speed: randRange(6, 14),
+                    alpha: 1,
+                    dx: Math.cos(angle),
+                    dy: Math.sin(angle) * 0.5 + 0.5,
+                    life: 1,
+                });
+            }
+
+            let t = 0;
+            let lastShooter = 0;
+
+            function draw(ts) {
+                t = ts * 0.001;
+                const W = canvas.width, H = canvas.height;
+
+                ctx.fillStyle = '#000000';
+                ctx.fillRect(0, 0, W, H);
+
+                nebulae.forEach(n => {
+                    const grad = ctx.createRadialGradient(n.cx, n.cy, 0, n.cx, n.cy, n.r);
+                    grad.addColorStop(0, `rgba(${n.col}, ${n.a})`);
+                    grad.addColorStop(0.5, `rgba(${n.col}, ${n.a * 0.4})`);
+                    grad.addColorStop(1, `rgba(${n.col}, 0)`);
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+
+                stars.forEach(s => {
+                    const flicker = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed * 60 + s.twinkleOffset);
+                    s.alpha = s.baseAlpha * (0.55 + 0.45 * flicker);
+
+                    const { r: cr, g: cg, b: cb } = s.color;
+
+                    if (s.glowMult > 1) {
+                        const gVal = Math.max(0, s.alpha - 0.2);
+                        const glowR = s.r * s.glowMult;
+                        const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
+                        grd.addColorStop(0, `rgba(${cr},${cg},${cb},${gVal * 0.6})`);
+                        grd.addColorStop(0.4, `rgba(${cr},${cg},${cb},${gVal * 0.15})`);
+                        grd.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+                        ctx.fillStyle = grd;
+                        ctx.beginPath();
+                        ctx.arc(s.x, s.y, glowR, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    ctx.globalAlpha = s.alpha;
+                    ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    if (s.layer === 2 && s.r > 1.3 && s.alpha > 0.7) {
+                        ctx.globalAlpha = s.alpha * 0.3;
+                        ctx.strokeStyle = `rgb(${cr},${cg},${cb})`;
+                        ctx.lineWidth = 0.5;
+                        const sLen = s.r * 4;
+                        ctx.beginPath();
+                        ctx.moveTo(s.x - sLen, s.y); ctx.lineTo(s.x + sLen, s.y);
+                        ctx.moveTo(s.x, s.y - sLen); ctx.lineTo(s.x, s.y + sLen);
+                        ctx.stroke();
+                    }
+                });
+                ctx.globalAlpha = 1;
+
+                if (ts - lastShooter > randRange(1800, 5000)) {
+                    spawnShooter();
+                    lastShooter = ts;
+                }
+                shooters = shooters.filter(s => s.life > 0);
+                shooters.forEach(s => {
+                    s.life -= 0.015;
+                    s.x += s.dx * s.speed;
+                    s.y += s.dy * s.speed;
+                    const tail = ctx.createLinearGradient(
+                        s.x - s.dx * s.len, s.y - s.dy * s.len, s.x, s.y
+                    );
+                    tail.addColorStop(0, `rgba(255,255,255,0)`);
+                    tail.addColorStop(1, `rgba(255,255,255,${s.life * 0.9})`);
+                    ctx.strokeStyle = tail;
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(s.x - s.dx * s.len, s.y - s.dy * s.len);
+                    ctx.lineTo(s.x, s.y);
+                    ctx.stroke();
+                });
+
+                requestAnimationFrame(draw);
+            }
+
+            initStars();
+            requestAnimationFrame(draw);
+        })();
+        function logout() {
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => window.location.href = '/');
+        }
+    </script>
+</body>
+
+</html>

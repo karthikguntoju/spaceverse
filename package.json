@@ -1,0 +1,47 @@
+{
+  "name": "sample",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node app-enhanced.js",
+    "start-all": "node simple-start.js",
+    "dev": "nodemon app-enhanced.js",
+    "build:vrsystem": "node scripts/build-vrsystem.js",
+    "original": "node app.js",
+    "migrate-atlas": "node migrate-to-atlas.js",
+    "health-check": "node health-check.js"
+  },
+  "dependencies": {
+    "@babel/standalone": "^7.28.5",
+    "@google/genai": "^1.44.0",
+    "@google/generative-ai": "^0.24.1",
+    "@react-three/fiber": "^9.4.2",
+    "@react-three/xr": "^6.6.28",
+    "astronomy-engine": "^2.1.19",
+    "axios": "^1.6.0",
+    "bcryptjs": "^2.4.3",
+    "cookie-parser": "~1.4.4",
+    "cors": "^2.8.5",
+    "debug": "~2.6.9",
+    "dotenv": "^17.2.1",
+    "express": "^4.22.1",
+    "express-rate-limit": "^8.1.0",
+    "express-session": "^1.18.2",
+    "firebase": "^12.11.0",
+    "http-errors": "~1.6.3",
+    "jade": "^0.29.0",
+    "leo-profanity": "^1.8.0",
+    "mongoose": "^8.18.0",
+    "morgan": "^1.10.1",
+    "nodemon": "^3.1.10",
+    "puppeteer": "^24.34.0",
+    "react": "^19.2.3",
+    "react-dom": "^19.2.3",
+    "three": "^0.182.0",
+    "tough-cookie": "^6.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.2",
+    "npm-run-all": "^4.1.5"
+  }
+}

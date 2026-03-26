@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceVerse - VR Solar System (Standalone)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #0D1117;
+        }
+        
+        #vr-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #E6F1FF;
+            font-size: 18px;
+        }
+        
+        #error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6b6b;
+            font-size: 18px;
+            text-align: center;
+            display: none;
+        }
+        
+        #retry-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: #64FFDA;
+            color: #0D1117;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="vr-container"></div>
+    <div id="loading">Initializing VR Experience...</div>
+    <div id="error">
+        <p>Error loading VR experience. Please check the browser console for details.</p>
+        <button id="retry-btn" onclick="retryLoad()">Retry</button>
+    </div>
+    
+    <!-- React and ReactDOM -->
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js"></script>
+    
+    <script>
+        // Global error handling
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        });
+        
+        function retryLoad() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            loadVRComponents();
+        }
+        
+        function loadVRComponents() {
+            console.log('Loading VR components...');
+            
+            // Create a simple standalone component
+            window.VRSolarSystem = function() {
+                return React.createElement('div', {
+                    style: {
+                        width: '100vw',
+                        height: '100vh',
+                        position: 'relative',
+                        backgroundColor: '#0D1117',
+                        color: '#E6F1FF',
+                        fontFamily: 'Inter, sans-serif'
+                    }
+                }, 
+                    React.createElement('div', {
+                        style: {
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            textAlign: 'center'
+                        }
+                    },
+                        React.createElement('h1', null, 'VR Solar System'),
+                        React.createElement('p', null, 'Standalone version - no external dependencies'),
+                        React.createElement('div', { style: { marginTop: '20px' } },
+                            React.createElement('button', {
+                                onClick: () => alert('VR functionality would be implemented here'),
+                                style: {
+                                    padding: '12px 24px',
+                                    backgroundColor: 'rgba(100, 255, 218, 0.2)',
+                                    color: '#E6F1FF',
+                                    border: '2px solid #64FFDA',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '16px'
+                                }
+                            }, '👓 Enter VR Mode')
+                        )
+                    ),
+                    // Back to Home button
+                    React.createElement('a', {
+                        href: '/',
+                        style: {
+                            position: 'absolute',
+                            top: '20px',
+                            left: '20px',
+                            padding: '10px 20px',
+                            backgroundColor: 'rgba(100, 255, 218, 0.06)',
+                            color: '#E6F1FF',
+                            border: '2px solid #64FFDA',
+                            borderRadius: '25px',
+                            textDecoration: 'none',
+                            zIndex: 1000
+                        }
+                    }, '← Back to Home')
+                );
+            };
+            
+            console.log('VRSolarSystem component created successfully');
+            renderApp();
+        }
+        
+        function renderApp() {
+            try {
+                console.log('Attempting to render app...');
+                
+                // Check if required libraries are available
+                if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+                    throw new Error('React or ReactDOM not loaded');
+                }
+                
+                // Check if VRSolarSystem component is available
+                if (typeof window.VRSolarSystem === 'undefined') {
+                    throw new Error('VRSolarSystem component not loaded');
+                }
+                
+                console.log('All dependencies loaded, rendering app...');
+                
+                // Create app component
+                const App = () => React.createElement(window.VRSolarSystem);
+                
+                // Render the app
+                const container = document.getElementById('vr-container');
+                const root = ReactDOM.createRoot(container);
+                root.render(React.createElement(App));
+                
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                console.log('App rendered successfully');
+            } catch (error) {
+                console.error('Error rendering app:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                
+                // Show detailed error in the error div
+                const errorDiv = document.getElementById('error');
+                errorDiv.innerHTML = `
+                    <p>Error loading VR experience:</p>
+                    <p><strong>${error.message}</strong></p>
+                    <p>Please check the browser console for details.</p>
+                    <button id="retry-btn" onclick="retryLoad()">Retry</button>
+                `;
+            }
+        }
+        
+        // Start loading when page is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadVRComponents);
+        } else {
+            loadVRComponents();
+        }
+    </script>
+</body>
+</html>

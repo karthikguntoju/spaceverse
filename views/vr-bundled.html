@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceVerse - VR Solar System (Bundled)</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #0D1117;
+        }
+        
+        #vr-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #E6F1FF;
+            font-size: 18px;
+        }
+        
+        #error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6b6b;
+            font-size: 18px;
+            text-align: center;
+            display: none;
+        }
+        
+        #retry-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: #64FFDA;
+            color: #0D1117;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .fallback-ui {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            background: radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 100%);
+            color: #E6F1FF;
+            font-family: 'Inter', sans-serif;
+            overflow: hidden;
+        }
+        
+        .planet {
+            position: absolute;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .sun {
+            background: radial-gradient(circle, #ffd700 0%, #ff8c00 70%, #ff4500 100%);
+            box-shadow: 0 0 50px #ff4500, 0 0 100px #ff8c00;
+        }
+        
+        .mercury { background: linear-gradient(45deg, #a9a9a9, #696969); }
+        .venus { background: linear-gradient(45deg, #e39e1c, #b87333); }
+        .earth { background: linear-gradient(45deg, #1e90ff, #228b22); }
+        .mars { background: linear-gradient(45deg, #ff4500, #8b0000); }
+        .jupiter { background: linear-gradient(45deg, #d2b48c, #cd853f); }
+        .saturn { background: linear-gradient(45deg, #f0e68c, #daa520); }
+        .uranus { background: linear-gradient(45deg, #afeeee, #5f9ea0); }
+        .neptune { background: linear-gradient(45deg, #4169e1, #000080); }
+        .pluto { background: linear-gradient(45deg, #cdcdcd, #a9a9a9); }
+    </style>
+</head>
+<body>
+    <div id="vr-container"></div>
+    <div id="loading">Initializing VR Experience...</div>
+    <div id="error">
+        <p>Error loading VR experience. Please check the browser console for details.</p>
+        <button id="retry-btn" onclick="retryLoad()">Retry</button>
+    </div>
+    
+    <!-- React and ReactDOM -->
+    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
+    
+    <script>
+        // Global error handling
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        });
+        
+        function retryLoad() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            loadVRComponents();
+        }
+        
+        // Simple 3D solar system implementation without external libraries
+        function createSolarSystemScene() {
+            // Create container
+            const container = document.createElement('div');
+            container.className = 'fallback-ui';
+            
+            // Create sun
+            const sun = document.createElement('div');
+            sun.className = 'planet sun';
+            sun.style.width = '60px';
+            sun.style.height = '60px';
+            sun.style.left = '50%';
+            sun.style.top = '50%';
+            container.appendChild(sun);
+            
+            // Planet data
+            const planets = [
+                { name: 'Mercury', size: 5, distance: 90, speed: 0.004, color: 'mercury' },
+                { name: 'Venus', size: 8, distance: 120, speed: 0.002, color: 'venus' },
+                { name: 'Earth', size: 9, distance: 150, speed: 0.001, color: 'earth' },
+                { name: 'Mars', size: 7, distance: 180, speed: 0.0008, color: 'mars' },
+                { name: 'Jupiter', size: 20, distance: 230, speed: 0.0005, color: 'jupiter' },
+                { name: 'Saturn', size: 18, distance: 280, speed: 0.0003, color: 'saturn' },
+                { name: 'Uranus', size: 12, distance: 320, speed: 0.0002, color: 'uranus' },
+                { name: 'Neptune', size: 12, distance: 360, speed: 0.0001, color: 'neptune' },
+                { name: 'Pluto', size: 3, distance: 390, speed: 0.00005, color: 'pluto' }
+            ];
+            
+            // Create planets
+            planets.forEach((planet, index) => {
+                const planetEl = document.createElement('div');
+                planetEl.className = `planet ${planet.color}`;
+                planetEl.style.width = `${planet.size}px`;
+                planetEl.style.height = `${planet.size}px`;
+                planetEl.dataset.angle = 0;
+                planetEl.dataset.distance = planet.distance;
+                planetEl.dataset.speed = planet.speed;
+                planetEl.title = planet.name;
+                container.appendChild(planetEl);
+            });
+            
+            // Animation loop
+            let time = 0;
+            function animate() {
+                time += 0.01;
+                const planets = container.querySelectorAll('.planet:not(.sun)');
+                planets.forEach(planet => {
+                    const angle = parseFloat(planet.dataset.angle) + parseFloat(planet.dataset.speed);
+                    const distance = parseFloat(planet.dataset.distance);
+                    const x = 50 + (distance * Math.cos(angle) / 5);
+                    const y = 50 + (distance * Math.sin(angle) / 5);
+                    
+                    planet.style.left = `${x}%`;
+                    planet.style.top = `${y}%`;
+                    planet.dataset.angle = angle;
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            
+            animate();
+            
+            // Add back button
+            const backButton = document.createElement('a');
+            backButton.href = '/';
+            backButton.textContent = '← Back to Home';
+            backButton.style.position = 'absolute';
+            backButton.style.top = '20px';
+            backButton.style.left = '20px';
+            backButton.style.padding = '10px 20px';
+            backButton.style.backgroundColor = 'rgba(100, 255, 218, 0.06)';
+            backButton.style.color = '#E6F1FF';
+            backButton.style.border = '2px solid #64FFDA';
+            backButton.style.borderRadius = '25px';
+            backButton.style.textDecoration = 'none';
+            backButton.style.zIndex = '1000';
+            container.appendChild(backButton);
+            
+            // Add VR button
+            const vrButton = document.createElement('button');
+            vrButton.textContent = '👓 Enter VR Mode';
+            vrButton.style.position = 'absolute';
+            vrButton.style.bottom = '20px';
+            vrButton.style.left = '50%';
+            vrButton.style.transform = 'translateX(-50%)';
+            vrButton.style.padding = '12px 24px';
+            vrButton.style.backgroundColor = 'rgba(100, 255, 218, 0.2)';
+            vrButton.style.color = '#E6F1FF';
+            vrButton.style.border = '2px solid #64FFDA';
+            vrButton.style.borderRadius = '8px';
+            vrButton.style.cursor = 'pointer';
+            vrButton.style.fontSize = '16px';
+            vrButton.onclick = () => alert('VR mode would be activated here in a full implementation');
+            container.appendChild(vrButton);
+            
+            return container;
+        }
+        
+        function loadVRComponents() {
+            console.log('Loading bundled VR components...');
+            
+            // Check if required libraries are available
+            if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+                console.error('React or ReactDOM not loaded, using fallback');
+                useFallbackUI();
+                return;
+            }
+            
+            console.log('React and ReactDOM available, creating component');
+            
+            // Create a simple component that renders our fallback UI
+            function VRSolarSystem() {
+                // Since we can't use Three.js, we'll render a simple 2D representation
+                return React.createElement('div', {
+                    style: {
+                        width: '100vw',
+                        height: '100vh',
+                        position: 'relative',
+                        backgroundColor: '#0D1117',
+                        color: '#E6F1FF',
+                        fontFamily: 'Inter, sans-serif',
+                        overflow: 'hidden'
+                    }
+                },
+                    React.createElement('div', {
+                        style: {
+                            position: 'absolute',
+                            top: '50%',
+                            left: '50%',
+                            transform: 'translate(-50%, -50%)',
+                            textAlign: 'center'
+                        }
+                    },
+                        React.createElement('h1', null, 'VR Solar System'),
+                        React.createElement('p', null, 'WebXR libraries not available'),
+                        React.createElement('p', null, 'Showing simplified 2D representation'),
+                        React.createElement('div', { style: { marginTop: '20px' } },
+                            React.createElement('button', {
+                                onClick: () => alert('VR functionality requires WebXR libraries'),
+                                style: {
+                                    padding: '12px 24px',
+                                    backgroundColor: 'rgba(100, 255, 218, 0.2)',
+                                    color: '#E6F1FF',
+                                    border: '2px solid #64FFDA',
+                                    borderRadius: '8px',
+                                    cursor: 'pointer',
+                                    fontSize: '16px'
+                                }
+                            }, '👓 Enter VR Mode')
+                        )
+                    ),
+                    // Back to Home button
+                    React.createElement('a', {
+                        href: '/',
+                        style: {
+                            position: 'absolute',
+                            top: '20px',
+                            left: '20px',
+                            padding: '10px 20px',
+                            backgroundColor: 'rgba(100, 255, 218, 0.06)',
+                            color: '#E6F1FF',
+                            border: '2px solid #64FFDA',
+                            borderRadius: '25px',
+                            textDecoration: 'none',
+                            zIndex: 1000
+                        }
+                    }, '← Back to Home')
+                );
+            }
+            
+            // Render the app
+            try {
+                const container = document.getElementById('vr-container');
+                const root = ReactDOM.createRoot(container);
+                root.render(React.createElement(VRSolarSystem));
+                
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                console.log('App rendered successfully with React');
+            } catch (error) {
+                console.error('Error rendering with React, using fallback:', error);
+                useFallbackUI();
+            }
+        }
+        
+        function useFallbackUI() {
+            console.log('Using pure DOM fallback UI');
+            const container = document.getElementById('vr-container');
+            const scene = createSolarSystemScene();
+            container.innerHTML = '';
+            container.appendChild(scene);
+            
+            // Hide loading indicator
+            document.getElementById('loading').style.display = 'none';
+        }
+        
+        // Start loading when page is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadVRComponents);
+        } else {
+            loadVRComponents();
+        }
+    </script>
+</body>
+</html>

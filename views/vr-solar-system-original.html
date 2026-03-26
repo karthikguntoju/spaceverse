@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceVerse - VR Solar System Explorer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            font-family: 'Inter', sans-serif;
+            background-color: #0D1117;
+        }
+        
+        #vr-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #E6F1FF;
+            font-size: 18px;
+        }
+        
+        #error {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff6b6b;
+            font-size: 18px;
+            text-align: center;
+            display: none;
+        }
+        
+        #retry-btn {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background-color: #64FFDA;
+            color: #0D1117;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div id="vr-container"></div>
+    <div id="loading">Initializing VR Experience...</div>
+    <div id="error">
+        <p>Error loading VR experience. Please check the browser console for details.</p>
+        <button id="retry-btn" onclick="retryLoad()">Retry</button>
+    </div>
+    
+    <!-- Three.js -->
+    <script src="https://unpkg.com/three@0.182.0/build/three.min.js"></script>
+    
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    
+    <!-- React Three Fiber (local-first UMD then CDN fallback) -->
+    <script src="/lib/fiber/react-three-fiber.umd.js" onerror="console.warn('local @react-three/fiber UMD not found')"></script>
+    <script src="https://unpkg.com/@react-three/fiber@9.4.2/dist/react-three-fiber.umd.js"></script>
+    
+    <!-- React Three XR (local-first UMD then CDN fallback) -->
+    <script src="/lib/xr/react-three-xr.umd.js" onerror="console.warn('local @react-three/xr UMD not found')"></script>
+    <script src="https://unpkg.com/@react-three/xr@6.6.28/dist/react-three-xr.umd.js"></script> 
+    
+    <!-- Babel for JSX transformation -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <script>
+        // Global error handling
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+            console.error('Error filename:', e.filename);
+            console.error('Error lineno:', e.lineno);
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('error').style.display = 'block';
+        });
+        
+        // Log when scripts are loaded
+        window.addEventListener('load', function() {
+            console.log('All resources loaded');
+            console.log('THREE available:', typeof THREE !== 'undefined');
+            console.log('React available:', typeof React !== 'undefined');
+            console.log('ReactDOM available:', typeof ReactDOM !== 'undefined');
+            console.log('ReactThreeFiber available:', typeof ReactThreeFiber !== 'undefined');
+            console.log('ReactThreeXR available:', typeof ReactThreeXR !== 'undefined');
+            
+            // Check window properties for debugging
+            const fiberKeys = Object.keys(window).filter(key => key.toLowerCase().includes('fiber'));
+            const xrKeys = Object.keys(window).filter(key => key.toLowerCase().includes('xr'));
+            console.log('Possible fiber keys:', fiberKeys);
+            console.log('Possible xr keys:', xrKeys);
+        });        
+        function retryLoad() {
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('error').style.display = 'none';
+            loadVRComponents();
+        }
+        
+        async function ensureLibraries() {
+            // Ensure Three.js is loaded
+            if (typeof THREE === 'undefined') {
+                console.log('THREE not found, injecting script from jsDelivr');
+                await new Promise((resolve, reject) => {
+                    const s = document.createElement('script');
+                    s.src = 'https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.min.js';
+                    s.onload = resolve;
+                    s.onerror = () => reject(new Error('Failed to load THREE'));
+                    document.head.appendChild(s);
+                }).catch(async (err) => {
+                    console.warn('Three.js dynamic load failed:', err);
+                    // Try local ESM copy served by the server
+                    try {
+                        const m = await import('/lib/three/three.module.min.js');
+                        window.THREE = m;
+                        console.log('Three.js loaded from local /lib/three/three.module.min.js');
+                    } catch (localErr) {
+                        console.warn('Local Three.js import failed:', localErr);
+                    }
+                });
+            }
+
+            // Ensure React and ReactDOM are available (already loaded via UMD above, but double-check)
+            if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+                console.log('React or ReactDOM missing');
+                // We expect these to be loaded by the page; if not, we abort and let the error handler show details
+            }
+
+            // Ensure React Three Fiber is available (try UMD global, else import local ESM then CDN ESM)
+            if (typeof ReactThreeFiber === 'undefined' && typeof Fiber === 'undefined') {
+                console.log('ReactThreeFiber global not present, attempting dynamic import of ESM bundle (local-first)');
+                try {
+                    let m;
+                    try {
+                        m = await import('/lib/fiber/react-three-fiber.esm.js');
+                        console.log('React Three Fiber loaded from local /lib/fiber/react-three-fiber.esm.js');
+                    } catch (localErr) {
+                        m = await import('https://cdn.jsdelivr.net/npm/@react-three/fiber@9.4.2/dist/react-three-fiber.esm.js');
+                        console.log('React Three Fiber loaded via CDN ESM');
+                    }
+                    window.ReactThreeFiber = m;
+                    window.Fiber = m;
+                } catch (e) {
+                    console.warn('Failed to load React Three Fiber via ESM (local+cdn):', e);
+                }
+            }
+
+            // Ensure React Three XR is available (try UMD global, else import local ESM then CDN ESM)
+            if (typeof ReactThreeXR === 'undefined' && typeof XR === 'undefined') {
+                console.log('ReactThreeXR global not present, attempting dynamic import of ESM bundle (local-first)');
+                try {
+                    let xrModule;
+                    try {
+                        xrModule = await import('/lib/xr/index.js');
+                        console.log('React Three XR loaded from local /lib/xr/index.js');
+                    } catch (localErr) {
+                        xrModule = await import('https://cdn.jsdelivr.net/npm/@react-three/xr@6.6.28/dist/index.js');
+                        console.log('React Three XR loaded via CDN ESM');
+                    }
+                    window.ReactThreeXR = xrModule.default || xrModule;
+                    window.XR = window.ReactThreeXR;
+                } catch (e) {
+                    console.warn('Failed to load React Three XR via ESM (local+cdn):', e);
+                }
+            }
+
+            return true;
+        }
+
+        async function loadVRComponents() {
+            console.log('Loading VR components...');
+            try {
+                await ensureLibraries();
+            } catch (e) {
+                console.warn('Library assurance failed (continuing):', e);
+            }
+
+            // Prefer a precompiled bundle for VRSolarSystem (self-contained: includes React and ReactDOM)
+            try {
+                const bundleScript = document.createElement('script');
+                bundleScript.src = '/public/js/vrsystem.bundle.js';
+                bundleScript.onload = () => {
+                    console.log('VRSolarSystem bundle loaded');
+                    // Allow a short delay for registration
+                    setTimeout(renderApp, 100);
+                };
+                bundleScript.onerror = async (err) => {
+                    console.warn('VRSolarSystem bundle not available, falling back to in-page JSX compilation:', err);
+                    // Fallback: fetch and compile the JSX as before
+                    try {
+                        const resp = await fetch('/src/VRSolarSystem.browser.jsx');
+                        const src = await resp.text();
+
+                        if (typeof Babel === 'undefined' || typeof Babel.transform === 'undefined') {
+                            console.warn('Babel not available to transform JSX; attempting to inject as-is');
+                            const s = document.createElement('script');
+                            s.src = '/src/VRSolarSystem.browser.jsx';
+                            s.onload = () => { console.log('VRSolarSystem loaded (no transform)'); setTimeout(renderApp, 100); };
+                            s.onerror = (err2) => { console.error('Failed to load VRSolarSystem.jsx:', err2); document.getElementById('loading').style.display='none'; document.getElementById('error').style.display='block'; };
+                            document.head.appendChild(s);
+                        } else {
+                            // Transform JSX to executable JS
+                            const transformed = Babel.transform(src, { presets: ['react'] }).code;
+                            const s2 = document.createElement('script');
+                            s2.type = 'text/javascript';
+                            s2.text = transformed;
+                            document.head.appendChild(s2);
+                            console.log('VRSolarSystem.jsx compiled and injected');
+                            // Allow a short delay for module registration
+                            await new Promise(r => setTimeout(r, 100));
+                            setTimeout(renderApp, 100);
+                        }
+                    } catch (e2) {
+                        console.error('Failed to fetch/compile VRSolarSystem (fallback):', e2);
+                        document.getElementById('loading').style.display = 'none';
+                        document.getElementById('error').style.display = 'block';
+                    }
+                };
+                document.head.appendChild(bundleScript);
+            } catch (e) {
+                console.error('Failed to load VRSolarSystem bundle or JSX:', e);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+            }
+        }
+        
+        async function renderApp() {
+            try {
+                console.log('Attempting to render app...');
+                
+                // Check if required libraries are available
+                if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
+                    throw new Error('React or ReactDOM not loaded');
+                }
+                
+                // Check if Three.js is available
+                if (typeof THREE === 'undefined') {
+                    throw new Error('Three.js not loaded');
+                }
+
+                // If React Three Fiber or React Three XR aren't available, fall back to a pure Three.js renderer
+                if ((typeof ReactThreeFiber === 'undefined' && typeof Fiber === 'undefined') || (typeof ReactThreeXR === 'undefined' && typeof XR === 'undefined') || typeof VRSolarSystem === 'undefined') {
+                    console.warn('Full React VR stack not available — falling back to simplified Three.js VR experience');
+                    // Prefer local UMD copy of Three (served at /lib/three/three.min.js).
+                    // Attempt to dynamically inject the UMD build if THREE is not defined.
+                    if (typeof THREE === 'undefined') {
+                        // Try local UMD core build first, then module import
+                        const tryUME = () => new Promise((res, rej) => {
+                            const s = document.createElement('script');
+                            s.src = '/lib/three/three.core.min.js';
+                            s.onload = () => { console.log('Loaded three.core.min.js'); res(); };
+                            s.onerror = () => rej(new Error('three.core.min.js not available'));
+                            document.head.appendChild(s);
+                        });
+
+                        try {
+                            await tryUME();
+                            const f = document.createElement('script');
+                            f.src = '/public/js/three-vr-fallback.js';
+                            f.onload = () => { window.initThreeVRFallback('vr-container'); };
+                            document.head.appendChild(f);
+                        } catch (e) {
+                            try {
+                                const m = await import('/lib/three/three.module.min.js');
+                                window.THREE = m;
+                                const f2 = document.createElement('script');
+                                f2.src = '/public/js/three-vr-fallback.js';
+                                f2.onload = () => { window.initThreeVRFallback('vr-container'); };
+                                document.head.appendChild(f2);
+                            } catch (modErr) {
+                                console.warn('Failed to load any local three builds:', modErr);
+                                renderPureThreeFallback();
+                            }
+                        }
+                    } else {
+                        // THREE already present (maybe loaded via ESM); load fallback helper
+                        const f = document.createElement('script');
+                        f.src = '/public/js/three-vr-fallback.js';
+                        f.onload = () => { window.initThreeVRFallback('vr-container'); };
+                        document.head.appendChild(f);
+                    }
+                    document.getElementById('loading').style.display = 'none';
+                    return;
+                }
+
+                console.log('All dependencies loaded, rendering app...');
+
+                // Create app component
+                const App = () => React.createElement(VRSolarSystem);
+
+                // Render the app
+                const container = document.getElementById('vr-container');
+                const root = ReactDOM.createRoot(container);
+                root.render(React.createElement(App));
+
+                // Hide loading indicator
+                document.getElementById('loading').style.display = 'none';
+                console.log('App rendered successfully');
+            } catch (error) {
+                console.error('Error rendering app:', error);
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('error').style.display = 'block';
+                
+                // Show detailed error in the error div
+                const errorDiv = document.getElementById('error');
+                errorDiv.innerHTML = `
+                    <p>Error loading VR experience:</p>
+                    <p><strong>${error.message}</strong></p>
+                    <p>Please check the browser console for details.</p>
+                    <button id="retry-btn" onclick="retryLoad()">Retry</button>
+                `;
+            }
+        }
+        
+        // Start loading when page is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', loadVRComponents);
+        } else {
+            loadVRComponents();
+        }
+
+        // Simplified Three.js fallback renderer for environments where React VR libs are unavailable
+        function renderPureThreeFallback() {
+            try {
+                const container = document.getElementById('vr-container');
+                // Clear any previous contents
+                container.innerHTML = '';
+
+                const scene = new THREE.Scene();
+                const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+                camera.position.set(0, 50, 150);
+
+                const renderer = new THREE.WebGLRenderer({ antialias: true });
+                renderer.setSize(window.innerWidth, window.innerHeight);
+                renderer.setPixelRatio(window.devicePixelRatio);
+                container.appendChild(renderer.domElement);
+
+                // Basic lighting
+                scene.add(new THREE.AmbientLight(0x333333));
+                const sunLight = new THREE.PointLight(0xffffff, 2, 300);
+                scene.add(sunLight);
+
+                // Simple sun and earth
+                const sunGeo = new THREE.SphereGeometry(30, 32, 32);
+                const sunMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+                const sun = new THREE.Mesh(sunGeo, sunMat);
+                scene.add(sun);
+
+                const earthGeo = new THREE.SphereGeometry(5, 32, 32);
+                const earthMat = new THREE.MeshPhongMaterial({ color: 0x1e90ff });
+                const earth = new THREE.Mesh(earthGeo, earthMat);
+                earth.position.set(95, 0, 0);
+                scene.add(earth);
+
+                // Stars
+                const starGeo = new THREE.BufferGeometry();
+                const starVertices = [];
+                for (let i = 0; i < 2000; i++) {
+                    starVertices.push((Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000, (Math.random() - 0.5) * 2000);
+                }
+                starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+                const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.5 }));
+                scene.add(stars);
+
+                // Animation
+                const loop = () => {
+                    earth.rotation.y += 0.01;
+                    earth.position.x = Math.cos(Date.now() * 0.0005) * 95;
+                    earth.position.z = Math.sin(Date.now() * 0.0005) * 95;
+                    camera.position.x = Math.sin(Date.now() * 0.0001) * 150;
+                    camera.position.z = Math.cos(Date.now() * 0.0001) * 150;
+                    camera.lookAt(scene.position);
+                    renderer.render(scene, camera);
+                    requestAnimationFrame(loop);
+                };
+
+                loop();
+            } catch (e) {
+                console.error('Fallback renderer failed:', e);
+                const errDiv = document.getElementById('error');
+                if (errDiv) {
+                    errDiv.style.display = 'block';
+                    errDiv.innerHTML = `<p>Fallback renderer failed: ${e.message}</p>`;
+                }
+            }
+        }
+    </script>
+    <script src="/public/js/chat-widget.js" defer></script>
+</body>
+</html>

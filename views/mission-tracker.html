@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission Tracker - Space Missions Worldwide</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --space-dark: #050510;
+            --space-light: #1a1a3a;
+            --neon-blue: #00f3ff;
+            --neon-purple: #bc13fe;
+            --neon-amber: #ffb703;
+            --glass-bg: rgba(20, 20, 40, 0.4);
+            --glass-border: rgba(0, 243, 255, 0.3);
+            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+            --text-main: #e2e8f0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #000000;
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+        }
+
+        /* Canvas Space Background */
+        #space-bg {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -2;
+            display: block;
+        }
+
+                .navbar {
+            position: fixed;
+            top: 1.5rem;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 98%;
+            max-width: 1800px;
+            
+            /* Sci-Fi Geometry (Chamfered Tech Box) */
+            clip-path: polygon(25px 0, calc(100% - 25px) 0, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 25px 100%, 0 calc(100% - 25px), 0 25px);
+            
+            /* Frosty Glassmorphism */
+            background: rgba(5, 10, 20, 0.7);
+            backdrop-filter: blur(24px) saturate(200%);
+            -webkit-backdrop-filter: blur(24px) saturate(200%);
+            
+            padding: 0.8rem 2.5rem;
+            z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            
+            /* Inner telemetry glow and structural pseudo-bordering through shadows */
+            box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.15), inset 0 0 60px rgba(0, 0, 0, 0.9);
+            transition: all 0.4s ease;
+            border: none;
+        }
+
+        /* Nav Brackets matching the clip-path angles perfectly */
+        .nav-bracket {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 35px;
+            background: transparent;
+            pointer-events: none;
+            z-index: 10;
+        }
+        .nav-bracket.left {
+            left: 0;
+            border-left: 2px solid var(--neon-blue);
+            clip-path: polygon(0 25px, 25px 0, 100% 0, 100% 100%, 25px 100%, 0 calc(100% - 25px));
+            box-shadow: inset 10px 0 20px -5px rgba(0, 243, 255, 0.4);
+        }
+        .nav-bracket.right {
+            right: 0;
+            border-right: 2px solid var(--neon-blue);
+            clip-path: polygon(0 0, calc(100% - 25px) 0, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 0 100%);
+            box-shadow: inset -10px 0 20px -5px rgba(0, 243, 255, 0.4);
+        }
+
+        .navbar:hover {
+            box-shadow: inset 0 0 30px rgba(0, 243, 255, 0.25), inset 0 0 80px rgba(0, 0, 0, 0.95);
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 800;
+            color: var(--neon-blue);
+            text-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        .logo-icon {
+            width: 45px;
+            height: 45px;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .logo-planet {
+            width: 30px;
+            height: 30px;
+            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #005b99);
+            border-radius: 50%;
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.8), inset -5px -5px 10px rgba(0, 0, 0, 0.4);
+            animation: planetRotate 10s linear infinite;
+        }
+
+        .logo-ring {
+            position: absolute;
+            width: 48px;
+            height: 14px;
+            border: 2px solid var(--neon-purple);
+            border-radius: 50%;
+            transform: rotateX(70deg);
+            box-shadow: 0 0 15px rgba(188, 19, 254, 0.8);
+            animation: ringPulse 3s infinite alternate;
+        }
+
+        @keyframes planetRotate {
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        @keyframes ringPulse {
+            100% {
+                box-shadow: 0 0 25px rgba(188, 19, 254, 1);
+                border-width: 3px;
+            }
+        }
+
+        .nav-content {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            flex-grow: 1;
+            margin-left: 2rem;
+            position: static;
+        }
+
+        .nav-links {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 2.5rem;
+            list-style: none;
+            margin: 0;
+        }
+
+        .nav-links li, .nav-links a {
+            display: inline-block;
+        }
+
+        .nav-links a {
+            color: var(--text-main);
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 1rem;
+            letter-spacing: 0.5px;
+            position: relative;
+            padding: 0.5rem 0;
+            transition: color 0.3s;
+        }
+
+        .nav-links a::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: var(--neon-blue);
+            box-shadow: 0 0 10px var(--neon-blue);
+            transform: scaleX(0);
+            transform-origin: right;
+            transition: transform 0.4s cubic-bezier(0.86, 0, 0.07, 1);
+        }
+
+        .nav-links a:hover {
+            color: #fff;
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
+        }
+
+        .nav-links a:hover::after {
+            transform: scaleX(1);
+            transform-origin: left;
+        }
+
+        /* Scanning laser above the link */
+        .nav-links a::before {
+            content: '';
+            position: absolute;
+            top: -4px;
+            left: 0;
+            width: 15px;
+            height: 2px;
+            background: #fff;
+            box-shadow: 0 0 10px #fff, 0 0 20px var(--neon-blue);
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .nav-links a:hover::before {
+            opacity: 1;
+            animation: scanLaser 1s infinite linear;
+        }
+
+        @keyframes scanLaser {
+            0% { left: 0%; opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { left: 100%; opacity: 0; }
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 140px auto 50px;
+            padding: 0 2rem;
+            position: relative;
+            z-index: 10;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 3.5rem;
+        }
+
+        .header h1 {
+            font-family: 'Orbitron', Arial, sans-serif;
+            font-size: 3.5rem;
+            font-weight: 900;
+            background: linear-gradient(180deg, #ffffff 0%, var(--neon-amber) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            filter: drop-shadow(0 0 15px rgba(255, 183, 3, 0.4));
+            margin-bottom: 1rem;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: #a0aec0;
+        }
+
+        .filters {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-bottom: 3rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 0.7rem 1.8rem;
+            background: rgba(0, 243, 255, 0.03);
+            border: 1px solid var(--glass-border);
+            border-radius: 30px;
+            color: var(--neon-blue);
+            cursor: pointer;
+            font-family: 'Inter', sans-serif;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .filter-btn:hover {
+            border-color: rgba(0, 243, 255, 0.6);
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+            color: #fff;
+        }
+
+        .filter-btn.active {
+            background: rgba(0, 243, 255, 0.15);
+            border-color: var(--neon-blue);
+            box-shadow: 0 0 20px rgba(0, 243, 255, 0.6);
+            color: #fff;
+        }
+
+        .missions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 2.5rem;
+            margin-bottom: 3rem;
+        }
+
+        .mission-card {
+            background: rgba(255, 255, 255, 0.05); /* Glassmorphism */
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 30px;
+            padding: 2.5rem;
+            transition: all 0.4s cubic-bezier(0.23, 1, 0.320, 1);
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5), inset 0 2px 10px rgba(255, 255, 255, 0.05);
+        }
+
+        .mission-card::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: radial-gradient(circle at center, rgba(255,255,255,0.08) 0%, transparent 50%);
+            opacity: 0;
+            transition: opacity 0.4s ease;
+            pointer-events: none;
+            z-index: 1;
+        }
+
+        .mission-card:hover {
+            transform: translateY(-8px);
+            border-color: rgba(0, 243, 255, 0.4);
+            border-top-color: rgba(255, 255, 255, 0.6);
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6), inset 0 2px 20px rgba(255, 255, 255, 0.1);
+        }
+
+        .mission-card:hover::before {
+            opacity: 1;
+        }
+
+        .mission-card:hover::before {
+            left: 100%;
+        }
+
+        .mission-status {
+            display: inline-block;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: 1px solid transparent;
+        }
+
+        .status-upcoming {
+            background: rgba(0, 243, 255, 0.15);
+            color: var(--neon-blue);
+            border-color: rgba(0, 243, 255, 0.4);
+            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
+        }
+
+        .status-completed {
+            background: rgba(188, 19, 254, 0.15);
+            color: var(--neon-purple);
+            border-color: rgba(188, 19, 254, 0.4);
+            box-shadow: 0 0 10px rgba(188, 19, 254, 0.2);
+        }
+
+        .status-active {
+            background: rgba(255, 183, 3, 0.15);
+            color: var(--neon-amber);
+            border-color: rgba(255, 183, 3, 0.4);
+            box-shadow: 0 0 10px rgba(255, 183, 3, 0.2);
+        }
+
+        .mission-card h3 {
+            color: #fff;
+            margin-bottom: 0.5rem;
+            font-size: 1.5rem;
+            font-family: 'Orbitron', sans-serif;
+            letter-spacing: 1px;
+        }
+
+        .mission-agency {
+            color: var(--neon-blue);
+            font-weight: 600;
+            margin-bottom: 1.2rem;
+            font-size: 1.1rem;
+        }
+
+        .mission-details {
+            margin-bottom: 1.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 16px;
+            padding: 1.2rem;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .mission-detail-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        
+        .mission-detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .mission-detail-label {
+            color: #a0aec0;
+            font-size: 0.9rem;
+        }
+
+        .mission-detail-value {
+            color: var(--text-main);
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .mission-description {
+            color: #cbd5e1;
+            font-size: 0.95rem;
+            line-height: 1.6;
+            margin-top: 1rem;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(5, 5, 16, 0.85);
+            backdrop-filter: blur(10px);
+            overflow-y: auto;
+        }
+
+        .modal-content {
+            background: rgba(15, 15, 25, 0.6);
+            backdrop-filter: blur(30px) saturate(180%);
+            -webkit-backdrop-filter: blur(30px) saturate(180%);
+            margin: 5% auto;
+            padding: 3rem;
+            border-radius: 30px;
+            width: 90%;
+            max-width: 800px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-top: 1px solid rgba(255, 255, 255, 0.4);
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7), inset 0 2px 15px rgba(255, 255, 255, 0.05);
+            position: relative;
+            animation: modalPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes modalPop {
+            0% { transform: scale(0.9); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        .close {
+            position: absolute;
+            top: 25px;
+            right: 30px;
+            color: #a0aec0;
+            font-size: 32px;
+            font-weight: 300;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: var(--neon-blue);
+            transform: rotate(90deg);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 3rem;
+            font-size: 1.2rem;
+            color: var(--neon-blue);
+            text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .cost-highlight {
+            color: #10b981;
+            font-weight: bold;
+        }
+
+        @media (max-width: 768px) {
+            .missions-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .header h1 {
+                font-size: 2.2rem;
+            }
+            
+            .navbar {
+                padding: 1rem;
+            }
+            .nav-links {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <canvas id="space-bg"></canvas>
+    
+
+        <nav class="navbar">
+        <div class="nav-bracket left"></div>
+        <div class="logo">
+            <div class="logo-icon">
+                <div class="logo-planet"></div>
+                <div class="logo-ring"></div>
+            </div>
+            <span>Spaceverse</span>
+        </div>
+        <div class="nav-content" id="navContent">
+            <ul class="nav-links" id="navLinks">
+                
+                <li><a href="/solar-system">Solar System</a></li>
+                <li><a href="/space-traffic-simulator">Traffic</a></li>
+                <li><a href="/mission-tracker">Missions</a></li>
+                <li><a href="/space-launches">Videos</a></li>
+            </ul>
+            <a href="/" class="nav-back-btn" style="background: rgba(0,243,255,0.15); padding: 0.5rem 1rem; border-radius: 8px; border: 1px solid #00f3ff; color: #00f3ff; text-transform: uppercase; font-weight: bold; letter-spacing: 1px; box-shadow: 0 0 10px rgba(0,243,255,0.3); text-decoration: none; display: inline-block; margin-right: 15px; transition: all 0.3s ease;" onmouseover="this.style.background='#00f3ff'; this.style.color='#000'; this.style.boxShadow='0 0 20px #00f3ff';" onmouseout="this.style.background='rgba(0,243,255,0.15)'; this.style.color='#00f3ff'; this.style.boxShadow='0 0 10px rgba(0,243,255,0.3)';">⬅ Back to Home</a>
+            <div class="user-info" id="userInfo">
+                <button class="logout-btn" onclick="logout()" style="background: rgba(255, 77, 77, 0.1); color: #ff4d4d; border: 1px solid #ff4d4d; padding: 0.5rem 1.2rem; border-radius: 20px; cursor: pointer; font-weight: 600; font-family: 'Inter', sans-serif; transition: all 0.3s; box-shadow: 0 0 5px rgba(255,0,0,0.2);">Logout</button>
+            </div>
+        </div>
+        <div class="nav-bracket right"></div>
+    </nav>
+
+    <div class="container">
+        <div class="header">
+            <h1>🛰️ Global Space Mission Tracker</h1>
+            <p>Track upcoming and completed space missions from agencies worldwide</p>
+        </div>
+
+        <div class="filters">
+            <button class="filter-btn active" onclick="filterMissions('all')">All Missions</button>
+            <button class="filter-btn" onclick="filterMissions('upcoming')">Upcoming</button>
+            <button class="filter-btn" onclick="filterMissions('completed')">Completed</button>
+            <button class="filter-btn" onclick="filterMissions('active')">Active</button>
+        </div>
+
+        <div id="missionsContainer" class="missions-grid">
+            <div class="loading">Loading mission data...</div>
+        </div>
+    </div>
+
+    <div id="missionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let allMissions = [];
+        let currentFilter = 'all';
+
+        // Sample mission data (in production, this would come from an API)
+        const missionsData = [
+            {
+                id: 1,
+                name: "Artemis 3",
+                agency: "NASA",
+                status: "upcoming",
+                launchDate: "2026-09-15",
+                endDate: "2026-10-15",
+                cost: "$93 billion (program total)",
+                description: "First crewed lunar landing mission since Apollo 17. Will land astronauts near the lunar south pole to search for water ice.",
+                objectives: [
+                    "First woman and person of color on the Moon",
+                    "Explore lunar south pole region",
+                    "Test new spacesuits and equipment",
+                    "Collect samples and conduct science experiments"
+                ],
+                vehicle: "Space Launch System (SLS) Block 1B",
+                crew: "4 astronauts (to be announced)"
+            },
+            {
+                id: 2,
+                name: "Chandrayaan-4",
+                agency: "ISRO",
+                status: "upcoming",
+                launchDate: "2027-01-20",
+                endDate: "2027-12-20",
+                cost: "$75 million",
+                description: "India's sample return mission to the Moon. Will collect lunar samples and return them to Earth for analysis.",
+                objectives: [
+                    "Collect and return lunar samples",
+                    "Demonstrate sample return capability",
+                    "Study lunar regolith composition",
+                    "Test advanced landing technologies"
+                ],
+                vehicle: "GSLV Mk III",
+                crew: "Uncrewed"
+            },
+            {
+                id: 3,
+                name: "Mars Sample Return",
+                agency: "NASA/ESA",
+                status: "upcoming",
+                launchDate: "2028-07-10",
+                endDate: "2033-09-10",
+                cost: "$7 billion",
+                description: "Multi-mission campaign to retrieve samples collected by Perseverance rover and return them to Earth.",
+                objectives: [
+                    "Retrieve samples from Mars",
+                    "Launch samples into Mars orbit",
+                    "Capture and return samples to Earth",
+                    "Study Mars geology and potential for life"
+                ],
+                vehicle: "Multiple launch vehicles",
+                crew: "Uncrewed"
+            },
+            {
+                id: 4,
+                name: "Gaganyaan-1",
+                agency: "ISRO",
+                status: "upcoming",
+                launchDate: "2025-12-15",
+                endDate: "2025-12-18",
+                cost: "$1.4 billion",
+                description: "India's first crewed spaceflight mission. Will send Indian astronauts to low Earth orbit.",
+                objectives: [
+                    "Demonstrate crewed orbital capability",
+                    "Test life support systems",
+                    "Conduct microgravity experiments",
+                    "Advance India's human spaceflight program"
+                ],
+                vehicle: "GSLV Mk III (Human Rated)",
+                crew: "3 astronauts"
+            },
+            {
+                id: 5,
+                name: "Europa Clipper",
+                agency: "NASA",
+                status: "active",
+                launchDate: "2024-10-14",
+                endDate: "2030-04-11",
+                cost: "$5 billion",
+                description: "Mission to Jupiter's moon Europa to investigate its potential habitability. Currently in transit to Jupiter.",
+                objectives: [
+                    "Study Europa's ice shell thickness",
+                    "Investigate subsurface ocean",
+                    "Analyze surface composition",
+                    "Assess habitability potential"
+                ],
+                vehicle: "SpaceX Falcon Heavy",
+                crew: "Uncrewed"
+            },
+            {
+                id: 6,
+                name: "Artemis 2",
+                agency: "NASA",
+                status: "upcoming",
+                launchDate: "2025-09-01",
+                endDate: "2025-09-11",
+                cost: "$93 billion (program total)",
+                description: "First crewed flight test of SLS and Orion spacecraft. Will perform a lunar flyby with four astronauts aboard.",
+                objectives: [
+                    "Test SLS and Orion with crew",
+                    "Lunar flyby mission",
+                    "Validate life support systems",
+                    "Prepare for Artemis 3 landing"
+                ],
+                vehicle: "Space Launch System Block 1",
+                crew: "Reid Wiseman, Victor Glover, Christina Koch, Jeremy Hansen"
+            },
+            {
+                id: 7,
+                name: "Chandrayaan-3",
+                agency: "ISRO",
+                status: "completed",
+                launchDate: "2023-07-14",
+                endDate: "2023-09-04",
+                cost: "$75 million",
+                description: "Successful lunar landing mission. India became the 4th country to soft-land on the Moon and first to land near the south pole.",
+                objectives: [
+                    "Demonstrate soft landing capability ✓",
+                    "Deploy Pragyan rover ✓",
+                    "Conduct surface experiments ✓",
+                    "Study lunar south pole region ✓"
+                ],
+                vehicle: "GSLV Mk III",
+                crew: "Uncrewed"
+            },
+            {
+                id: 8,
+                name: "James Webb Space Telescope",
+                agency: "NASA/ESA/CSA",
+                status: "completed",
+                launchDate: "2021-12-25",
+                endDate: "Ongoing operations",
+                cost: "$10 billion",
+                description: "Revolutionary space observatory studying the universe in infrared. Successfully deployed and producing groundbreaking science.",
+                objectives: [
+                    "Study first galaxies ✓",
+                    "Analyze exoplanet atmospheres ✓",
+                    "Observe stellar formation ✓",
+                    "Investigate dark matter and energy ✓"
+                ],
+                vehicle: "Ariane 5",
+                crew: "Uncrewed"
+            },
+            {
+                id: 9,
+                name: "SpaceX Demo-2",
+                agency: "SpaceX/NASA",
+                status: "completed",
+                launchDate: "2020-05-30",
+                endDate: "2020-08-02",
+                cost: "$3.1 billion (Commercial Crew Program)",
+                description: "First crewed commercial spacecraft to ISS. Restored US crewed launch capability after Space Shuttle retirement.",
+                objectives: [
+                    "Test Crew Dragon spacecraft ✓",
+                    "Dock with ISS ✓",
+                    "Validate crew systems ✓",
+                    "Safe return to Earth ✓"
+                ],
+                vehicle: "Falcon 9",
+                crew: "Douglas Hurley, Robert Behnken"
+            },
+            {
+                id: 10,
+                name: "Tianwen-1",
+                agency: "CNSA (China)",
+                status: "completed",
+                launchDate: "2020-07-23",
+                endDate: "2021-05-15 (landing)",
+                cost: "$Unknown",
+                description: "China's first independent Mars mission. Successfully landed Zhurong rover on Mars surface.",
+                objectives: [
+                    "Orbit Mars ✓",
+                    "Land rover on surface ✓",
+                    "Study Martian geology ✓",
+                    "Search for water ice ✓"
+                ],
+                vehicle: "Long March 5",
+                crew: "Uncrewed"
+            },
+            {
+                id: 11,
+                name: "Lunar Gateway",
+                agency: "NASA/ESA/JAXA/CSA",
+                status: "upcoming",
+                launchDate: "2025-11-01",
+                endDate: "Permanent facility",
+                cost: "$30+ billion",
+                description: "Lunar orbital station to support Artemis missions and serve as staging point for deep space exploration.",
+                objectives: [
+                    "Establish lunar orbit station",
+                    "Support Artemis landings",
+                    "Enable long-duration missions",
+                    "Test deep space technologies"
+                ],
+                vehicle: "SpaceX Falcon Heavy",
+                crew: "Intermittently crewed"
+            },
+            {
+                id: 12,
+                name: "Dragonfly",
+                agency: "NASA",
+                status: "upcoming",
+                launchDate: "2028-07-01",
+                endDate: "2034-01-01",
+                cost: "$3.4 billion",
+                description: "Rotorcraft lander mission to Saturn's moon Titan. Will fly between landing sites to study prebiotic chemistry.",
+                objectives: [
+                    "Explore Titan's surface",
+                    "Study organic chemistry",
+                    "Search for biosignatures",
+                    "Investigate methane cycle"
+                ],
+                vehicle: "To be determined",
+                crew: "Uncrewed"
+            }
+        ];
+
+        function initializeMissions() {
+            allMissions = missionsData;
+            displayMissions(allMissions);
+        }
+
+        function displayMissions(missions) {
+            const container = document.getElementById('missionsContainer');
+            
+            if (missions.length === 0) {
+                container.innerHTML = '<div class="loading">No missions found for this filter.</div>';
+                return;
+            }
+
+            container.innerHTML = missions.map(mission => `
+                <div class="mission-card" onclick="showMissionDetails(${mission.id})">
+                    <span class="mission-status status-${mission.status}">${mission.status.toUpperCase()}</span>
+                    <h3>${mission.name}</h3>
+                    <div class="mission-agency">${mission.agency}</div>
+                    <div class="mission-details">
+                        <div class="mission-detail-item">
+                            <span class="mission-detail-label">Launch Date:</span>
+                            <span class="mission-detail-value">${new Date(mission.launchDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        </div>
+                        ${mission.endDate ? `
+                        <div class="mission-detail-item">
+                            <span class="mission-detail-label">End Date:</span>
+                            <span class="mission-detail-value">${mission.endDate === 'Ongoing operations' || mission.endDate === 'Permanent facility' ? mission.endDate : new Date(mission.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        </div>
+                        ` : ''}
+                        <div class="mission-detail-item">
+                            <span class="mission-detail-label">Cost:</span>
+                            <span class="mission-detail-value cost-highlight">${mission.cost}</span>
+                        </div>
+                    </div>
+                    <div class="mission-description">${mission.description.substring(0, 150)}...</div>
+                </div>
+            `).join('');
+        }
+
+        function filterMissions(filter) {
+            currentFilter = filter;
+            
+            // Update active button
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+
+            // Filter missions
+            const filtered = filter === 'all' ? allMissions : allMissions.filter(m => m.status === filter);
+            displayMissions(filtered);
+        }
+
+        function showMissionDetails(missionId) {
+            const mission = allMissions.find(m => m.id === missionId);
+            if (!mission) return;
+
+            const modal = document.getElementById('missionModal');
+            const modalContent = document.getElementById('modalContent');
+
+            modalContent.innerHTML = `
+                <h2 style="color: var(--neon-blue); font-family: 'Orbitron', sans-serif; margin-bottom: 1rem; font-size: 2rem;">${mission.name}</h2>
+                <div style="margin-bottom: 1.5rem;">
+                    <span class="mission-status status-${mission.status}">${mission.status.toUpperCase()}</span>
+                    <span style="margin-left: 1rem; color: var(--neon-amber); font-weight: bold; font-size: 1.1rem;">${mission.agency}</span>
+                </div>
+                <p style="color: var(--text-main); line-height: 1.8; margin-bottom: 1.5rem; font-size: 1.05rem;">${mission.description}</p>
+                
+                <h3 style="color: var(--neon-amber); font-family: 'Orbitron', sans-serif; margin-bottom: 1rem; font-size: 1.3rem;">Mission Details</h3>
+                <div class="mission-details">
+                    <div class="mission-detail-item">
+                        <span class="mission-detail-label">Launch Date:</span>
+                        <span class="mission-detail-value">${new Date(mission.launchDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                    ${mission.endDate ? `
+                    <div class="mission-detail-item">
+                        <span class="mission-detail-label">End Date:</span>
+                        <span class="mission-detail-value">${mission.endDate === 'Ongoing operations' || mission.endDate === 'Permanent facility' ? mission.endDate : new Date(mission.endDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                    </div>
+                    ` : ''}
+                    <div class="mission-detail-item">
+                        <span class="mission-detail-label">Cost:</span>
+                        <span class="mission-detail-value cost-highlight">${mission.cost}</span>
+                    </div>
+                    <div class="mission-detail-item">
+                        <span class="mission-detail-label">Vehicle:</span>
+                        <span class="mission-detail-value">${mission.vehicle}</span>
+                    </div>
+                    <div class="mission-detail-item">
+                        <span class="mission-detail-label">Crew:</span>
+                        <span class="mission-detail-value">${mission.crew}</span>
+                    </div>
+                </div>
+
+                <h3 style="color: var(--neon-amber); font-family: 'Orbitron', sans-serif; margin-bottom: 1rem; font-size: 1.3rem;">Mission Objectives</h3>
+                <ul style="color: var(--text-main); line-height: 2; margin-left: 1.5rem; margin-bottom: 1.5rem;">
+                    ${mission.objectives.map(obj => `<li>${obj}</li>`).join('')}
+                </ul>
+            `;
+
+            modal.style.display = 'block';
+        }
+
+        function closeModal() {
+            document.getElementById('missionModal').style.display = 'none';
+        }
+
+        function logout() {
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => window.location.href = '/');
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('missionModal');
+            if (event.target == modal) {
+                closeModal();
+            }
+        }
+
+        // Initialize on page load
+        window.onload = initializeMissions;
+    </script>
+    <script>
+    /* ====================================================
+       REALISTIC SPACE BACKGROUND — Canvas Star Engine
+       ==================================================== */
+    (function () {
+        const canvas = document.getElementById('space-bg');
+        const ctx = canvas.getContext('2d');
+
+        // Resize canvas to fill viewport
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.addEventListener('resize', () => { resize(); initStars(); });
+
+        // Star color palette – realistic spectral tints
+        const STAR_COLORS = [
+            { r: 255, g: 255, b: 255 },  // pure white
+            { r: 200, g: 220, b: 255 },  // blue-white
+            { r: 180, g: 200, b: 255 },  // blue
+            { r: 255, g: 245, b: 220 },  // warm white
+            { r: 255, g: 220, b: 160 },  // yellow
+            { r: 255, g: 180, b: 100 },  // orange
+            { r: 255, g: 150, b: 120 },  // red dwarf
+        ];
+
+        // Layer config: count, speed multiplier, max radius
+        const LAYERS = [
+            { count: 250, speed: 0.0,  maxR: 0.6 },  // far – tiny, static
+            { count: 180, speed: 0.0,  maxR: 1.1 },  // mid
+            { count: 90,  speed: 0.0,  maxR: 1.8 },  // near – large, bright
+        ];
+
+        let stars = [];
+        let shooters = [];
+        let nebulae = [];
+
+        function randRange(min, max) { return Math.random() * (max - min) + min; }
+        function randInt(min, max) { return Math.floor(randRange(min, max)); }
+
+        function initStars() {
+            stars = [];
+            const W = canvas.width, H = canvas.height;
+
+            LAYERS.forEach((layer, li) => {
+                for (let i = 0; i < layer.count; i++) {
+                    const col = STAR_COLORS[randInt(0, STAR_COLORS.length)];
+                    stars.push({
+                        x:        randRange(0, W),
+                        y:        randRange(0, H),
+                        r:        randRange(0.15, layer.maxR),
+                        baseAlpha: randRange(0.4, 1.0),
+                        alpha:    0,
+                        twinkleSpeed: randRange(0.003, 0.025),
+                        twinkleOffset: randRange(0, Math.PI * 2),
+                        color:    col,
+                        layer:    li,
+                        glowMult: li === 2 ? randRange(2.5, 5) : (li === 1 ? randRange(1.5, 3) : 1),
+                    });
+                }
+            });
+
+            // Pre-bake a few nebula blobs
+            nebulae = [];
+            const nebulaConfigs = [
+                { cx: 0.15, cy: 0.50, r: 0.25, col: '188,19,254',  a: 0.045 },
+                { cx: 0.85, cy: 0.30, r: 0.28, col: '0,180,255',   a: 0.040 },
+                { cx: 0.50, cy: 0.85, r: 0.20, col: '255,120,20',  a: 0.030 },
+                { cx: 0.70, cy: 0.10, r: 0.18, col: '80,220,180',  a: 0.025 },
+            ];
+            nebulaConfigs.forEach(n => nebulae.push({
+                cx: n.cx * W, cy: n.cy * H,
+                r:  n.r  * Math.max(W, H),
+                col: n.col, a: n.a,
+            }));
+        }
+
+        function spawnShooter() {
+            const W = canvas.width, H = canvas.height;
+            const angle = randRange(-0.6, -0.2);  // mostly downward right
+            shooters.push({
+                x:     randRange(0, W),
+                y:     randRange(0, H * 0.5),
+                len:   randRange(60, 180),
+                speed: randRange(6, 14),
+                alpha: 1,
+                dx:    Math.cos(angle),
+                dy:    Math.sin(angle) * 0.5 + 0.5,
+                life:  1,
+            });
+        }
+
+        let t = 0;
+        let lastShooter = 0;
+
+        function draw(ts) {
+            t = ts * 0.001;
+            const W = canvas.width, H = canvas.height;
+
+            // Background fill
+            ctx.fillStyle = '#000000';
+            ctx.fillRect(0, 0, W, H);
+
+            // Nebula blobs
+            nebulae.forEach(n => {
+                const grad = ctx.createRadialGradient(n.cx, n.cy, 0, n.cx, n.cy, n.r);
+                grad.addColorStop(0,   `rgba(${n.col}, ${n.a})`);
+                grad.addColorStop(0.5, `rgba(${n.col}, ${n.a * 0.4})`);
+                grad.addColorStop(1,   `rgba(${n.col}, 0)`);
+                ctx.fillStyle = grad;
+                ctx.beginPath();
+                ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Stars
+            stars.forEach(s => {
+                const flicker = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed * 60 + s.twinkleOffset);
+                s.alpha = s.baseAlpha * (0.55 + 0.45 * flicker);
+
+                const r = s.r;
+                const { r: cr, g: cg, b: cb } = s.color;
+
+                // Glow halo
+                if (s.glowMult > 1) {
+                    const gVal = Math.max(0, s.alpha - 0.2);
+                    const glowR = r * s.glowMult;
+                    const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
+                    grd.addColorStop(0,   `rgba(${cr},${cg},${cb},${gVal * 0.6})`);
+                    grd.addColorStop(0.4, `rgba(${cr},${cg},${cb},${gVal * 0.15})`);
+                    grd.addColorStop(1,   `rgba(${cr},${cg},${cb},0)`);
+                    ctx.fillStyle = grd;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, glowR, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Star core
+                ctx.globalAlpha = s.alpha;
+                ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+                ctx.beginPath();
+                ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Cross-diffraction spike
+                if (s.layer === 2 && s.r > 1.3 && s.alpha > 0.7) {
+                    ctx.globalAlpha = s.alpha * 0.3;
+                    ctx.strokeStyle = `rgb(${cr},${cg},${cb})`;
+                    ctx.lineWidth = 0.5;
+                    const sLen = r * 4;
+                    ctx.beginPath();
+                    ctx.moveTo(s.x - sLen, s.y); ctx.lineTo(s.x + sLen, s.y);
+                    ctx.moveTo(s.x, s.y - sLen); ctx.lineTo(s.x, s.y + sLen);
+                    ctx.stroke();
+                }
+            });
+            ctx.globalAlpha = 1;
+
+            // Shooting stars
+            if (ts - lastShooter > randRange(1800, 5000)) {
+                spawnShooter();
+                lastShooter = ts;
+            }
+            shooters = shooters.filter(s => s.life > 0);
+            shooters.forEach(s => {
+                s.life -= 0.015;
+                s.x += s.dx * s.speed;
+                s.y += s.dy * s.speed;
+                const tail = ctx.createLinearGradient(
+                    s.x - s.dx * s.len, s.y - s.dy * s.len, s.x, s.y
+                );
+                tail.addColorStop(0, `rgba(255,255,255,0)`);
+                tail.addColorStop(1, `rgba(255,255,255,${s.life * 0.9})`);
+                ctx.strokeStyle = tail;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(s.x - s.dx * s.len, s.y - s.dy * s.len);
+                ctx.lineTo(s.x, s.y);
+                ctx.stroke();
+            });
+
+            requestAnimationFrame(draw);
+        }
+
+        initStars();
+        requestAnimationFrame(draw);
+    })();
+    </script>
+    <script src="/public/js/chat-widget.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceVerse - VR Solar System</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #E6F1FF;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            background: linear-gradient(90deg, #64FFDA, #00FFFF);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            text-shadow: 0 0 20px rgba(100, 255, 218, 0.3);
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            margin-bottom: 2rem;
+            opacity: 0.8;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin: 2rem auto;
+            max-width: 800px;
+            border: 1px solid rgba(100, 255, 218, 0.2);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin: 2rem 0;
+        }
+        
+        .status-item {
+            background: rgba(255, 255, 255, 0.08);
+            padding: 1rem;
+            border-radius: 10px;
+            text-align: center;
+        }
+        
+        .status-label {
+            font-size: 0.9rem;
+            opacity: 0.7;
+            margin-bottom: 0.5rem;
+        }
+        
+        .status-value {
+            font-size: 1.2rem;
+            font-weight: bold;
+        }
+        
+        .success {
+            color: #64FFDA;
+        }
+        
+        .warning {
+            color: #FFD700;
+        }
+        
+        .error {
+            color: #FF6B6B;
+        }
+        
+        .btn {
+            display: inline-block;
+            padding: 12px 30px;
+            margin: 10px;
+            background: rgba(100, 255, 218, 0.1);
+            color: #64FFDA;
+            border: 2px solid #64FFDA;
+            border-radius: 30px;
+            font-size: 1rem;
+            font-weight: bold;
+            text-decoration: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover {
+            background: rgba(100, 255, 218, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(100, 255, 218, 0.2);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, #64FFDA, #00FFFF);
+            color: #0D1117;
+            border: none;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(90deg, #5ae6c8, #00e5e5);
+            box-shadow: 0 5px 15px rgba(100, 255, 218, 0.4);
+        }
+        
+        .info-box {
+            background: rgba(255, 255, 255, 0.08);
+            border-left: 4px solid #64FFDA;
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: left;
+            border-radius: 0 10px 10px 0;
+        }
+        
+        .solar-system {
+            position: relative;
+            height: 400px;
+            margin: 2rem auto;
+            max-width: 800px;
+        }
+        
+        .sun {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #ffd700 0%, #ff8c00 70%, #ff4500 100%);
+            border-radius: 50%;
+            box-shadow: 0 0 50px #ff4500, 0 0 100px #ff8c00;
+            z-index: 10;
+        }
+        
+        .orbit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .planet {
+            position: absolute;
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+        }
+        
+        .mercury { background: linear-gradient(45deg, #a9a9a9, #696969); width: 15px; height: 15px; }
+        .venus { background: linear-gradient(45deg, #e39e1c, #b87333); width: 20px; height: 20px; }
+        .earth { background: linear-gradient(45deg, #1e90ff, #228b22); width: 22px; height: 22px; }
+        .mars { background: linear-gradient(45deg, #ff4500, #8b0000); width: 18px; height: 18px; }
+        
+        .back-link {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            padding: 10px 20px;
+            background: rgba(100, 255, 218, 0.06);
+            color: #E6F1FF;
+            border: 2px solid #64FFDA;
+            border-radius: 25px;
+            text-decoration: none;
+            z-index: 1000;
+        }
+        
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(13, 17, 23, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid rgba(100, 255, 218, 0.3);
+            border-top: 5px solid #64FFDA;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <a href="/" class="back-link">← Back to Home</a>
+    
+    <div id="loading" class="loading">
+        <div class="spinner"></div>
+        <p>Initializing VR Experience...</p>
+    </div>
+    
+    <div id="main-content" class="container hidden">
+        <h1>SpaceVerse VR Solar System</h1>
+        <p class="subtitle">Immersive 3D Solar System Exploration</p>
+        
+        <div class="card">
+            <h2>VR Experience Status</h2>
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="status-label">WebXR Support</div>
+                    <div id="webxr-status" class="status-value warning">Checking...</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">VR Libraries</div>
+                    <div id="libraries-status" class="status-value error">Not Loaded</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">3D Engine</div>
+                    <div id="engine-status" class="status-value error">Unavailable</div>
+                </div>
+                <div class="status-item">
+                    <div class="status-label">VR Mode</div>
+                    <div id="vr-mode-status" class="status-value warning">Limited</div>
+                </div>
+            </div>
+            
+            <div class="info-box">
+                <h3>Current Limitations</h3>
+                <p>We detected that the required WebXR libraries couldn't be loaded properly. This may be due to:</p>
+                <ul>
+                    <li>Network connectivity issues preventing library downloads</li>
+                    <li>Browser compatibility limitations</li>
+                    <li>Content security policies blocking external scripts</li>
+                </ul>
+                <p>As a fallback, we're showing this simplified interface with a 2D representation of the solar system.</p>
+            </div>
+            
+            <button id="enter-vr-btn" class="btn btn-primary">👓 Attempt VR Mode</button>
+            <a href="/" class="btn">← Back to Home</a>
+        </div>
+        
+        <div class="card">
+            <h2>Solar System Overview</h2>
+            <div class="solar-system">
+                <div class="sun"></div>
+                <!-- Orbits and planets will be added by JavaScript -->
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Check WebXR support
+        function checkWebXRSupport() {
+            if (navigator.xr) {
+                document.getElementById('webxr-status').textContent = 'Supported';
+                document.getElementById('webxr-status').className = 'status-value success';
+                return true;
+            } else {
+                document.getElementById('webxr-status').textContent = 'Not Supported';
+                document.getElementById('webxr-status').className = 'status-value error';
+                return false;
+            }
+        }
+        
+        // Create a simple 2D solar system visualization
+        function createSolarSystem() {
+            const container = document.querySelector('.solar-system');
+            const orbits = [
+                { radius: 100, planetClass: 'mercury', planetAngle: 0, speed: 0.02 },
+                { radius: 140, planetClass: 'venus', planetAngle: Math.PI/3, speed: 0.015 },
+                { radius: 180, planetClass: 'earth', planetAngle: Math.PI/1.5, speed: 0.01 },
+                { radius: 220, planetClass: 'mars', planetAngle: Math.PI, speed: 0.008 }
+            ];
+            
+            // Create orbits
+            orbits.forEach(orbit => {
+                const orbitElement = document.createElement('div');
+                orbitElement.className = 'orbit';
+                orbitElement.style.width = `${orbit.radius * 2}px`;
+                orbitElement.style.height = `${orbit.radius * 2}px`;
+                container.appendChild(orbitElement);
+                
+                const planet = document.createElement('div');
+                planet.className = `planet ${orbit.planetClass}`;
+                planet.style.left = `${50 + (orbit.radius * Math.cos(orbit.planetAngle) / 220 * 100)}%`;
+                planet.style.top = `${50 + (orbit.radius * Math.sin(orbit.planetAngle) / 220 * 100)}%`;
+                planet.dataset.radius = orbit.radius;
+                planet.dataset.angle = orbit.planetAngle;
+                planet.dataset.speed = orbit.speed;
+                container.appendChild(planet);
+            });
+            
+            // Animate planets
+            function animate() {
+                const planets = document.querySelectorAll('.planet');
+                planets.forEach(planet => {
+                    const radius = parseFloat(planet.dataset.radius);
+                    let angle = parseFloat(planet.dataset.angle);
+                    const speed = parseFloat(planet.dataset.speed);
+                    
+                    angle += speed;
+                    const x = 50 + (radius * Math.cos(angle) / 220 * 100);
+                    const y = 50 + (radius * Math.sin(angle) / 220 * 100);
+                    
+                    planet.style.left = `${x}%`;
+                    planet.style.top = `${y}%`;
+                    planet.dataset.angle = angle;
+                });
+                
+                requestAnimationFrame(animate);
+            }
+            
+            animate();
+        }
+        
+        // Initialize the page
+        function init() {
+            // Check WebXR support
+            checkWebXRSupport();
+            
+            // Create solar system visualization
+            createSolarSystem();
+            
+            // Set up VR button
+            document.getElementById('enter-vr-btn').addEventListener('click', function() {
+                alert('In a full implementation, this would attempt to enter VR mode. Currently, the required WebXR libraries are not available.');
+            });
+            
+            // Hide loading screen and show content
+            setTimeout(function() {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+            }, 1500);
+        }
+        
+        // Start when page loads
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    </script>
+</body>
+</html>

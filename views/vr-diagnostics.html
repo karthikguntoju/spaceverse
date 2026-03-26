@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VR Library Diagnostics</title>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0D1117;
+            color: #E6F1FF;
+            margin: 0;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: #64FFDA;
+        }
+        
+        .test-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        
+        .result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        
+        .success {
+            background: rgba(100, 255, 218, 0.1);
+            border-left: 4px solid #64FFDA;
+        }
+        
+        .error {
+            background: rgba(255, 107, 107, 0.1);
+            border-left: 4px solid #FF6B6B;
+        }
+        
+        .warning {
+            background: rgba(255, 215, 0, 0.1);
+            border-left: 4px solid #FFD700;
+        }
+        
+        button {
+            background: #64FFDA;
+            color: #0D1117;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+        }
+        
+        button:hover {
+            opacity: 0.8;
+        }
+        
+        pre {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #64FFDA;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <a href="/" class="back-link">← Back to Home</a>
+        <h1>VR Library Diagnostics</h1>
+        
+        <div class="test-section">
+            <h2>Library Detection</h2>
+            <div id="library-results"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Manual Library Loading</h2>
+            <button onclick="loadThreeJS()">Load Three.js</button>
+            <button onclick="loadReact()">Load React</button>
+            <button onclick="loadReactDOM()">Load ReactDOM</button>
+            <button onclick="loadFiber()">Load React Three Fiber</button>
+            <button onclick="loadXR()">Load React Three XR</button>
+            <div id="loading-results"></div>
+        </div>
+        
+        <div class="test-section">
+            <h2>Window Object Inspection</h2>
+            <button onclick="inspectWindow()">Inspect Window Object</button>
+            <pre id="window-inspection"></pre>
+        </div>
+    </div>
+    
+    <script>
+        // Test library availability
+        function testLibraries() {
+            const results = document.getElementById('library-results');
+            results.innerHTML = '';
+            
+            // Test Three.js
+            const threeResult = document.createElement('div');
+            threeResult.className = `result ${typeof THREE !== 'undefined' ? 'success' : 'error'}`;
+            threeResult.innerHTML = `<strong>Three.js:</strong> ${typeof THREE !== 'undefined' ? '✅ Available' : '❌ Not Available'}`;
+            results.appendChild(threeResult);
+            
+            // Test React
+            const reactResult = document.createElement('div');
+            reactResult.className = `result ${typeof React !== 'undefined' ? 'success' : 'error'}`;
+            reactResult.innerHTML = `<strong>React:</strong> ${typeof React !== 'undefined' ? '✅ Available' : '❌ Not Available'}`;
+            results.appendChild(reactResult);
+            
+            // Test ReactDOM
+            const reactDOMResult = document.createElement('div');
+            reactDOMResult.className = `result ${typeof ReactDOM !== 'undefined' ? 'success' : 'error'}`;
+            reactDOMResult.innerHTML = `<strong>ReactDOM:</strong> ${typeof ReactDOM !== 'undefined' ? '✅ Available' : '❌ Not Available'}`;
+            results.appendChild(reactDOMResult);
+            
+            // Test React Three Fiber
+            const fiberAvailable = typeof window.ReactThreeFiber !== 'undefined' || typeof window.Fiber !== 'undefined';
+            const fiberResult = document.createElement('div');
+            fiberResult.className = `result ${fiberAvailable ? 'success' : 'error'}`;
+            fiberResult.innerHTML = `<strong>React Three Fiber:</strong> ${fiberAvailable ? '✅ Available' : '❌ Not Available'}`;
+            results.appendChild(fiberResult);
+            
+            // Test React Three XR
+            const xrAvailable = typeof window.ReactThreeXR !== 'undefined' || typeof window.XR !== 'undefined';
+            const xrResult = document.createElement('div');
+            xrResult.className = `result ${xrAvailable ? 'success' : 'error'}`;
+            xrResult.innerHTML = `<strong>React Three XR:</strong> ${xrAvailable ? '✅ Available' : '❌ Not Available'}`;
+            results.appendChild(xrResult);
+            
+            // Show available keys for debugging
+            if (typeof window.ReactThreeFiber !== 'undefined') {
+                const fiberKeys = document.createElement('div');
+                fiberKeys.className = 'result warning';
+                fiberKeys.innerHTML = `<strong>Fiber Keys:</strong> ${Object.keys(window.ReactThreeFiber).join(', ')}`;
+                results.appendChild(fiberKeys);
+            }
+            
+            if (typeof window.ReactThreeXR !== 'undefined') {
+                const xrKeys = document.createElement('div');
+                xrKeys.className = 'result warning';
+                xrKeys.innerHTML = `<strong>XR Keys:</strong> ${Object.keys(window.ReactThreeXR).join(', ')}`;
+                results.appendChild(xrKeys);
+            }
+        }
+        
+        // Manual library loading functions
+        function loadLibrary(src, name) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = src;
+                script.onload = () => resolve(`${name} loaded successfully`);
+                script.onerror = () => reject(new Error(`Failed to load ${name}`));
+                document.head.appendChild(script);
+            });
+        }
+        
+        async function loadThreeJS() {
+            const results = document.getElementById('loading-results');
+            results.innerHTML = '<p>Loading Three.js...</p>';
+            try {
+                await loadLibrary('https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.min.js', 'Three.js');
+                results.innerHTML += '<p class="success">Three.js loaded successfully</p>';
+                testLibraries();
+            } catch (error) {
+                results.innerHTML += `<p class="error">Error loading Three.js: ${error.message}</p>`;
+            }
+        }
+        
+        async function loadReact() {
+            const results = document.getElementById('loading-results');
+            results.innerHTML = '<p>Loading React...</p>';
+            try {
+                await loadLibrary('https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.development.js', 'React');
+                results.innerHTML += '<p class="success">React loaded successfully</p>';
+                testLibraries();
+            } catch (error) {
+                results.innerHTML += `<p class="error">Error loading React: ${error.message}</p>`;
+            }
+        }
+        
+        async function loadReactDOM() {
+            const results = document.getElementById('loading-results');
+            results.innerHTML = '<p>Loading ReactDOM...</p>';
+            try {
+                await loadLibrary('https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.development.js', 'ReactDOM');
+                results.innerHTML += '<p class="success">ReactDOM loaded successfully</p>';
+                testLibraries();
+            } catch (error) {
+                results.innerHTML += `<p class="error">Error loading ReactDOM: ${error.message}</p>`;
+            }
+        }
+        
+        async function loadFiber() {
+            const results = document.getElementById('loading-results');
+            results.innerHTML = '<p>Loading React Three Fiber...</p>';
+            try {
+                await loadLibrary('https://cdn.jsdelivr.net/npm/@react-three/fiber@9.4.2/dist/react-three-fiber.esm.js', 'React Three Fiber');
+                results.innerHTML += '<p class="success">React Three Fiber loaded successfully</p>';
+                testLibraries();
+            } catch (error) {
+                results.innerHTML += `<p class="error">Error loading React Three Fiber: ${error.message}</p>`;
+            }
+        }
+        
+        async function loadXR() {
+            const results = document.getElementById('loading-results');
+            results.innerHTML = '<p>Loading React Three XR...</p>';
+            try {
+                await loadLibrary('https://cdn.jsdelivr.net/npm/@react-three/xr@6.6.28/dist/index.js', 'React Three XR');
+                results.innerHTML += '<p class="success">React Three XR loaded successfully</p>';
+                testLibraries();
+            } catch (error) {
+                results.innerHTML += `<p class="error">Error loading React Three XR: ${error.message}</p>`;
+            }
+        }
+        
+        function inspectWindow() {
+            const inspection = document.getElementById('window-inspection');
+            const windowKeys = Object.keys(window);
+            const filteredKeys = windowKeys.filter(key => 
+                key.includes('React') || 
+                key.includes('Three') || 
+                key.includes('Fiber') || 
+                key.includes('XR') ||
+                key === 'THREE'
+            );
+            
+            inspection.textContent = JSON.stringify(filteredKeys, null, 2);
+        }
+        
+        // Run initial test
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', testLibraries);
+        } else {
+            testLibraries();
+        }
+    </script>
+</body>
+</html>

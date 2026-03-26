@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SpaceVerse - Pure HTML VR Experience</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #000;
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+            perspective: 1000px;
+        }
+        
+        #scene {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            transform-style: preserve-3d;
+        }
+        
+        #stars {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        }
+        
+        .star {
+            position: absolute;
+            background: #fff;
+            border-radius: 50%;
+        }
+        
+        #solar-system {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            transform-style: preserve-3d;
+            width: 1000px;
+            height: 1000px;
+        }
+        
+        .orbit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) rotateX(75deg);
+            transform-style: preserve-3d;
+        }
+        
+        .planet {
+            position: absolute;
+            border-radius: 50%;
+            transform-style: preserve-3d;
+            transform: translate(-50%, -50%);
+            transition: transform 0.1s ease;
+        }
+        
+        #sun {
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, #ffd700 0%, #ff8c00 70%, #ff4500 100%);
+            box-shadow: 0 0 50px #ff4500, 0 0 100px #ff8c00;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10;
+        }
+        
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #64FFDA;
+        }
+        
+        #controls button {
+            background: #64FFDA;
+            color: #000;
+            border: none;
+            padding: 10px 15px;
+            margin: 5px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        #controls button:hover {
+            background: #5ae6c8;
+        }
+        
+        #info-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            border: 1px solid #64FFDA;
+            max-width: 300px;
+            z-index: 100;
+        }
+        
+        #back-home {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(100, 255, 218, 0.1);
+            color: #64FFDA;
+            padding: 10px 20px;
+            text-decoration: none;
+            border: 2px solid #64FFDA;
+            border-radius: 25px;
+            z-index: 100;
+        }
+        
+        #loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        
+        #loading-text {
+            margin-top: 20px;
+            font-size: 1.2em;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        #error-message {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(255, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div id="loading">
+        <div>Loading SpaceVerse Experience...</div>
+        <div id="loading-text">Initializing stellar environment</div>
+    </div>
+    
+    <a href="/" id="back-home">← Back to Home</a>
+    
+    <div id="scene">
+        <div id="stars"></div>
+        <div id="solar-system">
+            <div id="sun" class="planet"></div>
+            <!-- Orbits and planets will be created by JavaScript -->
+        </div>
+    </div>
+    
+    <div id="controls">
+        <button id="zoom-in">Zoom In</button>
+        <button id="zoom-out">Zoom Out</button>
+        <button id="speed-up">Speed Up</button>
+        <button id="slow-down">Slow Down</button>
+        <button id="reset-view">Reset View</button>
+    </div>
+    
+    <div id="info-panel">
+        <h3>SpaceVerse Explorer</h3>
+        <p id="planet-info">Welcome to the Solar System. Click on any planet to learn more.</p>
+        <p id="speed-info">Current speed: 1x</p>
+    </div>
+    
+    <div id="error-message" class="hidden">
+        <h3>VR Experience Limitation</h3>
+        <p>We're unable to load the advanced VR libraries at this time. This simplified 3D experience is shown as a fallback.</p>
+        <button onclick="document.getElementById('error-message').classList.add('hidden')">Continue</button>
+    </div>
+    
+    <script>
+        // Configuration
+        let cameraDistance = 1000;
+        let animationSpeed = 1;
+        let isDragging = false;
+        let lastX, lastY;
+        let rotationX = 0;
+        let rotationY = 0;
+        
+        // Planet data
+        const planetData = [
+            { name: "Mercury", size: 10, distance: 120, speed: 0.04, color: "#a9a9a9", angle: 0 },
+            { name: "Venus", size: 18, distance: 160, speed: 0.03, color: "#e39e1c", angle: Math.PI/4 },
+            { name: "Earth", size: 20, distance: 200, speed: 0.02, color: "#1e90ff", angle: Math.PI/2 },
+            { name: "Mars", size: 15, distance: 240, speed: 0.015, color: "#ff4500", angle: Math.PI },
+            { name: "Jupiter", size: 40, distance: 320, speed: 0.01, color: "#d2b48c", angle: Math.PI*1.5 },
+            { name: "Saturn", size: 35, distance: 380, speed: 0.008, color: "#f0e68c", angle: Math.PI*1.75 },
+            { name: "Uranus", size: 25, distance: 440, speed: 0.006, color: "#afeeee", angle: Math.PI*1.9 },
+            { name: "Neptune", size: 25, distance: 500, speed: 0.005, color: "#4169e1", angle: Math.PI*1.95 }
+        ];
+        
+        // Create stars
+        function createStars() {
+            const starsContainer = document.getElementById('stars');
+            for (let i = 0; i < 500; i++) {
+                const star = document.createElement('div');
+                star.className = 'star';
+                star.style.width = Math.random() * 3 + 'px';
+                star.style.height = star.style.width;
+                star.style.left = Math.random() * 100 + '%';
+                star.style.top = Math.random() * 100 + '%';
+                star.style.opacity = Math.random();
+                starsContainer.appendChild(star);
+            }
+        }
+        
+        // Create solar system
+        function createSolarSystem() {
+            const solarSystem = document.getElementById('solar-system');
+            
+            // Create orbits and planets
+            planetData.forEach((planet, index) => {
+                // Create orbit
+                const orbit = document.createElement('div');
+                orbit.className = 'orbit';
+                orbit.style.width = (planet.distance * 2) + 'px';
+                orbit.style.height = (planet.distance * 2) + 'px';
+                solarSystem.appendChild(orbit);
+                
+                // Create planet
+                const planetElement = document.createElement('div');
+                planetElement.className = 'planet';
+                planetElement.id = planet.name.toLowerCase();
+                planetElement.style.width = planet.size + 'px';
+                planetElement.style.height = planet.size + 'px';
+                planetElement.style.background = planet.color;
+                planetElement.style.left = '50%';
+                planetElement.style.top = '50%';
+                planetElement.dataset.index = index;
+                planetElement.title = planet.name;
+                
+                // Position planet
+                updatePlanetPosition(planetElement, planet);
+                
+                // Add click event
+                planetElement.addEventListener('click', () => showPlanetInfo(planet));
+                
+                solarSystem.appendChild(planetElement);
+            });
+        }
+        
+        // Update planet position
+        function updatePlanetPosition(planetElement, planet) {
+            const x = planet.distance * Math.cos(planet.angle);
+            const z = planet.distance * Math.sin(planet.angle);
+            planetElement.style.transform = `translate3d(${x}px, 0px, ${z}px)`;
+        }
+        
+        // Animation loop
+        function animate() {
+            const planets = document.querySelectorAll('.planet:not(#sun)');
+            planets.forEach((planetElement, index) => {
+                if (index > 0) { // Skip sun
+                    const planet = planetData[index - 1]; // Adjust for sun
+                    planet.angle += planet.speed * animationSpeed * 0.01;
+                    updatePlanetPosition(planetElement, planet);
+                }
+            });
+            
+            requestAnimationFrame(animate);
+        }
+        
+        // Show planet information
+        function showPlanetInfo(planet) {
+            document.getElementById('planet-info').innerHTML = `
+                <strong>${planet.name}</strong><br>
+                Distance: ${planet.distance} million km<br>
+                Orbital period: ${(100 / planet.speed).toFixed(1)} days<br>
+                Size: ${planet.size} pixels
+            `;
+        }
+        
+        // Control functions
+        function zoomIn() {
+            cameraDistance = Math.max(300, cameraDistance - 100);
+            updateCamera();
+        }
+        
+        function zoomOut() {
+            cameraDistance = Math.min(2000, cameraDistance + 100);
+            updateCamera();
+        }
+        
+        function speedUp() {
+            animationSpeed = Math.min(5, animationSpeed + 0.5);
+            document.getElementById('speed-info').textContent = `Current speed: ${animationSpeed}x`;
+        }
+        
+        function slowDown() {
+            animationSpeed = Math.max(0.1, animationSpeed - 0.5);
+            document.getElementById('speed-info').textContent = `Current speed: ${animationSpeed}x`;
+        }
+        
+        function resetView() {
+            cameraDistance = 1000;
+            animationSpeed = 1;
+            document.getElementById('speed-info').textContent = `Current speed: ${animationSpeed}x`;
+            updateCamera();
+        }
+        
+        // Update camera position
+        function updateCamera() {
+            const scene = document.getElementById('scene');
+            scene.style.transform = `translateZ(${-cameraDistance}px)`;
+        }
+        
+        // Mouse drag for rotation
+        function setupMouseControls() {
+            const scene = document.getElementById('scene');
+            
+            scene.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                lastX = e.clientX;
+                lastY = e.clientY;
+            });
+            
+            scene.addEventListener('mousemove', (e) => {
+                if (isDragging) {
+                    const deltaX = e.clientX - lastX;
+                    const deltaY = e.clientY - lastY;
+                    
+                    rotationY += deltaX * 0.5;
+                    rotationX -= deltaY * 0.5;
+                    rotationX = Math.max(-90, Math.min(90, rotationX));
+                    
+                    scene.style.transform = `translateZ(${-cameraDistance}px) rotateX(${rotationX}deg) rotateY(${rotationY}deg)`;
+                    
+                    lastX = e.clientX;
+                    lastY = e.clientY;
+                }
+            });
+            
+            scene.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+            
+            scene.addEventListener('mouseleave', () => {
+                isDragging = false;
+            });
+        }
+        
+        // Initialize
+        function init() {
+            // Show error message since we can't load VR libraries
+            setTimeout(() => {
+                document.getElementById('error-message').classList.remove('hidden');
+            }, 3000);
+            
+            createStars();
+            createSolarSystem();
+            updateCamera();
+            setupMouseControls();
+            
+            // Start animation
+            animate();
+            
+            // Setup controls
+            document.getElementById('zoom-in').addEventListener('click', zoomIn);
+            document.getElementById('zoom-out').addEventListener('click', zoomOut);
+            document.getElementById('speed-up').addEventListener('click', speedUp);
+            document.getElementById('slow-down').addEventListener('click', slowDown);
+            document.getElementById('reset-view').addEventListener('click', resetView);
+            
+            // Hide loading screen
+            setTimeout(() => {
+                document.getElementById('loading').classList.add('hidden');
+            }, 2000);
+        }
+        
+        // Start when page loads
+        window.addEventListener('load', init);
+    </script>
+</body>
+</html>
