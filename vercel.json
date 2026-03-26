@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "app-enhanced.js",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/index.js",
+      "dest": "app-enhanced.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "app-enhanced.js"
+    }
+  ]
+}

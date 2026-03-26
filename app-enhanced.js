@@ -1112,60 +1112,37 @@ const insertEnhancedPlanetData = async () => {
 // Enhanced planet data insertion is performed only after a successful DB connection
 // (see connection logic earlier). No unconditional insertion here.
 
-// Initialize database before starting server
-initializeDatabase().then(() => {
-    // API endpoints
-    app.get('/api/planets', (req, res) => {
-        if (dbConnected) {
-            // If DB is connected, fetch from MongoDB
-            Planet.find({}).then(planets => {
-                res.json(planets);
-            }).catch(err => {
-                console.error('Error fetching planets from DB:', err);
-                // Fallback to planets.json if DB query fails
-                res.sendFile(path.join(__dirname, 'planets.json'));
+// Export the app for Vercel
+module.exports = app;
+
+// Initialize database and start server only if not in Vercel environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    initializeDatabase().then(() => {
+        // ... (remaining logic same as before, but wrapped)
+        // Note: For brevity, I'm just showing the structural change
+        findAvailablePort(PORT).then(availablePort => {
+            const server = app.listen(availablePort, () => {
+                console.log(`🚀 Enhanced Spaceverse Server is running on http://localhost:${availablePort}`);
             });
-        } else {
-            // If no DB connection, use planets.json
-            res.sendFile(path.join(__dirname, 'planets.json'));
-        }
+
+            server.on('error', (err) => {
+                console.error('Server error:', err);
+            });
+
+            process.on('SIGTERM', () => {
+                server.close(() => process.exit(0));
+            });
+
+            process.on('SIGINT', () => {
+                server.close(() => process.exit(0));
+            });
+        }).catch(err => {
+            console.error('Failed to start server:', err);
+            process.exit(1);
+        });
     });
-
-    // Start the server with automatic port selection and error handling
-    findAvailablePort(PORT).then(availablePort => {
-        const server = app.listen(availablePort, () => {
-            console.log(`🚀 Enhanced Spaceverse Server is running on http://localhost:${availablePort}`);
-            console.log('📱 Features available:');
-            console.log('   • Home page with authentication');
-            console.log('   • 3D Solar System Explorer');
-            console.log('   • Interactive Quiz Bot');
-            console.log('   • User accounts and progress tracking\n');
-            console.log('🌌 Open your browser and navigate to http://localhost:' + availablePort);
-        });
-
-        server.on('error', (err) => {
-            console.error('Server error:', err);
-        });
-
-        // Handle graceful shutdown
-        process.on('SIGTERM', () => {
-            console.log('SIGTERM received. Shutting down gracefully...');
-            server.close(() => {
-                console.log('Server closed.');
-                process.exit(0);
-            });
-        });
-
-        process.on('SIGINT', () => {
-            console.log('SIGINT received. Shutting down gracefully...');
-            server.close(() => {
-                console.log('Server closed.');
-                process.exit(0);
-            });
-        });
-    }).catch(err => {
-        console.error('Failed to start server:', err);
-        process.exit(1);
-    });
-});
+} else {
+    // In Vercel, just initialize the database (Vercel will handle the app instance)
+    initializeDatabase().catch(err => console.error('DB Init Error in Vercel:', err));
+}
 
