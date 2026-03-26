@@ -39,7 +39,9 @@ except ImportError:
     print("Stable-Baselines3 not available, RL features disabled")
 
 # Load environment variables
-load_dotenv()
+#load_dotenv()
+if os.environ.get('NODE_ENV') != 'production':
+    load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -1124,7 +1126,8 @@ if __name__ == "__main__":
     # Run the service
     uvicorn.run(
         "ai_service:app",
-        host=os.getenv("AI_SERVICE_HOST", "127.0.0.1"),
+        #host=os.getenv("AI_SERVICE_HOST", "127.0.0.1"),
+        host=os.getenv("AI_SERVICE_HOST", "0.0.0.0"),
         port=int(os.getenv("AI_SERVICE_PORT", 8001)),
-        reload=os.getenv("AI_SERVICE_DEBUG", "false").lower() == "true"
+        reload=False  # never reload in production
     )
