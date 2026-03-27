@@ -9,6 +9,7 @@ including collision risk assessment, congestion analysis, and debris probability
 import os
 import numpy as np
 import pandas as pd
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
@@ -33,6 +34,14 @@ from tensorflow.keras.optimizers import Adam
 try:
     from stable_baselines3 import PPO
     from stable_baselines3.common.env_util import make_vec_env
+    try:
+        import gymnasium as _gym_module
+        from gymnasium import Env
+        from gymnasium.spaces import Box, Discrete
+    except ImportError:
+        import gym as _gym_module
+        from gym import Env
+        from gym.spaces import Box, Discrete
     RL_AVAILABLE = True
 except ImportError:
     RL_AVAILABLE = False
@@ -47,11 +56,22 @@ if os.environ.get('NODE_ENV') != 'production':
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Determine absolute base directory for model persistence
+_BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+_MODELS_DIR = os.path.join(_BASE_DIR, 'models')
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize models on startup"""
+    initialize_models()
+    yield
+
 # Initialize FastAPI app
 app = FastAPI(
     title="Space Traffic Simulator AI Service",
     description="AI-powered predictions for space traffic simulations",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Pydantic models for request/response validation
@@ -139,8 +159,8 @@ def initialize_models():
     
     # Try to load saved models first
     try:
-        random_forest_model = joblib.load('models/random_forest_model.pkl')
-        linear_model = joblib.load('models/linear_model.pkl')
+        random_forest_model = joblib.load(os.path.join(_MODELS_DIR, 'random_forest_model.pkl'))
+        linear_model = joblib.load(os.path.join(_MODELS_DIR, 'linear_model.pkl'))
         logger.info("Loaded saved models successfully")
         return
     except FileNotFoundError:
@@ -229,10 +249,9 @@ def initialize_models():
     
     # Save models for future use
     try:
-        import os
-        os.makedirs('models', exist_ok=True)
-        joblib.dump(random_forest_model, 'models/random_forest_model.pkl')
-        joblib.dump(linear_model, 'models/linear_model.pkl')
+        os.makedirs(_MODELS_DIR, exist_ok=True)
+        joblib.dump(random_forest_model, os.path.join(_MODELS_DIR, 'random_forest_model.pkl'))
+        joblib.dump(linear_model, os.path.join(_MODELS_DIR, 'linear_model.pkl'))
         logger.info("Models saved successfully")
     except Exception as e:
         logger.warning(f"Failed to save models: {str(e)}")
@@ -290,44 +309,44 @@ def initialize_models():
     # Initialize reinforcement learning model for traffic control
     if RL_AVAILABLE:
         try:
-            # Create a simple environment for demonstration
-            # In a real implementation, this would be a complex space traffic environment
-            from gym import Env
-            from gym.spaces import Box, Discrete
-            
+            # Determine if we are using gymnasium (new) or gym (legacy)
+            _using_gymnasium = 'gymnasium' in str(type(Env))
+
             class SimpleTrafficEnv(Env):
                 def __init__(self):
                     super(SimpleTrafficEnv, self).__init__()
                     self.action_space = Discrete(3)  # 0: do nothing, 1: increase altitude, 2: change inclination
                     self.observation_space = Box(low=0, high=1, shape=(6,), dtype=np.float32)
-                    self.state = np.random.rand(6)
+                    self.state = np.random.rand(6).astype(np.float32)
                     self.step_count = 0
-                
+
                 def step(self, action):
                     # Simplified reward function
-                    reward = -np.sum(np.abs(self.state - 0.5))  # Reward for being close to optimal state
+                    reward = float(-np.sum(np.abs(self.state - 0.5)))  # Reward for being close to optimal state
                     self.step_count += 1
-                    done = self.step_count >= 100
-                    
+                    terminated = self.step_count >= 100
+                    truncated = False
+
                     # Update state based on action
                     if action == 1:  # Increase altitude
                         self.state[0] = min(1.0, self.state[0] + 0.1)
                     elif action == 2:  # Change inclination
-                        self.state[1] = np.abs(self.state[1] - 0.1)
-                    
-                    return self.state, reward, done, {}
-                
-                def reset(self):
-                    self.state = np.random.rand(6)
+                        self.state[1] = float(np.abs(self.state[1] - 0.1))
+
+                    # gymnasium API returns 5 values; old gym returns 4
+                    return self.state, reward, terminated, truncated, {}
+
+                def reset(self, **kwargs):
+                    self.state = np.random.rand(6).astype(np.float32)
                     self.step_count = 0
-                    return self.state
-            
+                    return self.state, {}
+
             # Create and train RL model
             env = SimpleTrafficEnv()
             rl_model = PPO("MlpPolicy", env, verbose=0)
             # Train for a few steps (in reality, this would be much more)
             rl_model.learn(total_timesteps=100)
-            
+
             logger.info("Reinforcement learning model initialized successfully")
         except Exception as e:
             logger.error(f"Failed to initialize RL model: {str(e)}")
@@ -598,10 +617,7 @@ def get_skill_level_tips(skill_level):
     
     return tips
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize models when service starts"""
-    initialize_models()
+# Model initialization is handled by the lifespan context manager above.
 
 @app.post("/ai/simulate-impact", response_model=AISimulateImpactResponse)
 async def simulate_impact(request: AISimulateImpactRequest):
@@ -640,11 +656,8 @@ async def simulate_impact(request: AISimulateImpactRequest):
         lstm_predictions = rf_predictions  # Default to RF if LSTM not available
         if lstm_model is not None:
             try:
-                # Reshape for LSTM (1 sample, 10 time steps, 6 features)
-                # For demo, we'll just repeat the features 10 times
-                features_lstm = np.tile(features, (1, 1, 1))
-                # Repeat to create 10 time steps
-                features_lstm = np.repeat(features_lstm, 10, axis=1)
+                # Reshape for LSTM: (1, 10, 6) — 1 sample, 10 time steps, 6 features
+                features_lstm = np.tile(features.reshape(1, 1, -1), (1, 10, 1))  # shape: (1, 10, 6)
                 lstm_pred = lstm_model.predict(features_lstm, verbose=0)
                 # Handle different possible return shapes
                 if len(lstm_pred.shape) > 1:
@@ -694,10 +707,12 @@ async def simulate_impact(request: AISimulateImpactRequest):
         confidence_level = max(70.0, 100.0 - model_std * 100)  # Higher agreement = higher confidence
         
         # Generate explanation and recommendations
+        # Extract scalar values from predictions for explanation/recommendation generators
+        ep = pred_values  # already a 3-element array/list
         explanation = generate_explanation(
-            ensemble_predictions, 
-            ensemble_predictions, 
-            ensemble_predictions, 
+            float(ep[0]),
+            float(ep[1]),
+            float(ep[2]),
             SimulationParameters(
                 altitude=500,  # Placeholder
                 inclination=45,  # Placeholder
@@ -706,10 +721,10 @@ async def simulate_impact(request: AISimulateImpactRequest):
                 launchTime="2025-01-01T00:00:00Z"  # Placeholder
             )
         )
-        
+
         recommendations = generate_recommendations(
-            ensemble_predictions, 
-            ensemble_predictions, 
+            float(ep[0]),
+            float(ep[1]),
             SimulationParameters(
                 altitude=500,  # Placeholder
                 inclination=45,  # Placeholder
@@ -781,11 +796,8 @@ async def predict_risk(request: AIRiskPredictionRequest):
         lstm_predictions = rf_predictions  # Default to RF if LSTM not available
         if lstm_model is not None:
             try:
-                # Reshape for LSTM (1 sample, 10 time steps, 6 features)
-                # For demo, we'll just repeat the features 10 times
-                features_lstm = np.tile(features, (1, 1, 1))
-                # Repeat to create 10 time steps
-                features_lstm = np.repeat(features_lstm, 10, axis=1)
+                # Reshape for LSTM: (1, 10, 6) — 1 sample, 10 time steps, 6 features
+                features_lstm = np.tile(features.reshape(1, 1, -1), (1, 10, 1))  # shape: (1, 10, 6)
                 lstm_pred = lstm_model.predict(features_lstm, verbose=0)[0]
                 lstm_predictions = lstm_pred
             except Exception as e:
@@ -890,33 +902,47 @@ async def retrain_models(request: RetrainRequest):
     
     try:
         logger.info(f"Retraining models with {len(request.trainingData)} samples for target: {request.targetVariable}")
-        
+
         # Convert training data to numpy arrays
-        X = np.array([[d['altitude'], d['inclination'], d['velocity'], d['mass'], 
-                      d['objectsInLEO'], d['averageCongestion']] for d in request.trainingData])
-        
+        X = np.array([[d['altitude'], d['inclination'], d['velocity'], d['mass'],
+                       d['objectsInLEO'], d['averageCongestion']] for d in request.trainingData])
+
         # Select target variable
         target_map = {
             'collision': 'collisionRisk',
             'congestion': 'congestionIncrease',
             'debris': 'debrisProbability'
         }
-        
+        target_index_map = {'collision': 0, 'congestion': 1, 'debris': 2}
+
         if request.targetVariable not in target_map:
             raise ValueError(f"Invalid target variable: {request.targetVariable}")
-        
-        y = np.array([d[target_map[request.targetVariable]] for d in request.trainingData])
-        
-        # Retrain models
-        random_forest_model.fit(X, y)
-        linear_model.fit(X, y)
-        
+
+        y_single = np.array([d[target_map[request.targetVariable]] for d in request.trainingData])
+
+        # Preserve 3-column output shape: update only the target column, keep the rest
+        # from existing model predictions so downstream code (which expects 3 outputs) stays intact.
+        if random_forest_model is None or linear_model is None:
+            raise HTTPException(status_code=503, detail="Models not initialized yet")
+        # Assign to local vars so the type checker knows they are non-null below
+        _rf = random_forest_model
+        _lr = linear_model
+        y_combined = _rf.predict(X)  # shape (n, 3)
+        col = target_index_map[request.targetVariable]
+        y_combined[:, col] = y_single
+
+        # Retrain models on the updated 3-column target
+        _rf.fit(X, y_combined)
+        _lr.fit(X, y_combined)
+        # Sync back to globals so future prediction calls use updated weights
+        random_forest_model = _rf  # type: ignore[assignment]
+        linear_model = _lr  # type: ignore[assignment]
+
         # Save updated models
         try:
-            import os
-            os.makedirs('models', exist_ok=True)
-            joblib.dump(random_forest_model, 'models/random_forest_model.pkl')
-            joblib.dump(linear_model, 'models/linear_model.pkl')
+            os.makedirs(_MODELS_DIR, exist_ok=True)
+            joblib.dump(random_forest_model, os.path.join(_MODELS_DIR, 'random_forest_model.pkl'))
+            joblib.dump(linear_model, os.path.join(_MODELS_DIR, 'linear_model.pkl'))
             logger.info("Retrained models saved successfully")
         except Exception as e:
             logger.warning(f"Failed to save retrained models: {str(e)}")
@@ -976,11 +1002,8 @@ async def real_time_prediction(request: RealTimePredictionRequest):
         lstm_predictions = rf_predictions  # Default to RF if LSTM not available
         if lstm_model is not None:
             try:
-                # Reshape for LSTM (1 sample, 10 time steps, 6 features)
-                # For demo, we'll just repeat the features 10 times
-                features_lstm = np.tile(features, (1, 1, 1))
-                # Repeat to create 10 time steps
-                features_lstm = np.repeat(features_lstm, 10, axis=1)
+                # Reshape for LSTM: (1, 10, 6) — 1 sample, 10 time steps, 6 features
+                features_lstm = np.tile(features.reshape(1, 1, -1), (1, 10, 1))  # shape: (1, 10, 6)
                 lstm_pred = lstm_model.predict(features_lstm, verbose=0)[0]
                 lstm_predictions = lstm_pred
             except Exception as e:
