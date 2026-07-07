@@ -1515,7 +1515,7 @@ Answer:`;
     console.log('Sending prompt to Gemini API');
 
     const response = await ai.models.generateContent({
-      model: 'gemini-flash-latest',
+      model: 'gemini-2.5-flash',
       contents: prompt,
     });
 

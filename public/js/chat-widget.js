@@ -18,7 +18,7 @@
       transform: scale(1.1);
       box-shadow:0 0 30px rgba(0,243,255,0.6), inset 0 0 20px rgba(0,243,255,0.4); 
   }
-  #sv-chat-btn svg { width: 34px; height: 34px; fill: none; stroke: #00f3ff; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+  #sv-chat-btn span { font-size: 32px; line-height: 1; }
   
   #sv-chat-modal {
       position:fixed; right:20px; bottom:96px; 
@@ -90,23 +90,13 @@
   const btn = document.createElement('div');
   btn.id = 'sv-chat-btn';
   btn.title = 'Ask SpaceVerse Chatbot';
-  btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-      <path d="M12 2v2"></path>
-      <circle cx="12" cy="6" r="2"></circle>
-      <rect x="5" y="8" width="14" height="10" rx="3"></rect>
-      <path d="M7 13h2"></path>
-      <path d="M15 13h2"></path>
-      <path d="M10 16h4"></path>
-      <ellipse cx="12" cy="14" rx="13" ry="4" stroke="#00f3ff" stroke-width="1.5" transform="rotate(-15 12 14)"></ellipse>
-    </svg>
-  `;
+  btn.innerHTML = `<span>👽</span>`;
 
   const modal = document.createElement('div');
   modal.id = 'sv-chat-modal';
   modal.innerHTML = `
     <div id="sv-chat-header">SPACE TERMINAL <span style="font-size:10px; opacity:.8; font-family:'Inter', sans-serif; letter-spacing:0; text-shadow:none; color:#a0aec0; margin-left: 10px;">[GEMINI_AI_CORE]</span><div style="flex:1"></div><button id="sv-chat-close">✕</button></div>
-    <div id="sv-chat-body"><div class="sv-chat-system">Hello Pilot! I am your Gemini AI Assistant. Ask me for data regarding planetary mechanics, celestial phenomena, rockets, or black holes!</div></div>
+    <div id="sv-chat-body"><div class="sv-chat-system">Hello Pilot! I am your co pilot alien Assistant. Ask me for data regarding planetary mechanics, celestial phenomena, rockets, or black holes!</div></div>
     <div id="sv-chat-input-row"><input id="sv-chat-input" placeholder="Query terminal..." autocomplete="off" aria-label="Ask Space"/><button id="sv-chat-send">Send</button></div>
   `;
 
