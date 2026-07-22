@@ -7,8 +7,11 @@
   --neon-cyan: #00f0ff;
   --engine-orange: #ff5a2c;
 
-  --font-heading: 'Antonio', sans-serif;
-  --font-body: 'Archivo Narrow', sans-serif;
+  /* Antonio/Archivo Narrow were never loaded (no <link>/@font-face), so body
+     silently fell back to system sans-serif. Point these at the fonts the app
+     actually loads and intends: Orbitron (display) + Inter (body). */
+  --font-heading: 'Orbitron', sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
 
   --max-width: 1400px;
 }
