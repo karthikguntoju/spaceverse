@@ -994,6 +994,55 @@
             text-shadow: 0 0 30px rgba(0, 243, 255, 0.8);
         }
 
+        /* ─── Skip Intro Button ───────── */
+        .skip-launch-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            z-index: 10000;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.6rem 1.1rem;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 0.8rem;
+            letter-spacing: 0.15em;
+            text-transform: uppercase;
+            color: var(--text-main);
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            backdrop-filter: blur(8px);
+            cursor: pointer;
+            opacity: 0.75;
+            transition: opacity 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+        }
+
+        .skip-launch-btn:hover {
+            opacity: 1;
+            border-color: var(--neon-blue);
+            transform: translateY(-1px);
+        }
+
+        .skip-launch-btn:focus-visible {
+            outline: 2px solid var(--neon-blue);
+            outline-offset: 2px;
+        }
+
+        /* Hide once the launch is skipped/complete */
+        body.is-skipping-launch .skip-launch-btn {
+            display: none;
+        }
+
+        @media (max-width: 600px) {
+            .skip-launch-btn {
+                bottom: 1rem;
+                right: 1rem;
+                padding: 0.5rem 0.9rem;
+                font-size: 0.7rem;
+            }
+        }
+
         /* Special glow on the Explore Solar System card */
         #exploreLink {
             position: relative;
@@ -1038,6 +1087,28 @@
         <div class="warp-streaks" id="warpStreaks"></div>
         <div class="warp-center-text" id="warpText">INITIATING WARP DRIVE</div>
     </div>
+
+    <!-- Skip Intro -->
+    <button type="button" class="skip-launch-btn" id="skipLaunchBtn" aria-label="Skip intro animation">
+        Skip intro <span aria-hidden="true">&rarr;</span>
+    </button>
+    <script>
+        (function () {
+            var btn = document.getElementById('skipLaunchBtn');
+            if (!btn) return;
+            // Already seen this session: no intro to skip.
+            if (sessionStorage.getItem('hasSeenLaunch') === 'true') {
+                btn.style.display = 'none';
+                return;
+            }
+            btn.addEventListener('click', function () {
+                sessionStorage.setItem('hasSeenLaunch', 'true');
+                document.body.classList.add('is-skipping-launch');
+                window.scrollTo(0, 0);
+                try { if (window.ScrollTrigger) window.ScrollTrigger.refresh(); } catch (e) {}
+            });
+        })();
+    </script>
 
     <!-- SECTION: Launch Engine -->
     <section class="launch-engine">
