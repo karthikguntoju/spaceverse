@@ -2,589 +2,380 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SpaceVerse - VR Solar System</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>SpaceVerse — VR Solar System &amp; Deep Field Ride</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@500;700;900&display=swap">
     <style>
-        body {
-            margin: 0;
-            padding: 0;
+        :root {
+            --bg: #05070f;
+            --panel: rgba(9, 15, 27, 0.82);
+            --line: rgba(100, 255, 218, 0.28);
+            --accent: #64ffda;
+            --accent-2: #7aa2ff;
+            --danger: #ff5a5a;
+            --text: #e6f1ff;
+            --muted: #9fb3cc;
+        }
+
+        * { box-sizing: border-box; }
+
+        html, body {
+            margin: 0; padding: 0; height: 100%;
             overflow: hidden;
-            font-family: 'Inter', sans-serif;
-            background-color: #0D1117;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
         }
-        
-        #vr-container {
-            width: 100vw;
-            height: 100vh;
-        }
-        
+
+        #vr-container { position: fixed; inset: 0; }
+        #vr-container canvas { display: block; }
+
+        /* ── loading ─────────────────────────────────────────────── */
         #loading {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #E6F1FF;
-            font-size: 18px;
+            position: fixed; inset: 0; z-index: 60;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 18px; background: radial-gradient(circle at 50% 40%, #0d1730 0%, #04060d 70%);
         }
-        
+        #loading h1 {
+            font-family: 'Orbitron', sans-serif; font-size: clamp(22px, 4vw, 40px);
+            letter-spacing: 4px; margin: 0; color: var(--accent);
+            text-shadow: 0 0 24px rgba(100, 255, 218, 0.35);
+        }
+        #load-status { color: var(--muted); font-size: 14px; letter-spacing: 1px; }
+        .spinner {
+            width: 46px; height: 46px; border-radius: 50%;
+            border: 2px solid rgba(100, 255, 218, 0.18);
+            border-top-color: var(--accent);
+            animation: spin 0.9s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
         #error {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: #ff6b6b;
-            font-size: 18px;
-            text-align: center;
-            display: none;
+            position: fixed; inset: 0; z-index: 61; display: none;
+            flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+            background: #05070f; text-align: center; padding: 24px;
         }
-        
-        #retry-btn {
-            margin-top: 15px;
-            padding: 10px 20px;
-            background-color: #64FFDA;
-            color: #0D1117;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: bold;
+        #error h2 { color: var(--danger); font-family: 'Orbitron', sans-serif; }
+        #error-msg { color: var(--muted); font-size: 13px; max-width: 520px; }
+
+        /* ── shared chrome ───────────────────────────────────────── */
+        .hud { position: fixed; z-index: 20; pointer-events: none; }
+        .hud * { pointer-events: auto; }
+
+        #top-bar {
+            top: 0; left: 0; right: 0; padding: 14px 18px;
+            display: flex; align-items: center; justify-content: space-between; gap: 12px;
         }
-        
-        #enter-vr-btn {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            padding: 12px 24px;
-            background-color: rgba(100, 255, 218, 0.2);
-            color: #E6F1FF;
-            border: 2px solid #64FFDA;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 16px;
-            z-index: 1000;
+        .chip {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 9px 16px; min-height: 40px;
+            background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+            color: var(--text); text-decoration: none; font-size: 13px; font-weight: 600;
+            backdrop-filter: blur(9px); cursor: pointer;
+            transition: background 0.2s, border-color 0.2s, transform 0.15s;
         }
-        
-        #back-home {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            padding: 10px 20px;
-            background-color: rgba(100, 255, 218, 0.06);
-            color: #E6F1FF;
-            border: 2px solid #64FFDA;
-            border-radius: 25px;
-            text-decoration: none;
-            z-index: 1000;
+        .chip:hover { background: rgba(100, 255, 218, 0.13); border-color: var(--accent); transform: translateY(-1px); }
+        .chip.ghost { background: rgba(9, 15, 27, 0.5); }
+
+        #brand {
+            font-family: 'Orbitron', sans-serif; letter-spacing: 3px;
+            font-size: 13px; color: var(--accent); opacity: 0.9;
         }
-        
-        #controls-hint {
-            position: absolute;
-            bottom: 80px;
-            left: 20px;
-            color: rgba(255,255,255,0.7);
-            font-size: 12px;
-            z-index: 1000;
-            background: rgba(0,0,0,0.5);
-            padding: 10px 15px;
-            border-radius: 8px;
+
+        /* ── mode menu ───────────────────────────────────────────── */
+        #mode-menu {
+            position: fixed; inset: 0; z-index: 40; display: none;
+            align-items: center; justify-content: center; padding: 20px;
+            background: radial-gradient(circle at 50% 45%, rgba(9, 20, 40, 0.72) 0%, rgba(3, 5, 12, 0.94) 70%);
+            backdrop-filter: blur(3px);
         }
-        
-        #controls-hint p {
-            margin: 4px 0;
+        #mode-menu.show { display: flex; }
+        .menu-inner { width: min(920px, 100%); max-height: 92vh; overflow-y: auto; }
+        .menu-title {
+            font-family: 'Orbitron', sans-serif; font-size: clamp(24px, 4.4vw, 44px);
+            margin: 0 0 6px; letter-spacing: 2px;
         }
-        
-        #title-banner {
-            position: absolute;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            color: #E6F1FF;
-            font-size: 24px;
-            font-weight: bold;
-            z-index: 1000;
-            text-shadow: 0 0 10px #64FFDA;
+        .menu-title span { color: var(--accent); }
+        .menu-sub { color: var(--muted); margin: 0 0 22px; font-size: 14px; }
+
+        .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+        .card {
+            text-align: left; padding: 22px; border-radius: 16px; cursor: pointer;
+            background: linear-gradient(160deg, rgba(18, 30, 55, 0.9), rgba(8, 13, 24, 0.9));
+            border: 1px solid var(--line); color: var(--text);
+            font: inherit; transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+        }
+        .card:hover { transform: translateY(-3px); border-color: var(--accent); box-shadow: 0 14px 40px rgba(0, 0, 0, 0.5); }
+        .card h3 { font-family: 'Orbitron', sans-serif; margin: 0 0 8px; font-size: 19px; }
+        .card p { margin: 0; color: var(--muted); font-size: 13.5px; line-height: 1.55; }
+        .card .tag {
+            display: inline-block; margin-bottom: 12px; padding: 4px 10px; border-radius: 999px;
+            font-size: 11px; letter-spacing: 1.5px; font-weight: 700;
+            background: rgba(100, 255, 218, 0.12); color: var(--accent);
+        }
+        .card.ride .tag { background: rgba(255, 90, 90, 0.14); color: #ff8b8b; }
+        .card.pulse { animation: pulseCard 1.8s ease-in-out infinite; }
+        @keyframes pulseCard {
+            0%, 100% { box-shadow: 0 0 0 rgba(100, 255, 218, 0); }
+            50% { box-shadow: 0 0 32px rgba(100, 255, 218, 0.28); }
+        }
+
+        .settings {
+            margin-top: 18px; padding: 16px 18px; border-radius: 14px;
+            background: rgba(8, 13, 24, 0.75); border: 1px solid rgba(122, 162, 255, 0.22);
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 22px;
+        }
+        .settings label { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--muted); cursor: pointer; }
+        .settings input[type=checkbox] { width: 17px; height: 17px; accent-color: var(--accent); }
+        .settings input[type=range] { flex: 1 1 70px; min-width: 70px; accent-color: var(--accent); }
+        .settings label b { flex: 0 0 auto; color: var(--text); min-width: 58px; }
+        .warn-note {
+            grid-column: 1 / -1; font-size: 12px; color: #ffb46b; line-height: 1.5;
+            border-top: 1px dashed rgba(255, 180, 107, 0.25); padding-top: 10px;
+        }
+        #vr-ready { display: none; margin-top: 12px; font-size: 12px; color: var(--accent); }
+        .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
+        button.chip.disabled, button.chip:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* ── explore hud ─────────────────────────────────────────── */
+        #explore-hud, #ride-hud { display: none; }
+        #explore-hud.show, #ride-hud.show { display: block; }
+
+        #explore-panel {
+            position: fixed; left: 18px; bottom: 18px; z-index: 20;
+            background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
+            padding: 14px 16px; font-size: 12.5px; color: var(--muted); backdrop-filter: blur(9px);
+            max-width: 300px;
+        }
+        #explore-panel b { color: var(--text); }
+        #explore-panel .row { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
+        #explore-panel .keys { margin-top: 10px; line-height: 1.7; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; }
+        kbd {
+            background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16);
+            border-radius: 5px; padding: 1px 6px; font-size: 11px; font-family: ui-monospace, monospace;
+        }
+
+        /* ── ride hud ────────────────────────────────────────────── */
+        #ride-panel {
+            position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 20;
+            width: min(720px, calc(100% - 32px));
+            background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+            padding: 14px 18px; backdrop-filter: blur(10px);
+        }
+        .ride-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+        #seg-title { font-family: 'Orbitron', sans-serif; font-size: 17px; letter-spacing: 2px; color: var(--accent); }
+        #seg-sub { font-size: 12.5px; color: var(--muted); }
+        #seg-index, #ride-speed { font-family: 'Orbitron', sans-serif; font-size: 12px; color: var(--accent-2); }
+        #ride-bar { height: 6px; border-radius: 4px; background: rgba(255, 255, 255, 0.1); margin: 10px 0 12px; overflow: hidden; }
+        #ride-bar-fill {
+            height: 100%; width: 0%; border-radius: 4px;
+            background: linear-gradient(90deg, var(--accent-2), var(--accent));
+            box-shadow: 0 0 14px rgba(100, 255, 218, 0.5);
+        }
+        .ride-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+        .ride-btns .chip { padding: 7px 13px; font-size: 12px; min-height: 34px; }
+
+        #narration {
+            position: fixed; left: 50%; transform: translateX(-50%) translateY(8px); bottom: 150px; z-index: 21;
+            max-width: min(680px, calc(100% - 40px)); text-align: center;
+            background: rgba(4, 8, 16, 0.72); border-left: 2px solid var(--accent);
+            padding: 10px 18px; border-radius: 8px; font-size: 14px; line-height: 1.5;
+            opacity: 0; transition: opacity 0.4s, transform 0.4s; pointer-events: none;
+        }
+        #narration.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        #warning {
+            position: fixed; top: 84px; left: 50%; transform: translateX(-50%) scale(0.94); z-index: 22;
+            font-family: 'Orbitron', sans-serif; font-size: clamp(15px, 2.4vw, 22px); letter-spacing: 3px;
+            padding: 10px 22px; border-radius: 10px; color: #ffd2d2;
+            background: rgba(60, 8, 8, 0.6); border: 1px solid rgba(255, 90, 90, 0.55);
+            opacity: 0; transition: opacity 0.16s, transform 0.16s; pointer-events: none;
+            text-shadow: 0 0 18px rgba(255, 90, 90, 0.6);
+        }
+        #warning.show { opacity: 1; transform: translateX(-50%) scale(1); animation: warnPulse 0.55s ease-in-out infinite alternate; }
+        #warning.ok { color: #c9ffe6; background: rgba(8, 48, 36, 0.6); border-color: rgba(100, 255, 218, 0.5); animation: none; }
+        #warning.hit { color: #fff; background: rgba(90, 10, 10, 0.75); }
+        @keyframes warnPulse { from { box-shadow: 0 0 0 rgba(255, 90, 90, 0); } to { box-shadow: 0 0 26px rgba(255, 90, 90, 0.55); } }
+
+        #ride-done {
+            position: fixed; inset: 0; z-index: 30; display: none;
+            align-items: center; justify-content: center; pointer-events: none;
+        }
+        #ride-done.show { display: flex; }
+        #ride-done div {
+            font-family: 'Orbitron', sans-serif; font-size: clamp(20px, 4vw, 38px); letter-spacing: 4px;
+            color: var(--accent); text-shadow: 0 0 30px rgba(100, 255, 218, 0.5);
+            animation: doneIn 0.7s ease-out;
+        }
+        @keyframes doneIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+
+        /* ── info card ───────────────────────────────────────────── */
+        #info-card {
+            position: fixed; right: 18px; top: 74px; z-index: 24; width: min(320px, calc(100% - 36px));
+            background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+            padding: 18px; backdrop-filter: blur(10px);
+            opacity: 0; transform: translateX(14px); pointer-events: none; transition: opacity 0.25s, transform 0.25s;
+        }
+        #info-card.show { opacity: 1; transform: none; pointer-events: auto; }
+        #info-name { font-family: 'Orbitron', sans-serif; font-size: 20px; margin: 0 0 8px; color: var(--accent); }
+        #info-fact { font-size: 13px; color: var(--muted); line-height: 1.6; margin: 0 0 12px; }
+        #info-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; color: var(--muted); }
+        #info-stats span { background: rgba(122, 162, 255, 0.12); border-radius: 6px; padding: 4px 8px; }
+        #info-stats b { color: var(--text); }
+        #info-close {
+            position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14);
+            color: var(--text); cursor: pointer; line-height: 1;
+        }
+
+        #toast {
+            position: fixed; left: 50%; transform: translateX(-50%) translateY(10px); bottom: 196px; z-index: 25;
+            background: rgba(8, 14, 26, 0.9); border: 1px solid var(--line); border-radius: 10px;
+            padding: 10px 16px; font-size: 12.5px; color: var(--muted); max-width: min(560px, calc(100% - 36px));
+            opacity: 0; transition: opacity 0.3s, transform 0.3s; pointer-events: none; text-align: center;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        body.in-vr .hud, body.in-vr #mode-menu, body.in-vr #info-card, body.in-vr #toast { display: none !important; }
+
+        @media (max-width: 640px) {
+            #explore-panel { left: 10px; right: 10px; bottom: 10px; max-width: none; }
+            #ride-panel { bottom: 10px; }
+            #narration { bottom: 150px; }
         }
     </style>
 </head>
 <body>
     <div id="vr-container"></div>
-    <div id="loading">Initializing VR Experience...</div>
+
+    <div id="loading">
+        <h1>SPACEVERSE VR</h1>
+        <div class="spinner"></div>
+        <div id="load-status">Booting renderer…</div>
+    </div>
+
     <div id="error">
-        <p>Error loading VR experience. Please check the browser console for details.</p>
-        <button id="retry-btn" onclick="retryLoad()">Retry</button>
+        <h2>WebGL failed to start</h2>
+        <p id="error-msg"></p>
+        <a class="chip" href="/">← Back to home</a>
     </div>
-    
-    <a href="/" id="back-home">← Back to Home</a>
-    <div id="title-banner">🌌 VR Solar System Explorer</div>
-    <div id="controls-hint">
-        <p>🖱️ Drag to rotate view</p>
-        <p>🔍 Scroll to zoom in/out</p>
-        <p>👆 Double-click to reset</p>
+
+    <!-- top bar -->
+    <div class="hud" id="top-bar">
+        <a href="/" class="chip ghost">← Home</a>
+        <div id="brand">SPACEVERSE · VR</div>
+        <button id="btn-menu" class="chip ghost">☰ Menu</button>
     </div>
-    <button id="enter-vr-btn" onclick="enterVR()" style="display: none;">🥽 Enter VR Mode</button>
-    
-    <!-- Load libraries in the correct order -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/react@18.2.0/umd/react.production.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/react-dom@18.2.0/umd/react-dom.production.min.js"></script>
-    
-    <script>
-        // Global variables for our 3D scene
-        let scene, camera, renderer, vrCamera;
-        let planets = [];
-        let animationId;
-        let vrSession = null;
-        let vrEnabled = false;
 
-        // Ensure required libraries are available (dynamic fallback) — prefer local ESM first
-        async function ensureLibraries() {
-            // Prefer local ESM module import for Three.js
-            if (typeof THREE === 'undefined') {
-                try {
-                    const m = await import('/lib/three/three.module.min.js');
-                    window.THREE = m;
-                    console.log('Three.js loaded from local /lib/three/three.module.min.js');
-                } catch (modErr) {
-                    console.warn('Local module import failed:', modErr);
-                    // Try local UMD (core)
-                    try {
-                        await new Promise((resolve, reject) => {
-                            const s = document.createElement('script');
-                            s.src = '/lib/three/three.core.min.js';
-                            s.onload = resolve;
-                            s.onerror = () => reject(new Error('three.core.min.js not available'));
-                            document.head.appendChild(s);
-                        });
-                        // Wait a short time for UMD to attach globals
-                        await new Promise(r => setTimeout(r, 50));
-                        if (typeof THREE === 'undefined') {
-                            console.warn('Local UMD loaded but THREE global still undefined');
-                        } else {
-                            console.log('Three.js loaded from local /lib/three/three.core.min.js');
-                        }
-                    } catch (umdErr) {
-                        console.warn('Local UMD not available:', umdErr);
-                        // Try CDN ESM as last resort
-                        try {
-                            const m2 = await import('https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.module.js');
-                            window.THREE = m2;
-                            console.log('Three.js loaded via CDN ESM import');
-                        } catch (cdnEsmErr) {
-                            console.warn('CDN ESM import failed:', cdnEsmErr);
-                            // Finally, try CDN UMD
-                            try {
-                                await new Promise((resolve, reject) => {
-                                    const sCDN = document.createElement('script');
-                                    sCDN.src = 'https://cdn.jsdelivr.net/npm/three@0.182.0/build/three.min.js';
-                                    sCDN.onload = resolve;
-                                    sCDN.onerror = () => reject(new Error('Failed to load THREE from CDN UMD'));
-                                    document.head.appendChild(sCDN);
-                                });
-                                await new Promise(r => setTimeout(r, 50));
-                                console.log('Three.js loaded from CDN UMD');
-                            } catch (cdnUmdErr) {
-                                console.warn('CDN UMD load failed:', cdnUmdErr);
-                                throw new Error('Could not load Three.js library');
-                            }
-                        }
-                    }
-                }
-            } else {
-                console.log('THREE already available');
-            }
+    <!-- mode menu -->
+    <div id="mode-menu">
+        <div class="menu-inner">
+            <h1 class="menu-title">Choose your <span>experience</span></h1>
+            <p class="menu-sub">Both modes run on a normal screen and inside a VR headset (Quest, Vive, Index, WMR).</p>
 
-            // React/ReactDOM are optional for enhanced experiences; warn if missing
-            if (typeof React === 'undefined' || typeof ReactDOM === 'undefined') {
-                console.warn('React or ReactDOM not found on this page; React-based VR will not be available — using Three.js fallback');
-            }
+            <div class="cards">
+                <button class="card" id="start-explore">
+                    <span class="tag">FREE FLIGHT</span>
+                    <h3>🌌 Explore the Solar System</h3>
+                    <p>Fly anywhere. Twelve NASA-textured worlds, 20 named moons, Earth's city lights at
+                       night, Saturn's rings, two asteroid belts and the dwarf planets out to Eris.
+                       Point at anything — even a moon — to scan it.</p>
+                </button>
+                <button class="card ride" id="start-ride">
+                    <span class="tag">RIDE · 3 MIN</span>
+                    <h3>🎢 Deep Field — Roller Coaster</h3>
+                    <p>A rail-guided plunge: solar slingshot, asteroid gauntlet, Jupiter barrel roll,
+                       a shot straight through Saturn's rings, and four things that come far too close.</p>
+                </button>
+            </div>
 
-            return true;
-        }
-        
-        // Planet data with enhanced VR-optimized properties
-        const planetData = [
-            { name: "Sun", radius: 30, distance: 0, speed: 0, rotationSpeed: 0.0005, color: 0xffd700, emissive: 0xff4500, isEmissive: true },
-            { name: "Mercury", radius: 3, distance: 50, speed: 0.004, rotationSpeed: 0.0008, color: 0xa9a9a9 },
-            { name: "Venus", radius: 5, distance: 75, speed: 0.002, rotationSpeed: 0.0006, color: 0xe39e1c },
-            { name: "Earth", radius: 5.5, distance: 100, speed: 0.001, rotationSpeed: 0.01, color: 0x1e90ff },
-            { name: "Mars", radius: 4, distance: 130, speed: 0.0008, rotationSpeed: 0.009, color: 0xff4500 },
-            { name: "Jupiter", radius: 18, distance: 180, speed: 0.0005, rotationSpeed: 0.0002, color: 0xd2b48c },
-            { name: "Saturn", radius: 15, distance: 230, speed: 0.0004, rotationSpeed: 0.0001, color: 0xf0e68c, hasRing: true },
-            { name: "Uranus", radius: 10, distance: 280, speed: 0.0003, rotationSpeed: 0.00005, color: 0xafeeee },
-            { name: "Neptune", radius: 10, distance: 330, speed: 0.0002, rotationSpeed: 0.00003, color: 0x4169e1 }
-        ];
-        
-        // Global error handling
-        window.addEventListener('error', function(e) {
-            console.error('Global error:', e.error);
-            document.getElementById('loading').style.display = 'none';
-            document.getElementById('error').style.display = 'block';
-        });
-        
-        async function retryLoad() {
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('error').style.display = 'none';
-            try {
-                await ensureLibraries();
-            } catch (e) {
-                console.warn('ensureLibraries failed on retry:', e);
-            }
-            init();
-        }
-        
-        // Initialize the 3D scene
-        async function init() {
-            try {
-                console.log('Initializing 3D scene...');
-                
-                // If THREE isn't available here, try to initialize robust fallback
-                if (typeof THREE === 'undefined') {
-                    console.warn('THREE is not available at init; initializing robust fallback');
-                    // Try local module import first
-                    try {
-                        const m = await import('/lib/three/three.module.min.js');
-                        window.THREE = m;
-                        console.log('Three.js module imported at init');
-                    } catch (e) {
-                        console.warn('Module import failed at init:', e);
-                        // Try UMD core
-                        try {
-                            await new Promise((res, rej) => {
-                                const s = document.createElement('script');
-                                s.src = '/lib/three/three.core.min.js';
-                                s.onload = res;
-                                s.onerror = rej;
-                                document.head.appendChild(s);
-                            });
-                            await new Promise(r => setTimeout(r, 50));
-                        } catch (err) {
-                            console.warn('UMD load failed at init:', err);
-                        }
-                    }
+            <div class="settings">
+                <label><input type="checkbox" id="opt-comfort"> Comfort mode (damps rolls, adds tunnel vignette)</label>
+                <label><input type="checkbox" id="opt-scares" checked> Jumpscares enabled</label>
+                <label><input type="checkbox" id="opt-sound" checked> Sound</label>
+                <label><input type="checkbox" id="opt-labels" checked> Name labels (explore)</label>
+                <label><input type="checkbox" id="opt-orbits" checked> Orbit lines (explore)</label>
+                <label>Intensity
+                    <input type="range" id="opt-intensity" min="0.15" max="1" step="0.05" value="1">
+                    <b id="intensity-val">Full</b>
+                </label>
+                <div class="warn-note">
+                    ⚠ The ride contains sudden movement, flashing effects, loud impacts and deliberate
+                    jumpscares. Turn on Comfort mode or lower Intensity if you are prone to motion sickness.
+                    In a headset, stay seated.
+                </div>
+            </div>
 
-                    // If after attempts THREE still undefined, load fallback helper and stop
-                    if (typeof THREE === 'undefined') {
-                        console.warn('Three.js still not available; loading three-vr-fallback');
-                        const f = document.createElement('script');
-                        f.src = '/public/js/three-vr-fallback.js';
-                        f.onload = () => { window.initThreeVRFallback('vr-container'); };
-                        f.onerror = () => { console.error('Failed to load three-vr-fallback'); };
-                        document.head.appendChild(f);
-                        document.getElementById('loading').style.display = 'none';
-                        return;
-                    }
+            <div class="btn-row">
+                <button id="enter-vr" class="chip">🥽 Checking for headset…</button>
+                <span id="vr-ready">Headset detected — enter VR first, then pick a mode.</span>
+            </div>
+        </div>
+    </div>
 
-                }
+    <!-- explore hud -->
+    <div id="explore-hud" class="hud">
+        <div id="explore-panel">
+            <div class="row"><span>NEAREST</span><b id="near-body">—</b></div>
+            <div class="row"><span>DISTANCE</span><b id="near-dist">—</b></div>
+            <div class="row"><span>SPEED</span><b id="fly-speed">40 u/s</b></div>
+            <div class="keys">
+                <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> fly · <kbd>Q</kbd><kbd>E</kbd> up/down ·
+                <kbd>Shift</kbd> boost<br>
+                Drag to look · scroll to change speed · click a planet to scan<br>
+                In VR: left stick flies, right stick snap-turns, trigger scans
+            </div>
+        </div>
+    </div>
 
-                // Create scene
-                scene = new THREE.Scene();
-                scene.background = new THREE.Color(0x000000);
-                
-                // Create camera
-                camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-                camera.position.set(0, 50, 150);
-                
-                // Create renderer
-                renderer = new THREE.WebGLRenderer({ antialias: true });
-                renderer.setSize(window.innerWidth, window.innerHeight);
-                renderer.setPixelRatio(window.devicePixelRatio);
-                document.getElementById('vr-container').appendChild(renderer.domElement);
-                
-                // Add lighting
-                const ambientLight = new THREE.AmbientLight(0x333333);
-                scene.add(ambientLight);
-                
-                const sunLight = new THREE.PointLight(0xffffff, 2, 300);
-                scene.add(sunLight);
-                
-                // Create planets
-                createPlanets();
-                
-                // Add orbit lines
-                addOrbitLines();
-                
-                // Add stars background
-                addStars();
-                
-                // Setup mouse controls
-                setupMouseControls();
-                
-                // Handle window resize
-                window.addEventListener('resize', onWindowResize);
-                
-                // Show VR button if WebXR is supported
-                if (navigator.xr) {
-                    navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
-                        if (supported) {
-                            document.getElementById('enter-vr-btn').style.display = 'block';
-                        }
-                    });
-                }
-                
-                // Start animation
-                animate();
-                
-                // Hide loading indicator
-                document.getElementById('loading').style.display = 'none';
-                console.log('3D scene initialized successfully');
-                
-            } catch (error) {
-                console.error('Error initializing 3D scene:', error);
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('error').style.display = 'block';
-            }
-        }
-        
-        // Create planets
-        function createPlanets() {
-            planetData.forEach(data => {
-                const geometry = new THREE.SphereGeometry(data.radius, 32, 32);
-                
-                // Use emissive material for Sun, phong for others
-                let material;
-                if (data.isEmissive) {
-                    material = new THREE.MeshBasicMaterial({ 
-                        color: data.color
-                    });
-                } else {
-                    material = new THREE.MeshPhongMaterial({ 
-                        color: data.color,
-                        shininess: 50
-                    });
-                }
-                
-                const planet = new THREE.Mesh(geometry, material);
-                
-                if (data.name === "Sun") {
-                    planet.position.set(0, 0, 0);
-                    // Add strong glow effect for sun
-                    const sunGlow = new THREE.PointLight(0xffdd00, 2, 500);
-                    planet.add(sunGlow);
-                    // Add additional point light for illumination
-                    const sunLight2 = new THREE.PointLight(0xff6600, 1.5, 400);
-                    planet.add(sunLight2);
-                } else {
-                    // Position planets in a circle
-                    const angle = Math.random() * Math.PI * 2;
-                    planet.position.x = Math.cos(angle) * data.distance;
-                    planet.position.z = Math.sin(angle) * data.distance;
-                }
-                
-                // Add Saturn's rings
-                if (data.hasRing) {
-                    const ringGeometry = new THREE.RingGeometry(data.radius * 1.3, data.radius * 2.2, 64);
-                    const ringMaterial = new THREE.MeshBasicMaterial({ 
-                        color: 0xc9a86c,
-                        side: THREE.DoubleSide,
-                        transparent: true,
-                        opacity: 0.7
-                    });
-                    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-                    ring.rotation.x = Math.PI / 2.5; // Tilt the ring
-                    planet.add(ring);
-                }
-                
-                scene.add(planet);
-                
-                // Store planet data for animation
-                planets.push({
-                    mesh: planet,
-                    data: data,
-                    angle: Math.random() * Math.PI * 2
-                });
-            });
-        }
-        
-        // Add star background
-        function addStars() {
-            const starGeometry = new THREE.BufferGeometry();
-            const starMaterial = new THREE.PointsMaterial({
-                color: 0xffffff,
-                size: 0.5,
-                sizeAttenuation: true
-            });
-            
-            const starVertices = [];
-            for (let i = 0; i < 5000; i++) {
-                const x = (Math.random() - 0.5) * 2000;
-                const y = (Math.random() - 0.5) * 2000;
-                const z = (Math.random() - 0.5) * 2000;
-                starVertices.push(x, y, z);
-            }
-            
-            starGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
-            const stars = new THREE.Points(starGeometry, starMaterial);
-            scene.add(stars);
-        }
-        
-        // Add orbit visualization lines
-        function addOrbitLines() {
-            planetData.forEach(data => {
-                if (data.distance > 0) {
-                    const orbitGeometry = new THREE.BufferGeometry();
-                    const orbitPoints = [];
-                    const segments = 128;
-                    
-                    for (let i = 0; i <= segments; i++) {
-                        const angle = (i / segments) * Math.PI * 2;
-                        orbitPoints.push(
-                            Math.cos(angle) * data.distance,
-                            0,
-                            Math.sin(angle) * data.distance
-                        );
-                    }
-                    
-                    orbitGeometry.setAttribute('position', new THREE.Float32BufferAttribute(orbitPoints, 3));
-                    const orbitMaterial = new THREE.LineBasicMaterial({ 
-                        color: 0x444488,
-                        transparent: true,
-                        opacity: 0.3
-                    });
-                    const orbitLine = new THREE.Line(orbitGeometry, orbitMaterial);
-                    scene.add(orbitLine);
-                }
-            });
-        }
-        
-        // Mouse controls for camera
-        let isDragging = false;
-        let previousMousePosition = { x: 0, y: 0 };
-        let cameraRadius = 200;
-        let cameraAngleX = 0;
-        let cameraAngleY = 0.3;
-        let autoRotate = true;
-        
-        function setupMouseControls() {
-            const canvas = renderer.domElement;
-            
-            canvas.addEventListener('mousedown', (e) => {
-                isDragging = true;
-                autoRotate = false;
-                previousMousePosition = { x: e.clientX, y: e.clientY };
-            });
-            
-            canvas.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                
-                const deltaX = e.clientX - previousMousePosition.x;
-                const deltaY = e.clientY - previousMousePosition.y;
-                
-                cameraAngleX += deltaX * 0.005;
-                cameraAngleY += deltaY * 0.005;
-                cameraAngleY = Math.max(-Math.PI/2 + 0.1, Math.min(Math.PI/2 - 0.1, cameraAngleY));
-                
-                previousMousePosition = { x: e.clientX, y: e.clientY };
-            });
-            
-            canvas.addEventListener('mouseup', () => { isDragging = false; });
-            canvas.addEventListener('mouseleave', () => { isDragging = false; });
-            
-            canvas.addEventListener('wheel', (e) => {
-                e.preventDefault();
-                cameraRadius += e.deltaY * 0.5;
-                cameraRadius = Math.max(50, Math.min(500, cameraRadius));
-            });
-            
-            // Double click to reset view
-            canvas.addEventListener('dblclick', () => {
-                autoRotate = true;
-                cameraRadius = 200;
-                cameraAngleY = 0.3;
-            });
-        }
-        
-        // Handle window resize
-        function onWindowResize() {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-        
-        // Animation loop
-        function animate() {
-            animationId = requestAnimationFrame(animate);
-            
-            // Rotate planets
-            planets.forEach(planetObj => {
-                const { mesh, data, angle } = planetObj;
-                
-                // Rotate planet on its axis
-                mesh.rotation.y += data.rotationSpeed;
-                
-                // Orbit around sun (except sun itself)
-                if (data.distance > 0) {
-                    planetObj.angle += data.speed;
-                    mesh.position.x = Math.cos(planetObj.angle) * data.distance;
-                    mesh.position.z = Math.sin(planetObj.angle) * data.distance;
-                }
-            });
-            
-            // Camera control based on mouse or auto-rotate
-            if (autoRotate) {
-                cameraAngleX += 0.001;
-            }
-            
-            camera.position.x = Math.sin(cameraAngleX) * Math.cos(cameraAngleY) * cameraRadius;
-            camera.position.y = Math.sin(cameraAngleY) * cameraRadius;
-            camera.position.z = Math.cos(cameraAngleX) * Math.cos(cameraAngleY) * cameraRadius;
-            camera.lookAt(0, 0, 0);
-            
-            renderer.render(scene, camera);
-        }
-        
-        // Enter VR mode (robust handling)
-        async function enterVR() {
-            try {
-                if (!renderer) { alert('Renderer not initialized yet.'); return; }
+    <!-- ride hud -->
+    <div id="ride-hud" class="hud">
+        <div id="ride-panel">
+            <div class="ride-top">
+                <div>
+                    <div id="seg-title">STANDBY</div>
+                    <div id="seg-sub">Preparing track…</div>
+                </div>
+                <div style="text-align:right">
+                    <div id="seg-index">1/8</div>
+                    <div id="ride-speed">0 km/h</div>
+                </div>
+            </div>
+            <div id="ride-bar"><div id="ride-bar-fill"></div></div>
+            <div class="ride-btns">
+                <button id="btn-pause" class="chip">⏸ Pause</button>
+                <button id="btn-skip" class="chip">⏭ Skip section</button>
+                <button id="btn-restart" class="chip">↻ Restart</button>
+            </div>
+        </div>
+        <div id="narration"></div>
+        <div id="warning"></div>
+        <div id="ride-done"><div>MISSION COMPLETE</div></div>
+    </div>
 
-                // Enable XR on the renderer
-                if (renderer.xr) {
-                    renderer.xr.enabled = true;
-                } else {
-                    // Create the xr wrapper if missing
-                    if (THREE && THREE.WebXRManager) {
-                        renderer.xr = new THREE.WebXRManager(renderer, camera);
-                    }
-                }
+    <!-- planet scan card -->
+    <div id="info-card">
+        <button id="info-close">×</button>
+        <h3 id="info-name">Earth</h3>
+        <p id="info-fact"></p>
+        <div id="info-stats"></div>
+    </div>
 
-                if (navigator.xr && navigator.xr.requestSession) {
-                    try {
-                        const session = await navigator.xr.requestSession('immersive-vr');
-                        vrSession = session;
-                        if (renderer.xr && renderer.xr.setSession) renderer.xr.setSession(session);
-                        session.addEventListener('end', () => { vrSession = null; });
-                    } catch (err) {
-                        console.error('Error entering XR session:', err);
-                        alert('Failed to enter VR mode. Falling back to fullscreen view.');
-                        if (renderer.domElement.requestFullscreen) await renderer.domElement.requestFullscreen();
-                    }
-                } else {
-                    alert('WebXR not supported. Falling back to fullscreen render.');
-                    if (renderer.domElement.requestFullscreen) await renderer.domElement.requestFullscreen();
-                }
-            } catch (e) {
-                console.error('enterVR error:', e);
-                alert('Unable to enter VR mode. Check console for details.');
-            }
+    <div id="toast"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "/lib/three/three.module.js",
+            "three/addons/": "/lib/three/addons/"
         }
-        
-        // Start when page is ready (ensure libs first)
-        async function startPage() {
-            try {
-                await ensureLibraries();
-            } catch (e) {
-                console.warn('Library assurance failed (continuing to init):', e);
-            }
-
-            if (document.readyState === 'loading') {
-                document.addEventListener('DOMContentLoaded', init);
-            } else {
-                init();
-            }
-        }
-
-        startPage();
+    }
     </script>
+    <script type="module" src="/public/js/vr/main.js"></script>
     <script src="/public/js/chat-widget.js" defer></script>
 </body>
 </html>

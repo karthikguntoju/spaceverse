@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const session = require('express-session');
+const MongoStore = require('connect-mongo').default || require('connect-mongo');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 require('dotenv').config();
@@ -70,13 +71,31 @@ app.use(cors({ credentials: true, origin: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Session middleware (must be before routes that need it)
-app.use(session({
-    secret: 'spaceverse-secret-key-2024',
+// Session middleware (must be before routes that need it).
+// Use a persistent MongoDB-backed store when a URI is available so sessions
+// survive server restarts (otherwise the default in-memory store logs everyone
+// out on every restart, causing protected pages to redirect back to home).
+const sessionOptions = {
+    secret: process.env.SESSION_SECRET || 'spaceverse-secret-key-2024',
     resave: false,
-    saveUninitialized: true,
+    saveUninitialized: false,
     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000, sameSite: 'lax' } // 24 hours
-}));
+};
+if (process.env.MONGODB_URI) {
+    try {
+        sessionOptions.store = MongoStore.create({
+            mongoUrl: process.env.MONGODB_URI,
+            collectionName: 'sessions',
+            ttl: 24 * 60 * 60 // 1 day, matches cookie maxAge
+        });
+        console.log('Session store: MongoDB (persistent across restarts)');
+    } catch (e) {
+        console.warn('Failed to init MongoStore, using in-memory sessions:', e.message);
+    }
+} else {
+    console.warn('Session store: in-memory (sessions lost on restart — set MONGODB_URI to persist)');
+}
+app.use(session(sessionOptions));
 
 // Route handlers (must be before static file middleware)
 app.get('/', (req, res) => {
@@ -138,6 +157,11 @@ app.get('/vr-working', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'vr-working.html'));
 });
 
+// Direct entry into the space roller-coaster ride (same page, ride mode preselected)
+app.get('/vr-ride', ensureAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'vr-working.html'));
+});
+
 // Planet detail page
 app.get('/planet', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'planet-detail.html'));
@@ -171,6 +195,8 @@ app.use('/public', express.static('public'));
 app.use('/models', express.static('models'));
 app.use('/src', express.static('src'));
 // Serve local builds for important libraries as a CDN fallback
+// Addons (examples/jsm) must be registered before the build mount so VRButton etc. resolve
+app.use('/lib/three/addons', express.static(path.join(__dirname, 'node_modules', 'three', 'examples', 'jsm')));
 app.use('/lib/three', express.static(path.join(__dirname, 'node_modules', 'three', 'build')));
 // Optionally expose other local libs if needed in future
 // Prefer any local public lib overrides first (useful for CI/local fallbacks)
@@ -286,12 +312,23 @@ app.post('/api/register', async (req, res) => {
             return res.status(400).json({ error: 'User already exists' });
         }
 
-        // Register user securely into Firebase Authentication
+        // Register user securely into Firebase Authentication.
+        // If the email already exists in Firebase but has no local DB record
+        // (e.g. the DB was reset), verify the password by signing in and then
+        // rebuild the local record instead of failing.
         let userCredential;
         try {
             userCredential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
         } catch (firebaseErr) {
-            return res.status(400).json({ error: 'Firebase error: ' + firebaseErr.message });
+            if (firebaseErr.code === 'auth/email-already-in-use') {
+                try {
+                    userCredential = await signInWithEmailAndPassword(firebaseAuth, email, password);
+                } catch (signInErr) {
+                    return res.status(400).json({ error: 'This email is already registered. Use the correct password, or log in instead.' });
+                }
+            } else {
+                return res.status(400).json({ error: 'Firebase error: ' + firebaseErr.message });
+            }
         }
 
         // Hash password just for legacy compatibility in DB (or could leave empty, but let's keep it consistent)
@@ -403,7 +440,11 @@ app.post('/api/logout', (req, res) => {
 
 app.get('/api/user', (req, res) => {
     if (req.session.userId) {
-        res.json({ loggedIn: true, username: req.session.username });
+        res.json({
+            loggedIn: true,
+            username: req.session.username,
+            user: { id: req.session.userId, username: req.session.username }
+        });
     } else {
         res.json({ loggedIn: false });
     }
