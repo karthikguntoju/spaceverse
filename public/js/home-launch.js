@@ -38,6 +38,7 @@ class LaunchExperience {
 
         // Mouse parallax tracking
         this.mouse = { x: 0, y: 0 };
+        this.baseTilt = 0;   // gravity-turn lean, blended into shake/settle below
         this.init();
     }
 
@@ -262,6 +263,34 @@ class LaunchExperience {
         this.buildSmokeParticles();
         this.buildGlowSprites();
         this.buildSteamCloud();
+        this.buildStarStreaks();
+    }
+
+    /* ── Star streaks — vertical speed lines that fade in during high ascent ── */
+    buildStarStreaks() {
+        const N = 220;
+        this.STREAK_N  = N;
+        this.streakArr = new Float32Array(N * 6);
+        this.streakVel = new Float32Array(N);
+        for (let i = 0; i < N; i++) {
+            const a = Math.random() * Math.PI * 2;
+            const r = 3 + Math.random() * 12;
+            const x = Math.cos(a) * r, z = Math.sin(a) * r;
+            const y = Math.random() * 50 - 15;
+            const len = 0.6 + Math.random() * 1.8;
+            this.streakArr[i*6]   = x; this.streakArr[i*6+1] = y;       this.streakArr[i*6+2] = z;
+            this.streakArr[i*6+3] = x; this.streakArr[i*6+4] = y + len; this.streakArr[i*6+5] = z;
+            this.streakVel[i] = 18 + Math.random() * 30;
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.BufferAttribute(this.streakArr, 3));
+        this.streakMat = new THREE.LineBasicMaterial({
+            color: 0xbfd4ff, transparent: true, opacity: 0,
+            blending: THREE.AdditiveBlending, depthWrite: false
+        });
+        this.streaks = new THREE.LineSegments(geo, this.streakMat);
+        this.streaks.renderOrder = 0;
+        this.scene.add(this.streaks);
     }
 
     /* ── Main Engine Fire (SSME × 3 near main nozzle) ── */
@@ -348,44 +377,153 @@ class LaunchExperience {
         this.srbLifeArr[i]    = scatter ? Math.random() : 0;
     }
 
-    /* ── Volumetric smoke cloud ── */
+    /* ── Volumetric smoke cloud ──
+       Per-particle billowing plume driven by a custom ShaderMaterial:
+       - each particle grows over its lifetime (small ember → giant puff)
+       - warm-lit near the nozzle, cools to grey/white as it ages
+       - soft fluffy alpha texture, per-particle fade in/out
+       Motion (curl turbulence + buoyancy) lives in _updateSmoke().
+    */
     buildSmokeParticles() {
-        const COUNT = 8000;
-        this.smkPosArr  = new Float32Array(COUNT * 3);
-        this.smkVelArr  = new Float32Array(COUNT * 3);
-        this.smkLifeArr = new Float32Array(COUNT);
-        this.SMK_N      = COUNT;
+        const COUNT = 9000;
+        this.smkPosArr   = new Float32Array(COUNT * 3);
+        this.smkVelArr   = new Float32Array(COUNT * 3);
+        this.smkLifeArr  = new Float32Array(COUNT);   // 0..1 age
+        this.smkSeedArr  = new Float32Array(COUNT);   // per-particle noise phase
+        this.smkSizeArr  = new Float32Array(COUNT);   // base world size
+        this.SMK_N       = COUNT;
         for (let i = 0; i < COUNT; i++) this._resetSmoke(i, true);
 
         const geo = new THREE.BufferGeometry();
         geo.setAttribute('position', new THREE.BufferAttribute(this.smkPosArr, 3));
+        geo.setAttribute('aLife',    new THREE.BufferAttribute(this.smkLifeArr, 1));
+        geo.setAttribute('aSeed',    new THREE.BufferAttribute(this.smkSeedArr, 1));
+        geo.setAttribute('aSize',    new THREE.BufferAttribute(this.smkSizeArr, 1));
 
-        const mat = new THREE.PointsMaterial({
-            map: this._makeGradientSprite(128,
-                ['rgba(200,210,220,0.4)', 'rgba(160,170,180,0.1)', 'rgba(100,110,120,0.02)', 'rgba(0,0,0,0)']),
-            size: 5.5,          // Massive, realistic volumetric puffs
-            sizeAttenuation: true,
+        const mat = new THREE.ShaderMaterial({
+            uniforms: {
+                uTex:        { value: this._makeSmokeTexture(256) },
+                uOpacity:    { value: 0.0 },
+                uTime:       { value: 0.0 },
+                uPixelRatio: { value: Math.min(window.devicePixelRatio, 2) },
+                uHot:        { value: new THREE.Color(0xd98a3a) },  // exhaust-lit
+                uWarm:       { value: new THREE.Color(0x8f8a82) },  // dusty tan
+                uCool:       { value: new THREE.Color(0x9aa1ab) },  // cooled steam-grey
+            },
+            vertexShader: `
+                attribute float aLife;
+                attribute float aSeed;
+                attribute float aSize;
+                uniform float uPixelRatio;
+                varying float vLife;
+                varying float vSeed;
+                void main() {
+                    vLife = aLife;
+                    vSeed = aSeed;
+                    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                    // grows ~2.5x over its life as the puff expands
+                    float grow = aSize * (0.4 + aLife * 1.8);
+                    // large overlapping sprites — puffs merge into one cloud
+                    // mass instead of reading as separate dots
+                    gl_PointSize = grow * uPixelRatio * (200.0 / -mv.z);
+                    gl_PointSize = clamp(gl_PointSize, 5.0, 180.0);
+                    gl_Position = projectionMatrix * mv;
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D uTex;
+                uniform float uOpacity;
+                uniform float uTime;
+                uniform vec3 uHot;
+                uniform vec3 uWarm;
+                uniform vec3 uCool;
+                varying float vLife;
+                varying float vSeed;
+                void main() {
+                    // per-puff rotation — every particle slowly churns at its own
+                    // speed/direction instead of sitting as a static billboard
+                    float dir = step(0.5, fract(vSeed * 5.31)) * 2.0 - 1.0;
+                    float ang = vSeed * 6.2831 + uTime * dir * (0.25 + fract(vSeed * 3.71) * 0.45);
+                    vec2 pc = gl_PointCoord - 0.5;
+                    float cs = cos(ang), sn = sin(ang);
+                    pc = vec2(pc.x * cs - pc.y * sn, pc.x * sn + pc.y * cs) + 0.5;
+                    vec4 tex = texture2D(uTex, pc);
+                    // ragged erosion — the alpha threshold rises with age so the
+                    // puff dissolves from its thin edges inward, not a flat fade
+                    float erode = smoothstep(0.35, 1.0, vLife) * 0.30;
+                    float dens = smoothstep(erode, erode + 0.65, tex.a);
+                    // fade in fast, long body, soft dissipation
+                    float a = smoothstep(0.0, 0.10, vLife) * (1.0 - smoothstep(0.55, 1.0, vLife));
+                    // hot near the nozzle (young) -> tan -> cool grey (old)
+                    vec3 col = mix(uHot, uWarm, smoothstep(0.0, 0.18, vLife));
+                    col = mix(col, uCool, smoothstep(0.18, 0.6, vLife));
+                    // slight per-particle brightness variation
+                    col *= 0.82 + 0.18 * fract(vSeed * 7.13);
+                    gl_FragColor = vec4(col, dens * a * uOpacity);
+                }
+            `,
             transparent: true,
-            blending: THREE.NormalBlending,
             depthWrite: false,
-            color: 0xaabbcc,
-            opacity: 0.04,
+            blending: THREE.NormalBlending,
         });
+
         this.smkPts = new THREE.Points(geo, mat);
         this.smkPts.renderOrder = 1;
         this.scene.add(this.smkPts);
     }
 
     _resetSmoke(i, scatter = false) {
+        // Born concentrated at the nozzle, then billows outward (set in _updateSmoke)
         const ang = Math.random() * Math.PI * 2;
-        const r   = Math.random() * 1.2;
+        const r   = Math.random() * 0.35;                    // tight birth cluster
         this.smkPosArr[i*3]   = Math.cos(ang) * r;
-        this.smkPosArr[i*3+1] = scatter ? (Math.random() * -6 - 3) : -4;
+        this.smkPosArr[i*3+1] = scatter ? (Math.random() * -6 - 2) : 0;
         this.smkPosArr[i*3+2] = Math.sin(ang) * r;
-        this.smkVelArr[i*3]   = (Math.random() - 0.5) * 1.8;
-        this.smkVelArr[i*3+1] = -(0.15 + Math.random() * 0.25);
-        this.smkVelArr[i*3+2] = (Math.random() - 0.5) * 1.8;
-        this.smkLifeArr[i]    = scatter ? Math.random() : 0;
+
+        // Strong outward radial billow + slight downward wash off the deflector
+        const outSpeed = 1.6 + Math.random() * 2.4;
+        this.smkVelArr[i*3]   = Math.cos(ang) * outSpeed;
+        this.smkVelArr[i*3+1] = -(0.1 + Math.random() * 0.35);
+        this.smkVelArr[i*3+2] = Math.sin(ang) * outSpeed;
+
+        this.smkLifeArr[i] = scatter ? Math.random() : 0;
+        this.smkSeedArr[i] = Math.random() * 1000;
+        this.smkSizeArr[i] = 1.2 + Math.random() * 2.4;      // wider size spread — mixed puff scales read more natural
+    }
+
+    /* ── Fluffy multi-blob smoke alpha texture ── */
+    _makeSmokeTexture(size) {
+        const c = document.createElement('canvas');
+        c.width = c.height = size;
+        const ctx = c.getContext('2d');
+        // Layer several soft radial blobs for an irregular, cloud-like edge.
+        // Denser cores + more blobs: the erosion dissolve in the shader needs a
+        // wide alpha range (thin wisps die first, thick cores linger).
+        const blobs = 10;
+        for (let b = 0; b < blobs; b++) {
+            const bx = size * (0.32 + Math.random() * 0.36);
+            const by = size * (0.32 + Math.random() * 0.36);
+            const br = size * (0.20 + Math.random() * 0.22);
+            const g  = ctx.createRadialGradient(bx, by, 0, bx, by, br);
+            g.addColorStop(0,   'rgba(255,255,255,0.40)');
+            g.addColorStop(0.55,'rgba(255,255,255,0.14)');
+            g.addColorStop(1,   'rgba(255,255,255,0)');
+            ctx.fillStyle = g;
+            ctx.beginPath();
+            ctx.arc(bx, by, br, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        // Soft global falloff so square edges never show
+        const gg = ctx.createRadialGradient(size/2, size/2, 0, size/2, size/2, size/2);
+        gg.addColorStop(0,    'rgba(255,255,255,0)');
+        gg.addColorStop(0.75, 'rgba(255,255,255,0)');
+        gg.addColorStop(1,    'rgba(0,0,0,1)');
+        ctx.globalCompositeOperation = 'destination-out';
+        ctx.fillStyle = gg;
+        ctx.fillRect(0, 0, size, size);
+        const tex = new THREE.CanvasTexture(c);
+        tex.minFilter = THREE.LinearFilter;
+        return tex;
     }
 
     /* ── Bloom glow sprites ── */
@@ -542,9 +680,20 @@ class LaunchExperience {
         const ascentEase = Math.pow(Math.max(0, p), 1.8) * 35;
         this.shuttleGroup.position.y = ascentEase;
 
-        /* Camera stays fixed and centered — no vertical drift */
-        this.camera.position.y += (pyOff * 0.4 - this.camera.position.y) * 0.03;
-        this.camera.lookAt(0, 0, 0);
+        /* Camera chases half the ascent — the shuttle pulls away slowly and
+           stays framed for most of the climb instead of leaving at ~40% */
+        const followY = ascentEase * 0.5;
+        this.camera.position.y += (pyOff * 0.4 + followY - this.camera.position.y) * 0.07;
+        this.camera.lookAt(0, followY, 0);
+
+        /* Speed feel — FOV widens gently through mid-ascent */
+        const spdT = Math.min(1, Math.max(0, (p - 0.25) / 0.5));
+        this.camera.fov = 38 + spdT * 7;
+        this.camera.updateProjectionMatrix();
+
+        /* Gravity turn — real launches lean downrange after the tower */
+        const turnT = Math.min(1, Math.max(0, (p - 0.45) / 0.4));
+        this.baseTilt = -turnT * 0.10;
 
         /* ── Idle micro-vibration (subtle breathing before ignition) ── */
         if (p < 0.04) {
@@ -567,7 +716,8 @@ class LaunchExperience {
             // Subtle sway — shuttle gently follows mouse at idle
             this.shuttleGroup.position.x += (pxOff * 0.15 - this.shuttleGroup.position.x) * 0.04;
         } else {
-            this.shuttleGroup.position.x += (0 - this.shuttleGroup.position.x) * 0.1;
+            /* drift downrange with the gravity turn */
+            this.shuttleGroup.position.x += ((turnT * 1.5) - this.shuttleGroup.position.x) * 0.1;
         }
 
         /* ── Launch vibration system ──
@@ -605,13 +755,13 @@ class LaunchExperience {
             // Shuttle body tremor (separate from camera — the shuttle itself shakes)
             const stkAmp = shakeEnv * 0.04;
             this.shuttleGroup.position.x += (Math.random() - 0.5) * stkAmp;
-            this.shuttleGroup.rotation.z  = (Math.random() - 0.5) * shakeEnv * 0.006;
+            this.shuttleGroup.rotation.z  = this.baseTilt + (Math.random() - 0.5) * shakeEnv * 0.006;
         } else {
             // Smoothly return to neutral when not shaking
             this.camera.position.x  += (pxOff * 0.3 - this.camera.position.x) * 0.12;
             this.camera.position.z  += (18 - this.camera.position.z) * 0.12;
             this.camera.rotation.z  += (0 - this.camera.rotation.z) * 0.1;
-            this.shuttleGroup.rotation.z += (0 - this.shuttleGroup.rotation.z) * 0.1;
+            this.shuttleGroup.rotation.z += (this.baseTilt - this.shuttleGroup.rotation.z) * 0.1;
         }
 
         /* No gravity-turn roll — keep shuttle vertical */
@@ -646,7 +796,8 @@ class LaunchExperience {
         this._updateSmoke(dt, nozzleX, nozzleY, smokeThrust);
         this.smkPts.geometry.attributes.position.needsUpdate = true;
         this.smkPts.material.visible = smokeThrust > 0.01;
-        this.smkPts.material.opacity = 0.07 * smokeThrust;   // significantly reduced
+        this.smkPts.material.uniforms.uOpacity.value = 0.20 * smokeThrust;
+        this.smkPts.material.uniforms.uTime.value = t;
 
         // Steam — disabled (no launch pad in this layout)
         this.stmPts.material.visible = false;
@@ -678,6 +829,28 @@ class LaunchExperience {
             this.bloomPass.strength = 0.5 + fl * 0.7; // Fixed severe overexposure bug
         }
 
+        /* ── Star streaks — speed lines fade in past mid-ascent ── */
+        const streakLvl = Math.min(1, Math.max(0, (p - 0.5) / 0.25));
+        this.streakMat.opacity = streakLvl * 0.55;
+        if (streakLvl > 0.01) {
+            const camY = this.camera.position.y;
+            for (let i = 0; i < this.STREAK_N; i++) {
+                const fall = this.streakVel[i] * dt * streakLvl;
+                this.streakArr[i*6+1] -= fall;
+                this.streakArr[i*6+4] -= fall;
+                if (this.streakArr[i*6+4] < camY - 22) {
+                    const a = Math.random() * Math.PI * 2;
+                    const r = 3 + Math.random() * 12;
+                    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+                    const len = (0.6 + Math.random() * 1.8) * (1 + streakLvl * 1.5);
+                    const y = camY + 22 + Math.random() * 8;
+                    this.streakArr[i*6]   = x; this.streakArr[i*6+1] = y;       this.streakArr[i*6+2] = z;
+                    this.streakArr[i*6+3] = x; this.streakArr[i*6+4] = y + len; this.streakArr[i*6+5] = z;
+                }
+            }
+            this.streaks.geometry.attributes.position.needsUpdate = true;
+        }
+
         /* No ground mesh to update */
 
         this.composer.render();
@@ -701,18 +874,48 @@ class LaunchExperience {
     }
 
     _updateSmoke(dt, emitX, emitY, smokeThrust) {
+        const t = this.clock.elapsedTime;
+        const pos = this.smkPosArr, vel = this.smkVelArr, life = this.smkLifeArr, seed = this.smkSeedArr;
         for (let i = 0; i < this.SMK_N; i++) {
-            this.smkLifeArr[i] += dt * 0.18;
-            if (this.smkLifeArr[i] >= 1) {
+            life[i] += dt * (0.11 + (seed[i] % 1) * 0.05);   // varied dissipation speed
+            if (life[i] >= 1) {
                 this._resetSmoke(i);
-                this.smkPosArr[i*3]   += emitX;
-                this.smkPosArr[i*3+1] += emitY;
+                pos[i*3]   += emitX;
+                pos[i*3+1] += emitY;
                 continue;
             }
-            this.smkPosArr[i*3]   += this.smkVelArr[i*3]   * dt;
-            this.smkPosArr[i*3+1] += this.smkVelArr[i*3+1] * dt;
-            this.smkPosArr[i*3+2] += this.smkVelArr[i*3+2] * dt;
+
+            const i3 = i * 3;
+            const px = pos[i3], py = pos[i3+1], pz = pos[i3+2];
+            const s  = seed[i];
+            const age = life[i];
+
+            // Curl-ish turbulence — churning, rolling billow (cheap trig noise field)
+            const turb = 1.9 * smokeThrust;
+            const tx = (Math.sin(py * 0.7 + t * 0.9 + s)        + Math.sin(pz * 1.3 - t * 0.6 + s * 1.7)) * 0.5;
+            const tz = (Math.cos(px * 0.7 - t * 0.8 + s * 1.3)  + Math.cos(py * 1.1 + t * 0.7 + s * 0.9)) * 0.5;
+            const ty = (Math.sin(px * 0.9 + pz * 0.9 + t * 0.5 + s)) * 0.5;
+            vel[i3]   += tx * turb * dt;
+            vel[i3+2] += tz * turb * dt;
+            vel[i3+1] += ty * turb * 0.5 * dt;
+
+            // Buoyancy: heated smoke starts to rise as it ages
+            vel[i3+1] += age * age * 1.4 * dt;
+
+            // Gentle wind shear — old smoke drifts sideways so the cloud
+            // leans and breaks symmetry instead of forming a perfect dome
+            vel[i3] += age * 0.35 * dt;
+
+            // Aerodynamic drag — outward billow slows as the cloud puffs out
+            const drag = 1 - Math.min(1, dt * 0.9);
+            vel[i3]   *= drag;
+            vel[i3+2] *= drag;
+
+            pos[i3]   += vel[i3]   * dt;
+            pos[i3+1] += vel[i3+1] * dt;
+            pos[i3+2] += vel[i3+2] * dt;
         }
+        this.smkPts.geometry.attributes.aLife.needsUpdate = true;
     }
 
     _updateSteam(dt, steamLevel) {

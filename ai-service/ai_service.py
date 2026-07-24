@@ -23,12 +23,18 @@ from dotenv import load_dotenv
 import logging
 from datetime import datetime
 
-# Deep learning imports
-import tensorflow as tf
-from tensorflow import keras
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import LSTM, Dense, Dropout
-from tensorflow.keras.optimizers import Adam
+# Deep learning imports (optional — service degrades to scikit-learn models if unavailable)
+try:
+    import tensorflow as tf
+    from tensorflow import keras
+    from tensorflow.keras.models import Sequential
+    from tensorflow.keras.layers import LSTM, Dense, Dropout
+    from tensorflow.keras.optimizers import Adam
+    TF_AVAILABLE = True
+except ImportError:
+    TF_AVAILABLE = False
+    tf = keras = Sequential = LSTM = Dense = Dropout = Adam = None
+    print("TensorFlow not available, deep-learning features disabled (using scikit-learn models)")
 
 # Reinforcement learning imports
 try:
@@ -258,6 +264,8 @@ def initialize_models():
     
     # Create LSTM model for trajectory prediction
     try:
+        if not TF_AVAILABLE:
+            raise RuntimeError("TensorFlow not available")
         lstm_model = Sequential([
             LSTM(50, activation='relu', input_shape=(10, 6)),  # 10 time steps, 6 features
             Dropout(0.2),
@@ -285,6 +293,8 @@ def initialize_models():
     
     # Create debris prediction model
     try:
+        if not TF_AVAILABLE:
+            raise RuntimeError("TensorFlow not available")
         debris_prediction_model = Sequential([
             Dense(64, activation='relu', input_shape=(6,)),
             Dropout(0.3),

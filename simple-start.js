@@ -38,7 +38,14 @@ function startAIService() {
   console.log('Starting AI Service...');
   
   const aiServicePath = path.join(process.cwd(), 'ai-service');
-  const pythonCmd = os.platform() === 'win32' ? 'python' : 'python3';
+  const fs = require('fs');
+  // Prefer the local venv interpreter (has the AI deps installed); fall back to system python.
+  const venvPython = os.platform() === 'win32'
+    ? path.join(aiServicePath, '.venv', 'Scripts', 'python.exe')
+    : path.join(aiServicePath, '.venv', 'bin', 'python');
+  const pythonCmd = fs.existsSync(venvPython)
+    ? venvPython
+    : (os.platform() === 'win32' ? 'python' : 'python3');
   
   // Try to start the AI service directly first (assuming dependencies are installed)
   aiServiceProcess = spawn(pythonCmd, ['ai_service.py'], {
