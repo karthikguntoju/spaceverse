@@ -1,0 +1,1294 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spaceverse — Board the Mission</title>
+    <meta name="description"
+        content="Ride a shuttle out of the atmosphere, then sign in to a browser-native solar system: 3D planets, WebXR, live mission data and an AI traffic simulator.">
+    <meta name="theme-color" content="#04060f">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="/public/css/liquid-glass.css">
+
+    <style>
+        /* ═══════════════════════════════════════════════════════════════
+           LANDING — page-local layout
+           The design system owns the material; this file owns the stage.
+           ═══════════════════════════════════════════════════════════════ */
+
+        /* ── Act I: the launch ─────────────────────────────────────────
+           600vh of scroll drives the shuttle; the sticky child is the
+           frame you actually watch. */
+        .launch-engine {
+            position: relative;
+            height: 600vh;
+            background: transparent;
+        }
+
+        .launch-engine.launch-done {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .launch-sticky {
+            position: sticky;
+            top: 0;
+            height: 100vh;
+            width: 100%;
+            overflow: hidden;
+            z-index: 50;
+        }
+
+        /* The bloom composer writes an OPAQUE black frame — transparent clear
+           colour or not, the final copy pass fills every pixel. Left alone it
+           covers the whole viewport and the glass above it has nothing but
+           black to refract.
+
+           So the launch frame carries its own aurora, painted below the
+           render, and the canvases are keyed over it with screen blending:
+           black drops out, the lit shuttle survives. The instrument glass
+           then samples a genuinely coloured backdrop. */
+        .launch-sticky::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background:
+                radial-gradient(58vw 58vw at 10% 6%, rgba(34, 211, 238, 0.42), transparent 62%),
+                radial-gradient(54vw 54vw at 90% 24%, rgba(167, 139, 250, 0.4), transparent 62%),
+                radial-gradient(46vw 46vw at 46% 98%, rgba(232, 121, 249, 0.26), transparent 62%),
+                radial-gradient(30vw 30vw at 78% 88%, rgba(251, 191, 36, 0.16), transparent 64%),
+                linear-gradient(180deg, #050813 0%, #080d20 55%, #04060f 100%);
+        }
+
+        #nebula-canvas,
+        #ship-canvas {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 100%;
+            height: 100%;
+            transform: translate(-50%, -50%);
+            pointer-events: none;
+        }
+
+        #nebula-canvas {
+            z-index: 1;
+        }
+
+        #ship-canvas {
+            z-index: 5;
+        }
+
+        .launch-sticky canvas {
+            mix-blend-mode: screen;
+        }
+
+        /* ── Instrument glass ──────────────────────────────────────────
+           The old HUD was neon lines drawn straight onto the shuttle. These
+           are physical read-outs: small slabs of glass parked in the
+           corners, well clear of the vehicle. */
+        .hud-overlay {
+            position: absolute;
+            inset: 0;
+            z-index: 20;
+            pointer-events: none;
+        }
+
+        .instrument {
+            position: absolute;
+            padding: 0.85rem 1.05rem;
+            border-radius: var(--r-md);
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.68rem;
+            letter-spacing: 0.08em;
+            color: var(--ink-2);
+        }
+
+        .instrument .lbl {
+            display: block;
+            margin-bottom: 0.35rem;
+            font-size: 0.56rem;
+            font-weight: 600;
+            letter-spacing: 0.24em;
+            text-transform: uppercase;
+            color: var(--ink-4);
+        }
+
+        .instrument.tl {
+            top: calc(var(--dock-h) + 34px);
+            left: var(--gutter);
+        }
+
+        .instrument.tr {
+            top: calc(var(--dock-h) + 34px);
+            right: var(--gutter);
+            text-align: right;
+        }
+
+        /* Bottom-left, because the auto-scroll cue owns the bottom-right. */
+        .instrument.bl {
+            left: var(--gutter);
+            bottom: 2.2rem;
+            width: 190px;
+        }
+
+        .mission-timer {
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: #fff;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .tel-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 1.4rem;
+            padding: 0.16rem 0;
+        }
+
+        .tel-row span:last-child {
+            color: var(--aur-cyan);
+            font-variant-numeric: tabular-nums;
+        }
+
+        /* Thrust gauge — a channel of dark glass with a lit bar inside */
+        .engine-bar {
+            height: 7px;
+            margin-top: 0.15rem;
+            border-radius: 99px;
+            background: rgba(0, 0, 0, 0.42);
+            box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(255, 255, 255, 0.07);
+            overflow: hidden;
+        }
+
+        .engine-fill {
+            width: 0%;
+            height: 100%;
+            border-radius: 99px;
+            background: linear-gradient(90deg, var(--aur-teal), var(--aur-cyan), var(--aur-violet));
+            box-shadow: 0 0 14px rgba(34, 211, 238, 0.8);
+            transition: width 0.35s var(--ease-glass);
+        }
+
+        /* ── Hero copy ─────────────────────────────────────────────────
+           Parked in a left column above 940px so the shuttle flies through
+           clear air. Centred below that, where there is no side room. */
+        .launch-intro {
+            position: absolute;
+            z-index: 30;
+            left: 50%;
+            right: auto;
+            bottom: 15vh;
+            width: min(680px, calc(100vw - 2 * var(--gutter)));
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none;
+        }
+
+        .intro-slab {
+            padding: 1.5rem 1.6rem 1.7rem;
+            pointer-events: auto;
+        }
+
+        .launch-intro .display {
+            font-size: clamp(2rem, 5.6vw, 3.1rem);
+        }
+
+        .launch-intro p {
+            margin-top: 0.95rem;
+            font-size: 0.97rem;
+            line-height: 1.7;
+            color: var(--ink-2);
+        }
+
+        .intro-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.7rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        /* Phase read-out. The launch engine injects a rule at runtime sized
+           for the old centre-screen HUD; this out-specifies it (id + class)
+           so the phase reads as a status chip instead of a banner. */
+        .launch-intro .hud-center {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.55rem;
+            margin-bottom: 1rem;
+        }
+
+        .launch-intro #phase-text.hud-phase {
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.7rem !important;
+            font-weight: 500;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--aur-cyan);
+            opacity: 1;
+            margin: 0;
+        }
+
+        .scanning-line {
+            width: 30px;
+            height: 1px;
+            background: linear-gradient(90deg, var(--aur-cyan), transparent);
+        }
+
+        @media (min-width: 940px) {
+            .launch-intro {
+                left: var(--gutter);
+                right: auto;
+                top: 0;
+                bottom: 0;
+                width: min(520px, 42vw);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                /* No transform here: GSAP owns transform on this element for
+                   the scroll fade, and a static offset would be overwritten. */
+                transform: none;
+                text-align: left;
+            }
+
+            .launch-intro .hud-center,
+            .intro-actions {
+                justify-content: flex-start;
+            }
+
+            .launch-intro .display {
+                font-size: clamp(2.4rem, 3.9vw, 3.5rem);
+            }
+
+            .launch-intro p {
+                max-width: 40ch;
+            }
+        }
+
+        @media (max-width: 939px) {
+
+            /* Corner instruments land on the shuttle at narrow widths */
+            .instrument.tl,
+            .instrument.tr {
+                display: none;
+            }
+
+            .instrument.bl {
+                left: var(--gutter);
+                right: var(--gutter);
+                bottom: auto;
+                top: calc(var(--dock-h) + 30px);
+                width: auto;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .instrument.bl {
+                display: none;
+            }
+
+            .launch-intro {
+                bottom: 11vh;
+            }
+        }
+
+        /* ── Auto-scroll cue ───────────────────────────────────────────
+           For anyone who does not want to scroll six screens by hand. */
+        /* Bottom-right, not bottom-centre: the cue stays on screen through the
+           content sections below the launch, where a centred pill sits on top
+           of the running copy. */
+        .scroll-cue {
+            position: fixed;
+            right: var(--gutter);
+            bottom: 1.7rem;
+            z-index: 800;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            height: 46px;
+            padding: 0 1.15rem 0 0.85rem;
+            transition:
+                opacity var(--t-base) var(--ease-glass),
+                transform var(--t-base) var(--ease-glass),
+                visibility var(--t-base);
+        }
+
+        .scroll-cue:hover {
+            transform: translateY(-2px);
+        }
+
+        .scroll-cue.is-hidden {
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(14px);
+            pointer-events: none;
+        }
+
+        .cue-ring {
+            display: grid;
+            place-items: center;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+        }
+
+        .cue-ring svg {
+            width: 15px;
+            height: 15px;
+            animation: cue-bob 1.9s var(--ease-glass) infinite;
+        }
+
+        .scroll-cue.is-running .cue-ring svg {
+            animation: none;
+        }
+
+        @keyframes cue-bob {
+
+            0%,
+            100% {
+                transform: translateY(-2px);
+                opacity: 0.6;
+            }
+
+            50% {
+                transform: translateY(2px);
+                opacity: 1;
+            }
+        }
+
+        .cue-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+        }
+
+        /* ── Act II onwards ────────────────────────────────────────────
+           The page flow rides above the sticky launch frame. */
+        /* Veils the sticky launch frame underneath without smothering the
+           aurora — a heavy scrim here turns every panel below into grey
+           plastic. Opaque at the seam, then thin. */
+        .page-flow {
+            position: relative;
+            z-index: 60;
+            background: linear-gradient(180deg,
+                    rgba(4, 6, 15, 0) 0,
+                    rgba(4, 6, 15, 0.97) 5vh,
+                    rgba(4, 6, 15, 0.62) 26vh,
+                    rgba(4, 6, 15, 0.44) 100%);
+        }
+
+        .stat-stack {
+            display: grid;
+            gap: 0.85rem;
+        }
+
+        /* ── Access panel ──────────────────────────────────────────── */
+        .access-grid {
+            display: grid;
+            gap: clamp(2rem, 4vw, 3.5rem);
+            align-items: center;
+        }
+
+        @media (min-width: 980px) {
+            .access-grid {
+                grid-template-columns: 1fr 470px;
+            }
+        }
+
+        .access-copy ul {
+            display: grid;
+            gap: 0.8rem;
+            margin: 1.8rem 0 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .access-copy li {
+            display: flex;
+            gap: 0.75rem;
+            align-items: flex-start;
+            font-size: 0.93rem;
+            line-height: 1.65;
+            color: var(--ink-2);
+        }
+
+        .access-copy li svg {
+            flex: none;
+            width: 18px;
+            height: 18px;
+            margin-top: 3px;
+            color: var(--aur-teal);
+        }
+
+        .auth-panel {
+            padding: clamp(1.5rem, 3vw, 2.1rem);
+        }
+
+        .auth-panel .tabs {
+            margin-bottom: 1.15rem;
+        }
+
+        .auth-panel form {
+            margin-top: 1.25rem;
+        }
+
+        .auth-alt {
+            margin-top: 1.1rem;
+            font-size: 0.84rem;
+            text-align: center;
+            color: var(--ink-3);
+        }
+
+        .link-btn {
+            padding: 0.2rem;
+            font: inherit;
+            font-weight: 600;
+            color: var(--aur-cyan);
+            background: none;
+            border: none;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            cursor: pointer;
+        }
+
+        /* Signed-in state swaps in place of the forms */
+        .already-in {
+            display: none;
+            text-align: center;
+        }
+
+        body.is-signed-in .auth-forms {
+            display: none;
+        }
+
+        body.is-signed-in .already-in {
+            display: block;
+        }
+
+        .already-in .pilot-avatar {
+            width: 54px;
+            height: 54px;
+            margin: 0 auto 1rem;
+            font-size: 1.3rem;
+        }
+    </style>
+</head>
+
+<!-- data-lg           : built on the design system, take the full base layer.
+     data-force-launch : never skip the launch here — it is the page. -->
+
+<body data-lg data-force-launch>
+    <canvas class="lg-stars" id="space-bg" aria-hidden="true"></canvas>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         DOCK
+         ═══════════════════════════════════════════════════════════════ -->
+    <header class="dock glass glass--thin r-pill">
+        <a class="dock-logo" href="/landing">
+            <span class="dock-mark" aria-hidden="true"></span>
+            <span>Spaceverse</span>
+        </a>
+        <ul class="dock-nav">
+            <li><a href="#about">About</a></li>
+            <li><a href="#cosmos">The Cosmos</a></li>
+            <li><a href="#features">Capabilities</a></li>
+        </ul>
+        <div class="dock-actions">
+            <button type="button" class="btn btn--primary btn--sm" id="navSignIn">Sign In</button>
+            <button type="button" class="dock-burger" aria-label="Open menu" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </header>
+
+    <nav class="dock-sheet glass glass--deep" aria-label="Mobile menu">
+        <a href="#about">About</a>
+        <a href="#cosmos">The Cosmos</a>
+        <a href="#features">Capabilities</a>
+        <a href="#access">Sign In</a>
+    </nav>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         ACT I — LAUNCH
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="launch-engine" aria-label="Shuttle launch introduction">
+        <div class="launch-sticky">
+            <canvas id="nebula-canvas"></canvas>
+            <canvas id="ship-canvas"></canvas>
+
+            <div class="hud-overlay">
+                <div class="instrument glass glass--thin tl">
+                    <span class="lbl">Mission Clock</span>
+                    <div class="mission-timer">T-MINUS 00:00:00</div>
+                </div>
+
+                <div class="instrument glass glass--thin tr">
+                    <span class="lbl">Telemetry</span>
+                    <div class="tel-row"><span>VEL</span><span><span id="telemetry-vel">0.0</span> km/s</span></div>
+                    <div class="tel-row"><span>ALT</span><span><span id="telemetry-alt">0.0</span> km</span></div>
+                    <div class="tel-row"><span>FUEL</span><span><span id="telemetry-fuel">100</span> %</span></div>
+                </div>
+
+                <div class="instrument glass glass--thin bl">
+                    <span class="lbl">Thrust · <span id="mode-text">STANDBY</span></span>
+                    <div class="engine-bar">
+                        <div class="engine-fill" id="telemetry-thrust"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="launch-intro" id="launchIntro">
+                <div class="intro-slab glass glass--deep">
+                    <div class="hud-center">
+                        <span class="scanning-line" aria-hidden="true"></span>
+                        <div class="hud-phase" id="phase-text" role="status" aria-live="polite">LAUNCH PAD IDLE</div>
+                    </div>
+                    <h1 class="display">The universe is<br><em>a scroll away</em></h1>
+                    <p>Ride the shuttle out of the atmosphere, find out what we built and why — then sign in and take
+                        the controls of the whole Spaceverse.</p>
+                    <div class="intro-actions">
+                        <a class="btn btn--primary" href="#access">Sign in to enter</a>
+                        <a class="btn btn--ghost" href="#about">What is this?</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <button type="button" class="scroll-cue btn glass--thin" id="scrollCue"
+        aria-label="Auto-scroll through the launch to the sign-in panel">
+        <span class="cue-ring">
+            <svg id="cueIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <polyline points="6 9 12 15 18 9"></polyline>
+            </svg>
+        </span>
+        <span class="cue-label" id="cueLabel">Auto-scroll</span>
+    </button>
+
+    <div class="page-flow">
+        <!-- ═══════════════════════════════════════════════════════════
+             ACT II — ABOUT
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="section" id="about">
+            <div class="wrap">
+                <div class="split split--wide">
+                    <div class="reveal">
+                        <span class="eyebrow">Mission Control</span>
+                        <h2 class="h2">We build the sky<br>you can actually touch</h2>
+                        <p class="lede" style="margin-top:1.3rem;">Spaceverse started as a complaint: space is the most
+                            astonishing thing there is, and most of us only ever meet it as a flat diagram in a
+                            textbook. So we rebuilt it — to scale, in a browser tab, with real orbital mechanics, real
+                            mission data and a shuttle you can ride out of the atmosphere.</p>
+                        <p class="lede" style="margin-top:1.1rem;">No install, no plugin, no astronomy degree. Open a
+                            tab and you are in orbit.</p>
+                    </div>
+
+                    <div class="stat-stack reveal-group">
+                        <div class="stat glass r-md" data-lg-tilt>
+                            <b>8 planets</b><span>Modelled with true radii, orbital periods and axial tilt</span>
+                        </div>
+                        <div class="stat glass r-md" data-lg-tilt>
+                            <b>WebXR</b><span>Headset-ready solar system plus a deep space roller-coaster ride</span>
+                        </div>
+                        <div class="stat glass r-md" data-lg-tilt>
+                            <b>Live feeds</b><span>Launch manifests, mission trackers and astronomical events</span>
+                        </div>
+                        <div class="stat glass r-md" data-lg-tilt>
+                            <b>AI scoring</b><span>A traffic simulator that grades your orbital scenarios</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-3 reveal-group" style="margin-top:clamp(2.5rem,5vw,4rem);">
+                    <article class="card glass">
+                        <h3 class="h3">Accurate, not decorative</h3>
+                        <p>Distances, periods and ephemerides come from real planetary data. When a planet moves on
+                            screen, it moves for a reason.</p>
+                    </article>
+                    <article class="card glass">
+                        <h3 class="h3">Built to be played with</h3>
+                        <p>Quizzes, simulators, community scenarios. Every screen is something you poke at rather than
+                            something you read.</p>
+                    </article>
+                    <article class="card glass">
+                        <h3 class="h3">Open to everyone</h3>
+                        <p>Runs in any modern browser on any machine. If you can load this page, you can fly the
+                            mission.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             ACT III — THE COSMOS
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="section" id="cosmos">
+            <div class="wrap">
+                <div class="section-head reveal">
+                    <span class="eyebrow">Field Notes</span>
+                    <h2 class="h2">A short briefing on where you are going</h2>
+                    <p class="lede">Numbers worth carrying with you. Every one of them is modelled somewhere inside
+                        Spaceverse.</p>
+                </div>
+
+                <div class="grid grid-4 reveal-group">
+                    <article class="card glass glass--tap" data-lg-tilt>
+                        <span class="fact-key">One Astronomical Unit</span>
+                        <span class="fact-value">149.6M km</span>
+                        <p>The average Earth–Sun distance, and the ruler astronomers use for everything inside the
+                            solar system.</p>
+                    </article>
+                    <article class="card glass glass--tap" data-lg-tilt>
+                        <span class="fact-key">Sunlight Delay</span>
+                        <span class="fact-value">8 min 20 s</span>
+                        <p>How long a photon takes to reach you. The Sun you see has already moved on without you.</p>
+                    </article>
+                    <article class="card glass glass--tap" data-lg-tilt>
+                        <span class="fact-key">Solar System Age</span>
+                        <span class="fact-value">4.6 bn yrs</span>
+                        <p>Condensed out of a collapsing molecular cloud. Earth showed up in the first hundred million
+                            years of it.</p>
+                    </article>
+                    <article class="card glass glass--tap" data-lg-tilt>
+                        <span class="fact-key">Orbital Velocity</span>
+                        <span class="fact-value">7.8 km/s</span>
+                        <p>What low Earth orbit costs you. Not height — speed. Orbiting is falling and missing the
+                            ground.</p>
+                    </article>
+                    <article class="card glass glass--tap" data-lg-tilt>
+                        <span class="fact-key">Jupiter's Mass</span>
+                        <span class="fact-value">318 ×</span>
+                        <p>Earths. More than twice every other planet combined, and it shields the inner system from
+                            stray comets.</p>
+                    </article>
+                    <article class="card glass glass--tap" data-lg-tilt>
+                        <span class="fact-key">Tracked Debris</span>
+                        <span class="fact-value">36,000+</span>
+                        <p>Objects larger than 10 cm circling Earth right now. The traffic simulator lets you make it
+                            worse.</p>
+                    </article>
+                    <article class="card glass glass--tap" data-lg-tilt>
+                        <span class="fact-key">Observable Galaxies</span>
+                        <span class="fact-value">2 trillion</span>
+                        <p>Estimated across the observable universe. The deep-field ride flies you through a slice of
+                            them.</p>
+                    </article>
+                    <article class="card glass glass--tap" data-lg-tilt>
+                        <span class="fact-key">Universe Age</span>
+                        <span class="fact-value">13.8 bn yrs</span>
+                        <p>Measured from the cosmic microwave background — the oldest light anything has ever
+                            recorded.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             ACT IV — CAPABILITIES
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="section" id="features">
+            <div class="wrap">
+                <div class="section-head reveal">
+                    <span class="eyebrow">Mission Capabilities</span>
+                    <h2 class="h2">What unlocks when you sign in</h2>
+                    <p class="lede">Every module sits behind the access panel. One sign-in opens all of them.</p>
+                </div>
+
+                <div class="grid grid-4 reveal-group">
+                    <article class="card glass glass--tap glass--cyan" data-lg-tilt>
+                        <div class="tile-icon" aria-hidden="true">🌍</div>
+                        <h3 class="h3">3D Solar System</h3>
+                        <p>Every planet rendered with real textures, true relative radii and accurate orbital periods.
+                        </p>
+                    </article>
+                    <article class="card glass glass--tap glass--violet" data-lg-tilt>
+                        <div class="tile-icon" aria-hidden="true">🥽</div>
+                        <h3 class="h3">VR Solar System</h3>
+                        <p>The same system in WebXR. Put a headset on and stand inside the orbits.</p>
+                    </article>
+                    <article class="card glass glass--tap glass--rose" data-lg-tilt>
+                        <div class="tile-icon" aria-hidden="true">🎢</div>
+                        <h3 class="h3">VR Deep Space Ride</h3>
+                        <p>A roller-coaster through a galaxy field, on rails, at a speed no rocket will ever manage.</p>
+                    </article>
+                    <article class="card glass glass--tap glass--amber" data-lg-tilt>
+                        <div class="tile-icon" aria-hidden="true">🚀</div>
+                        <h3 class="h3">Traffic Simulator</h3>
+                        <p>Invent an orbital scenario and let the AI score it for collision risk and sustainability.</p>
+                    </article>
+                    <article class="card glass glass--tap glass--cyan" data-lg-tilt>
+                        <div class="tile-icon" aria-hidden="true">🛰️</div>
+                        <h3 class="h3">Mission Tracker</h3>
+                        <p>Live and upcoming missions from agencies worldwide, with historical context.</p>
+                    </article>
+                    <article class="card glass glass--tap glass--violet" data-lg-tilt>
+                        <div class="tile-icon" aria-hidden="true">🌙</div>
+                        <h3 class="h3">Artemis 2</h3>
+                        <p>NASA's return to lunar orbit — 3D trajectory, crew profiles and a cost breakdown.</p>
+                    </article>
+                    <article class="card glass glass--tap glass--rose" data-lg-tilt>
+                        <div class="tile-icon" aria-hidden="true">🧠</div>
+                        <h3 class="h3">Quiz Bot</h3>
+                        <p>Per-planet questions that get harder as you go, with scores kept for the session.</p>
+                    </article>
+                    <article class="card glass glass--tap glass--amber" data-lg-tilt>
+                        <div class="tile-icon" aria-hidden="true">🌌</div>
+                        <h3 class="h3">Astro Events</h3>
+                        <p>Eclipses, meteor showers and conjunctions — what is coming and where to look.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <!-- ═══════════════════════════════════════════════════════════
+             ACT V — ACCESS
+             ═══════════════════════════════════════════════════════════ -->
+        <section class="section" id="access">
+            <div class="wrap">
+                <div class="access-grid">
+                    <div class="access-copy reveal">
+                        <span class="eyebrow">Flight Deck Access</span>
+                        <h2 class="h2">Take the controls</h2>
+                        <p class="lede" style="margin-top:1.2rem;">One sign-in and the whole Spaceverse opens —
+                            planets, VR, simulator, trackers and quizzes.</p>
+                        <ul>
+                            <li>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Full 3D and WebXR solar system access
+                            </li>
+                            <li>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                AI space-traffic simulator and community scenarios
+                            </li>
+                            <li>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Live mission tracker, launch archive and astro events
+                            </li>
+                            <li>
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+                                    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                Quiz scores kept for your session
+                            </li>
+                        </ul>
+                    </div>
+
+                    <div class="auth-panel glass glass--deep reveal">
+                        <div class="auth-forms">
+                            <div class="tabs" role="tablist" aria-label="Access mode">
+                                <button type="button" class="tab" id="tabLogin" role="tab" aria-selected="true"
+                                    aria-controls="loginPane">Sign In</button>
+                                <button type="button" class="tab" id="tabRegister" role="tab" aria-selected="false"
+                                    aria-controls="registerPane">Create Access</button>
+                            </div>
+
+                            <div class="notice" role="note">
+                                <span aria-hidden="true">⚠</span>
+                                <span>Demo mode: any callsign and access code works. Nothing is stored and no
+                                    verification is sent.</span>
+                            </div>
+
+                            <form id="loginPane" role="tabpanel" aria-labelledby="tabLogin" novalidate>
+                                <div class="field">
+                                    <label for="loginUsername">Callsign</label>
+                                    <input class="input" type="text" id="loginUsername" name="username"
+                                        autocomplete="username" placeholder="Anything you like">
+                                </div>
+                                <div class="field">
+                                    <label for="loginPassword">Access Code</label>
+                                    <input class="input" type="password" id="loginPassword" name="password"
+                                        autocomplete="current-password" placeholder="Anything you like">
+                                </div>
+                                <button type="submit" class="btn btn--primary btn--block btn--lg">Launch
+                                    Spaceverse</button>
+                            </form>
+
+                            <form id="registerPane" role="tabpanel" aria-labelledby="tabRegister" hidden novalidate>
+                                <div class="field">
+                                    <label for="registerUsername">Callsign</label>
+                                    <input class="input" type="text" id="registerUsername" name="username"
+                                        autocomplete="username" placeholder="Pick a callsign">
+                                </div>
+                                <div class="field">
+                                    <label for="registerEmail">Email</label>
+                                    <input class="input" type="text" id="registerEmail" name="email"
+                                        autocomplete="email" placeholder="Not verified in demo mode">
+                                </div>
+                                <div class="field">
+                                    <label for="registerPassword">Access Code</label>
+                                    <input class="input" type="password" id="registerPassword" name="password"
+                                        autocomplete="new-password" placeholder="Anything you like">
+                                </div>
+                                <button type="submit" class="btn btn--primary btn--block btn--lg">Create &amp;
+                                    Launch</button>
+                            </form>
+
+                            <p class="status" id="authStatus" role="status" aria-live="polite"></p>
+
+                            <p class="auth-alt">
+                                No time for forms?
+                                <button type="button" class="link-btn" id="guestBtn">Enter as guest</button>
+                            </p>
+                        </div>
+
+                        <div class="already-in">
+                            <div class="pilot-avatar" id="signedInInitial">E</div>
+                            <h3 class="h3" style="margin-bottom:0.5rem;">Already cleared</h3>
+                            <p class="muted" style="margin-bottom:1.4rem;">Signed in as
+                                <strong id="signedInName" style="color:#fff;">Explorer</strong>.
+                            </p>
+                            <a class="btn btn--primary btn--block btn--lg" href="/">Enter Spaceverse</a>
+                            <p class="auth-alt">
+                                <button type="button" class="link-btn" id="logoutBtn">Sign out</button>
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <footer class="lg-footer">
+            <div class="wrap">
+                <span>Spaceverse — an interactive solar system.</span>
+                <span>Demo build: authentication is simulated.</span>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         STARFIELD
+         ═══════════════════════════════════════════════════════════════ -->
+    <script>
+        (function () {
+            const canvas = document.getElementById('space-bg');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+            function resize() {
+                canvas.width = window.innerWidth;
+                canvas.height = window.innerHeight;
+            }
+            resize();
+
+            const STAR_COLORS = [
+                { r: 255, g: 255, b: 255 }, { r: 200, g: 220, b: 255 }, { r: 180, g: 200, b: 255 },
+                { r: 255, g: 245, b: 220 }, { r: 255, g: 220, b: 160 }, { r: 255, g: 180, b: 100 },
+                { r: 255, g: 150, b: 120 }
+            ];
+            const LAYERS = [{ count: 230, maxR: 0.6 }, { count: 150, maxR: 1.1 }, { count: 70, maxR: 1.7 }];
+
+            let stars = [], shooters = [];
+            const rand = (a, b) => Math.random() * (b - a) + a;
+            const randInt = (a, b) => Math.floor(rand(a, b));
+
+            function initStars() {
+                stars = [];
+                const W = canvas.width, H = canvas.height;
+                LAYERS.forEach((layer, li) => {
+                    for (let i = 0; i < layer.count; i++) {
+                        stars.push({
+                            x: rand(0, W), y: rand(0, H), r: rand(0.15, layer.maxR),
+                            baseAlpha: rand(0.35, 0.95), alpha: 0,
+                            twinkleSpeed: rand(0.003, 0.025), twinkleOffset: rand(0, Math.PI * 2),
+                            color: STAR_COLORS[randInt(0, STAR_COLORS.length)], layer: li,
+                            glowMult: li === 2 ? rand(2.5, 5) : (li === 1 ? rand(1.5, 3) : 1)
+                        });
+                    }
+                });
+            }
+
+            function spawnShooter() {
+                const W = canvas.width, H = canvas.height;
+                const angle = rand(-0.6, -0.2);
+                shooters.push({
+                    x: rand(0, W), y: rand(0, H * 0.5), len: rand(60, 180), speed: rand(6, 14),
+                    dx: Math.cos(angle), dy: Math.sin(angle) * 0.5 + 0.5, life: 1
+                });
+            }
+
+            let lastShooter = 0;
+
+            function draw(ts) {
+                const t = ts * 0.001;
+                const W = canvas.width, H = canvas.height;
+                // Transparent clear: the aurora field below has to show through.
+                ctx.clearRect(0, 0, W, H);
+
+                stars.forEach(s => {
+                    const flicker = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed * 60 + s.twinkleOffset);
+                    s.alpha = s.baseAlpha * (reduceMotion ? 1 : (0.55 + 0.45 * flicker));
+                    const { r: cr, g: cg, b: cb } = s.color;
+
+                    if (s.glowMult > 1) {
+                        const gVal = Math.max(0, s.alpha - 0.2);
+                        const glowR = s.r * s.glowMult;
+                        const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
+                        grd.addColorStop(0, `rgba(${cr},${cg},${cb},${gVal * 0.55})`);
+                        grd.addColorStop(0.4, `rgba(${cr},${cg},${cb},${gVal * 0.14})`);
+                        grd.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
+                        ctx.fillStyle = grd;
+                        ctx.beginPath();
+                        ctx.arc(s.x, s.y, glowR, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+
+                    ctx.globalAlpha = s.alpha;
+                    ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
+                    ctx.beginPath();
+                    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+                    ctx.fill();
+                });
+                ctx.globalAlpha = 1;
+
+                if (!reduceMotion) {
+                    if (ts - lastShooter > rand(2200, 6000)) { spawnShooter(); lastShooter = ts; }
+                    shooters = shooters.filter(s => s.life > 0);
+                    shooters.forEach(s => {
+                        s.life -= 0.015;
+                        s.x += s.dx * s.speed;
+                        s.y += s.dy * s.speed;
+                        const tail = ctx.createLinearGradient(s.x - s.dx * s.len, s.y - s.dy * s.len, s.x, s.y);
+                        tail.addColorStop(0, 'rgba(255,255,255,0)');
+                        tail.addColorStop(1, `rgba(255,255,255,${s.life * 0.85})`);
+                        ctx.strokeStyle = tail;
+                        ctx.lineWidth = 1.4;
+                        ctx.beginPath();
+                        ctx.moveTo(s.x - s.dx * s.len, s.y - s.dy * s.len);
+                        ctx.lineTo(s.x, s.y);
+                        ctx.stroke();
+                    });
+                }
+
+                requestAnimationFrame(draw);
+            }
+
+            window.addEventListener('resize', () => { resize(); initStars(); });
+            initStars();
+            requestAnimationFrame(draw);
+        })();
+    </script>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         AUTO-SCROLL CUE
+         Drives the launch for anyone who does not want six screens of
+         manual scrolling. Any real input cancels it — the user is always
+         allowed to take the wheel back.
+         ═══════════════════════════════════════════════════════════════ -->
+    <script>
+        (function () {
+            const cue = document.getElementById('scrollCue');
+            const label = document.getElementById('cueLabel');
+            const access = document.getElementById('access');
+            if (!cue || !access) return;
+
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            let running = false, rafId = null, timerId = null;
+
+            const maxScroll = () =>
+                Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+
+            function targetY() {
+                const raw = access.getBoundingClientRect().top + window.scrollY - 70;
+                const max = maxScroll();
+                // The launch section alone is 600vh, so a document shorter than
+                // one viewport means layout has not settled yet. Clamping to
+                // that collapses the target to ~0, the click reads as
+                // "already there", and the button looks dead. Trust the
+                // element's own position until the page has real height.
+                return max > window.innerHeight ? Math.min(max, raw) : raw;
+            }
+
+            function setRunning(on) {
+                running = on;
+                cue.classList.toggle('is-running', on);
+                label.textContent = on ? 'Scrolling…' : 'Auto-scroll';
+            }
+
+            function stop() {
+                const wasRunning = running;
+                if (rafId) cancelAnimationFrame(rafId);
+                if (timerId) clearTimeout(timerId);
+                rafId = timerId = null;
+                // Clear the flag first: this doubles as Lenis's onComplete
+                // callback, and the re-target below fires onComplete again.
+                setRunning(false);
+
+                // Lenis runs its own tween. Cancelling our rAF and flags does
+                // not touch it, so the page would keep gliding to the old
+                // target after the user asked it to stop. Re-pointing it at
+                // the current position halts it in place.
+                if (wasRunning && window.lenis) {
+                    try {
+                        // stop() aborts the running tween outright; re-targeting
+                        // it at the current position did not reliably halt it.
+                        // start() hands normal scrolling straight back.
+                        if (typeof window.lenis.stop === 'function') {
+                            window.lenis.stop();
+                            window.lenis.start();
+                        } else if (typeof window.lenis.scrollTo === 'function') {
+                            window.lenis.scrollTo(window.scrollY, { immediate: true });
+                        }
+                    } catch (e) { /* older Lenis without these methods */ }
+                }
+            }
+
+            const easeInOutCubic = t => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+            function nativeScrollTo(to, duration) {
+                const from = window.scrollY;
+                const delta = to - from;
+                const t0 = performance.now();
+                (function step(now) {
+                    const p = Math.min(1, (now - t0) / (duration * 1000));
+                    window.scrollTo(0, from + delta * easeInOutCubic(p));
+                    if (p < 1 && running) rafId = requestAnimationFrame(step);
+                    else stop();
+                })(t0);
+            }
+
+            cue.addEventListener('click', () => {
+                if (running) { stop(); return; }
+                const to = targetY();
+                const distance = Math.abs(to - window.scrollY);
+                if (distance < 8) return;
+
+                if (reduceMotion) { window.scrollTo(0, to); return; }
+
+                setRunning(true);
+                // Long rides get more time, but never a crawl and never a lurch.
+                const duration = Math.max(1.2, Math.min(7, distance / (window.innerHeight * 1.1)));
+
+                if (window.lenis && typeof window.lenis.scrollTo === 'function') {
+                    window.lenis.scrollTo(to, {
+                        duration,
+                        easing: easeInOutCubic,
+                        onComplete: stop
+                    });
+                    // Safety net: if Lenis never fires onComplete (interrupted,
+                    // clamped, or destroyed) the button would stay stuck on
+                    // "Scrolling…" forever.
+                    timerId = setTimeout(stop, duration * 1000 + 900);
+                } else {
+                    nativeScrollTo(to, duration);
+                }
+            });
+
+            // Any deliberate input hands control back immediately — except a
+            // press on the cue itself. pointerdown fires before click, so
+            // cancelling here would clear the running flag and the click that
+            // follows would read it as "start" and relaunch the scroll.
+            ['wheel', 'touchstart', 'pointerdown'].forEach(evt => {
+                window.addEventListener(evt, (e) => {
+                    if (e.target && e.target.closest && e.target.closest('#scrollCue')) return;
+                    if (running) stop();
+                }, { passive: true });
+            });
+            window.addEventListener('keydown', (e) => {
+                if (running && ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', ' '].includes(e.key)) stop();
+            });
+
+            // Once the access panel is in view the cue has nothing left to do.
+            if ('IntersectionObserver' in window) {
+                new IntersectionObserver((entries) => {
+                    entries.forEach(en => cue.classList.toggle('is-hidden', en.intersectionRatio > 0.35));
+                }, { threshold: [0, 0.35, 1] }).observe(access);
+            }
+        })();
+    </script>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         DEMO AUTH
+         The server accepts any credentials while DEMO_AUTH is on; this only
+         handles form state, messaging and the redirect into the app.
+         ═══════════════════════════════════════════════════════════════ -->
+    <script>
+        (function () {
+            const loginPane = document.getElementById('loginPane');
+            const registerPane = document.getElementById('registerPane');
+            const statusEl = document.getElementById('authStatus');
+            const guestBtn = document.getElementById('guestBtn');
+            const navSignIn = document.getElementById('navSignIn');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const access = document.getElementById('access');
+
+            function setStatus(msg, kind) {
+                statusEl.textContent = msg || '';
+                statusEl.classList.toggle('is-error', kind === 'error');
+                statusEl.classList.toggle('is-ok', kind === 'ok');
+            }
+
+            // The shared runtime owns tab switching and the sliding lozenge;
+            // clearing stale status text is all this page has to add.
+            document.querySelectorAll('.tabs .tab').forEach(t =>
+                t.addEventListener('click', () => setStatus('')));
+
+            function setBusy(form, busy) {
+                const btn = form && form.querySelector('button[type="submit"]');
+                if (btn) btn.disabled = busy;
+                if (guestBtn) guestBtn.disabled = busy;
+            }
+
+            // The app has no launch sequence of its own — the ride lives here.
+            function enterApp() {
+                window.location.href = '/';
+            }
+
+            async function submitAuth(endpoint, payload, form) {
+                setBusy(form, true);
+                setStatus('Establishing uplink…');
+                try {
+                    const res = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'same-origin',
+                        body: JSON.stringify(payload)
+                    });
+                    const data = await res.json().catch(() => ({}));
+
+                    if (res.ok && data.success) {
+                        setStatus('Clearance granted. Entering Spaceverse…', 'ok');
+                        enterApp();
+                        return;
+                    }
+                    setStatus(data.error || 'Access denied. Try again.', 'error');
+                } catch (err) {
+                    setStatus('Could not reach mission control. Is the server running?', 'error');
+                } finally {
+                    setBusy(form, false);
+                }
+            }
+
+            loginPane.addEventListener('submit', (e) => {
+                e.preventDefault();
+                submitAuth('/api/login', {
+                    username: document.getElementById('loginUsername').value,
+                    password: document.getElementById('loginPassword').value
+                }, loginPane);
+            });
+
+            registerPane.addEventListener('submit', (e) => {
+                e.preventDefault();
+                submitAuth('/api/register', {
+                    username: document.getElementById('registerUsername').value,
+                    email: document.getElementById('registerEmail').value,
+                    password: document.getElementById('registerPassword').value
+                }, registerPane);
+            });
+
+            if (guestBtn) {
+                guestBtn.addEventListener('click', () => {
+                    submitAuth('/api/login', { username: 'Guest', password: 'guest' }, loginPane);
+                });
+            }
+
+            // Nav "Sign In" jumps to the panel and focuses the first field.
+            if (navSignIn) {
+                navSignIn.addEventListener('click', () => {
+                    const to = access.getBoundingClientRect().top + window.scrollY - 70;
+                    if (window.lenis && typeof window.lenis.scrollTo === 'function') {
+                        window.lenis.scrollTo(to, { duration: 1.1 });
+                    } else {
+                        window.scrollTo({ top: to, behavior: 'smooth' });
+                    }
+                    setTimeout(() => {
+                        const first = document.getElementById('loginUsername');
+                        if (first && !loginPane.hidden) first.focus({ preventScroll: true });
+                    }, 1200);
+                });
+            }
+
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', async () => {
+                    try {
+                        // Drain the body before reloading, otherwise the unread
+                        // response stream is aborted by the navigation.
+                        const res = await fetch('/api/logout', { method: 'POST', credentials: 'same-origin' });
+                        await res.text().catch(() => { });
+                    } catch (e) { /* offline: reload anyway */ }
+                    window.location.reload();
+                });
+            }
+
+            // Already signed in? Swap the forms for a straight way into the app.
+            (async function checkSession() {
+                try {
+                    const res = await fetch('/api/user', { credentials: 'same-origin' });
+                    const data = await res.json();
+                    if (data.loggedIn) {
+                        document.body.classList.add('is-signed-in');
+                        const name = data.username || 'Explorer';
+                        const nameEl = document.getElementById('signedInName');
+                        const initEl = document.getElementById('signedInInitial');
+                        if (nameEl) nameEl.textContent = name;
+                        if (initEl) initEl.textContent = name.trim().charAt(0).toUpperCase() || 'E';
+                        if (navSignIn) navSignIn.textContent = 'Enter Spaceverse';
+                    }
+                } catch (e) { /* not signed in, keep the forms */ }
+            })();
+        })();
+    </script>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         DESIGN SYSTEM RUNTIME + LAUNCH ENGINE
+         ═══════════════════════════════════════════════════════════════ -->
+    <script src="/public/js/liquid-glass.js"></script>
+
+    <!-- GSAP drives the scroll-linked launch; Lenis smooths the scroll it
+         reads from. Both must be present before home-launch.js boots. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
+    <script src="https://unpkg.com/@studio-freight/lenis@1.0.33/dist/lenis.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="/public/js/home-launch.js"></script>
+
+    <!-- Fade the hero slab out as the shuttle climbs -->
+    <script>
+        (function () {
+            const intro = document.getElementById('launchIntro');
+            if (!intro || typeof gsap === 'undefined' || typeof ScrollTrigger === 'undefined') return;
+            gsap.to(intro, {
+                opacity: 0,
+                y: -40,
+                ease: 'none',
+                scrollTrigger: { trigger: '.launch-engine', start: 'top top', end: '18% top', scrub: true }
+            });
+        })();
+    </script>
+</body>
+
+</html>

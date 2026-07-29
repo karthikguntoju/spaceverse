@@ -1,9 +1,10 @@
 /**
  * VR Solar System — entry point.
  *
- * Two experiences share one scene:
- *   • EXPLORE — free flight around a live, textured solar system
- *   • RIDE    — "Deep Field", a scripted roller-coaster with jumpscares
+ * Two experiences share one scene, but each has its own entry point and the
+ * launcher only ever offers the one you arrived for:
+ *   • EXPLORE — free flight around a live, textured solar system  (/vr-solar-system)
+ *   • RIDE    — "VR Deep Space Ride", a scripted roller-coaster    (/vr-ride)
  *
  * Works on a flat screen (mouse + WASD) and in a headset (WebXR, thumbstick
  * locomotion, controller ray picking, haptics). The camera always lives
@@ -19,6 +20,8 @@ import { SolarSystem, BODIES } from './solar-system.js';
 import { SpaceAudio } from './audio.js';
 import { ScareDirector } from './scares.js';
 import { Ride } from './ride.js';
+import MissionCore from '../game/core.js';
+import { createScanHunt } from '../game/missions/scan-hunt.js';
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -26,6 +29,12 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 class VRApp {
     constructor() {
         this.mode = 'menu';
+        /* The experience this URL is an entry point for. Resolved in the
+           constructor because buildVRMenu() runs during init() and must not
+           build a panel for the experience this page is not offering — the
+           coaster is its own feature and lives at /vr-ride. */
+        this.entry = (location.pathname.indexOf('vr-ride') !== -1 ||
+            location.search.indexOf('mode=ride') !== -1) ? 'ride' : 'explore';
         this.clock = new THREE.Clock();
         this.keys = new Set();
         this.flySpeed = 40;
@@ -121,6 +130,19 @@ class VRApp {
             }
         };
 
+        // Missions run on the shared core. VRApp stays the only owner of the
+        // scene, the camera and the audio; the core owns nothing but the run.
+        MissionCore.register(createScanHunt({
+            system: this.system,
+            audio: this.audio,
+            hud: {
+                setObjective: (text) => this.setMissionObjective(text),
+                setProgress: (done, total, missed) => this.setMissionProgress(done, total, missed),
+                flash: (kind) => this.flashMission(kind)
+            }
+        }));
+        MissionCore.on('result', (result) => this.onMissionResult(result));
+
         this.buildVRHud();
         this.buildVRMenu();
         this.buildControllers();
@@ -140,12 +162,12 @@ class VRApp {
         $('loading').style.display = 'none';
         $('mode-menu').classList.add('show');
 
-        // deep link: /vr-ride preselects the coaster
-        if (location.pathname.indexOf('vr-ride') !== -1 || location.search.indexOf('mode=ride') !== -1) {
-            $('start-ride').classList.add('pulse');
-        }
+        // the launcher scopes itself to this entry point from an inline script
+        // in the page; re-assert it here in case that script was skipped
+        $('mode-menu').classList.add(this.entry === 'ride' ? 'only-ride' : 'only-explore');
 
         window.__vr = this;   // debug / QA handle
+        this.missionCore = MissionCore;   // reachable from the QA handle
     }
 
     setStatus(msg) {
@@ -266,7 +288,14 @@ class VRApp {
             x.strokeRect(3, 3, 506, 250);
             x.textAlign = 'center';
             x.fillStyle = accent;
-            x.font = 'bold 46px Inter, sans-serif';
+            // shrink to fit rather than spill past the panel edge — the labels
+            // are not all the same length
+            let size = 46;
+            x.font = `bold ${size}px Inter, sans-serif`;
+            while (x.measureText(text).width > 448 && size > 26) {
+                size -= 2;
+                x.font = `bold ${size}px Inter, sans-serif`;
+            }
             x.fillText(text, 256, 112);
             x.fillStyle = '#cfe3ff';
             x.font = '26px Inter, sans-serif';
@@ -291,10 +320,15 @@ class VRApp {
             this.vrMenu.add(m);
             return m;
         };
-        this.vrMenuItems = [
-            mk(label('EXPLORE', 'Free flight · left stick to fly', '#64ffda'), 0.28, 'explore'),
-            mk(label('DEEP FIELD RIDE', '3 min · jumpscares ahead', '#ff8b8b'), -0.28, 'ride')
-        ];
+        // One panel, matching the entry point — the in-headset picker offers
+        // exactly what the DOM launcher offers, so neither duplicates the
+        // other experience.
+        this.vrMenuItems = this.entry === 'ride'
+            ? [mk(label('VR DEEP SPACE RIDE', '3 min · jumpscares ahead', '#ff8b8b'), 0, 'ride')]
+            : [
+                mk(label('EXPLORE', 'Free flight · left stick to fly', '#64ffda'), 0.28, 'explore'),
+                mk(label('SCAN HUNT', '90 sec · find 5 worlds', '#c4b5fd'), -0.28, 'scan-hunt')
+            ];
     }
 
     toggleVRMenu() {
@@ -448,6 +482,8 @@ class VRApp {
     bindUI() {
         $('start-explore').onclick = () => this.startExplore();
         $('start-ride').onclick = () => this.startRide();
+        const hunt = $('start-hunt');
+        if (hunt) hunt.onclick = () => this.startMission('scan-hunt');
         $('enter-vr').onclick = () => this.enterVR();
         $('btn-menu').onclick = () => this.toMenu();
         $('btn-restart').onclick = () => this.startRide();
@@ -484,7 +520,9 @@ class VRApp {
         if (item) {
             this.vrMenu.visible = false;
             this.vrHud.visible = true;
-            if (item.userData.action === 'explore') this.startExplore();
+            const action = item.userData.action;
+            if (action === 'explore') this.startExplore();
+            else if (action === 'scan-hunt') this.startMission('scan-hunt');
             else this.startRide();
             return;
         }
@@ -514,6 +552,15 @@ class VRApp {
     showBody(key, travel) {
         const d = this.system.getInfo(key);
         if (!d) return;
+
+        // During a mission a scan is an answer, not sightseeing. Route it to the
+        // mission first; the info card and the fly-to would give the next clue
+        // away and hand the player the answer they are being asked for.
+        if (this.mode === 'mission') {
+            MissionCore.input({ type: 'scan', key });
+            this.audio.blip(660);
+            return;
+        }
         $('info-name').textContent = d.name;
         $('info-fact').textContent = d.fact;
         let stats =
@@ -544,7 +591,22 @@ class VRApp {
 
     /* ── mode switching ─────────────────────────────────────────────── */
 
-    toMenu() {
+    /**
+     * Return to the launcher.
+     *
+     * Escape and the menu button are both bound to this unconditionally, which
+     * means a reflexive keypress used to destroy an in-progress run outright:
+     * the core never learned the run ended, end() never fired, and nothing was
+     * scored or shown. Confirm first, then abort cleanly so the run unwinds
+     * through the same path as any other ending.
+     */
+    toMenu(options = {}) {
+        if (this.mode === 'mission' && MissionCore.snapshot().running && !options.force) {
+            const ok = window.confirm('Abandon this run? Your progress will not be scored.');
+            if (!ok) return false;
+            MissionCore.abort('player-left');
+        }
+
         this.mode = 'menu';
         this.ride.stop();
         this.system.orbitRate = 1;
@@ -554,7 +616,7 @@ class VRApp {
         $('mode-menu').classList.add('show');
         $('ride-hud').classList.remove('show');
         $('explore-hud').classList.remove('show');
-        this.setHud('SPACEVERSE', 'Choose an experience');
+        this.setHud('SPACEVERSE', this.entry === 'ride' ? 'Deep Space Ride — ready' : 'Free flight — ready');
         this.audio.setPad(0.0);
         this.audio.setEngine(0);
     }
@@ -576,6 +638,83 @@ class VRApp {
         this.toast('Free flight: drag to look, W/S to fly, wheel for speed. Click a planet to scan it.');
     }
 
+    /* ── missions ───────────────────────────────────────────────────── */
+
+    async startMission(missionId) {
+        this.audio.init();
+        this.mode = 'mission';
+        this.ride.stop();
+        this.system.setOrbitLinesVisible($('opt-orbits').checked);
+        this.system.setLabelsVisible(false);   // finding it is the game
+        this.placeAtEarth();
+        $('mode-menu').classList.remove('show');
+        $('ride-hud').classList.remove('show');
+        $('explore-hud').classList.add('show');
+        $('info-card').classList.remove('show');
+        this.camera.fov = this.baseFov;
+        this.camera.updateProjectionMatrix();
+        this.audio.setPad(0.4);
+
+        try {
+            const meta = await MissionCore.run(missionId, { system: this.system });
+            this.setHud(meta.title.toUpperCase(), meta.brief);
+            this.toast(meta.brief);
+        } catch (err) {
+            console.error('[vr] mission failed to start:', err);
+            this.toast('Could not start mission: ' + err.message);
+            this.toMenu({ force: true });
+        }
+    }
+
+    setMissionObjective(text) {
+        this.missionObjective = text;
+        const el = $('narration');
+        if (!el) return;
+        if (!text) { el.classList.remove('show'); return; }
+        el.textContent = text;
+        el.classList.add('show');
+        this.setHud('SCAN HUNT', text.slice(0, 72));
+    }
+
+    setMissionProgress(done, total, missed) {
+        const el = $('seg-index');
+        if (el) el.textContent = `${done}/${total}`;
+        this.missionProgress = { done, total, missed };
+    }
+
+    flashMission(kind) {
+        // Reuses the ride's alert banner rather than adding a second one. Same
+        // element, same classes as onScareEvent, so there is one place that
+        // decides what an alert looks like.
+        const warn = $('warning');
+        if (!warn) return;
+        clearTimeout(this._warnT);
+        const ok = kind === 'correct';
+        warn.textContent = ok ? '✅ TARGET CONFIRMED' : '❌ WRONG TARGET';
+        warn.classList.remove('hit', 'ok');
+        warn.classList.add('show', ok ? 'ok' : 'hit');
+        this._warnT = setTimeout(() => this.clearWarning(), 900);
+    }
+
+    onMissionResult(result) {
+        if (result.abandoned) return;
+
+        const headline = result.won ? 'MISSION COMPLETE' : 'MISSION FAILED';
+        const detail = result.won
+            ? `${result.facts.found}/${result.facts.targets} found`
+            : (result.reason === 'timeout' ? 'Out of time' : 'Run ended');
+
+        this.setHud(headline, detail);
+        // The score screen never waits on the network. If the run could not be
+        // saved the player is told plainly rather than being shown a number that
+        // quietly went nowhere.
+        const saved = result.saved === false ? ' (not saved — will retry)' : '';
+        const score = typeof result.score === 'number' ? ` · ${result.score} XP` : '';
+        this.toast(`${headline}: ${detail}${score}${saved}`);
+        $('ride-done').classList.add('show');
+        setTimeout(() => $('ride-done').classList.remove('show'), 4000);
+    }
+
     startRide() {
         this.audio.init();
         this.mode = 'ride';
@@ -588,7 +727,7 @@ class VRApp {
         this.audio.setPad(0.18);
         this.ride.prepare();
         this.ride.start();
-        this.toast('DEEP FIELD — hold on. Space pauses, → skips a section, C toggles comfort mode.');
+        this.toast('VR DEEP SPACE RIDE — hold on. Space pauses, → skips a section, C toggles comfort mode.');
     }
 
     onSegment(s, i, n) {
@@ -765,6 +904,12 @@ class VRApp {
 
         if (this.mode === 'ride') this.ride.update(dt);
         else this.flyUpdate(dt);
+
+        // The mission core owns no frame loop of its own on purpose: inside an
+        // immersive session window.requestAnimationFrame never fires, so a core
+        // that pumped itself would freeze every mission the moment a player put
+        // on a headset. This is that pump.
+        if (this.mode === 'mission') MissionCore.tick(dt);
 
         this.scares.update(dt, camPos);
         if (this.mode !== 'ride') this.scares.setVignette(0);

@@ -1,5 +1,5 @@
 /**
- * "Deep Field" — the space roller-coaster.
+ * "VR Deep Space Ride" — the space roller-coaster.
  *
  * The ride is a single Catmull-Rom curve threaded through the live solar
  * system. Because a Catmull-Rom curve passes exactly through its control

@@ -1,0 +1,104 @@
+/* Shared chrome for every /games page. The canvas is the game; everything in
+   here is the frame around it. */
+
+* { box-sizing: border-box; }
+
+body.arcade {
+    margin: 0;
+    background: #03060f;
+    color: #e8eefc;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow: hidden;
+    height: 100vh;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+}
+
+#game { position: fixed; inset: 0; display: block; }
+
+.a-top {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    background: linear-gradient(180deg, rgba(3, 6, 15, 0.85), transparent);
+    pointer-events: none;
+}
+.a-top > * { pointer-events: auto; }
+.a-grow { flex: 1; }
+.a-chip {
+    padding: 7px 13px; border-radius: 999px; font-size: 13px; text-decoration: none;
+    background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16);
+    color: #e8eefc;
+}
+.a-chip:hover { border-color: var(--accent); }
+.a-name {
+    font-family: 'Orbitron', sans-serif; font-size: 13px; letter-spacing: 3px;
+    color: var(--accent);
+}
+.a-best { font-size: 12px; letter-spacing: 1.5px; color: #9fb3cc; font-variant-numeric: tabular-nums; }
+
+.a-hud {
+    position: fixed; top: 52px; left: 16px; z-index: 9; pointer-events: none;
+    display: flex; flex-direction: column; gap: 6px;
+}
+.a-score {
+    font-family: 'Orbitron', sans-serif; font-size: clamp(20px, 3.4vw, 30px);
+    letter-spacing: 2px; text-shadow: 0 0 18px rgba(100, 255, 218, 0.35);
+    font-variant-numeric: tabular-nums;
+}
+.a-extra { font-size: 13px; color: #9fb3cc; line-height: 1.7; font-variant-numeric: tabular-nums; }
+.a-extra b { color: #e8eefc; }
+
+.a-flash {
+    position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%);
+    font-family: 'Orbitron', sans-serif; font-size: clamp(20px, 4.5vw, 44px);
+    letter-spacing: 4px; opacity: 0; transition: opacity 0.12s; z-index: 8;
+    text-shadow: 0 0 30px currentColor; pointer-events: none; text-align: center;
+}
+.a-flash.show { opacity: 1; }
+
+.a-screen {
+    position: fixed; inset: 0; z-index: 20; display: flex;
+    align-items: center; justify-content: center; padding: 20px;
+    background: radial-gradient(circle at 50% 45%, rgba(9, 20, 40, 0.78), rgba(3, 5, 12, 0.95));
+    backdrop-filter: blur(5px);
+}
+.a-hidden { display: none; }
+
+.a-card {
+    width: min(520px, 100%); text-align: center; padding: 30px 26px;
+    background: linear-gradient(160deg, rgba(18, 30, 55, 0.95), rgba(8, 13, 24, 0.95));
+    border: 1px solid rgba(122, 162, 255, 0.24); border-radius: 22px;
+}
+.a-card h1 {
+    font-family: 'Orbitron', sans-serif; letter-spacing: 4px; margin: 0 0 10px;
+    font-size: clamp(20px, 4vw, 32px); color: var(--accent);
+}
+.a-tag { color: #9fb3cc; font-size: 14.5px; line-height: 1.6; margin: 0 0 16px; }
+
+.a-controls { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 7px; }
+.a-controls li { display: flex; align-items: center; gap: 10px; justify-content: center; font-size: 13.5px; color: #9fb3cc; }
+.a-controls kbd {
+    background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px; padding: 3px 9px; font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px; color: #e8eefc; min-width: 62px; display: inline-block;
+}
+
+.a-btn {
+    font-family: 'Orbitron', sans-serif; letter-spacing: 2.5px; font-size: 14px;
+    padding: 13px 30px; border-radius: 999px; cursor: pointer; text-decoration: none;
+    background: var(--accent); color: #04121a; border: 0; font-weight: 700;
+    display: inline-flex; align-items: center; justify-content: center;
+}
+.a-btn:hover { filter: brightness(1.12); }
+.a-btn.a-ghost { background: transparent; color: #e8eefc; border: 1px solid rgba(255, 255, 255, 0.2); }
+.a-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+
+.a-final {
+    font-family: 'Orbitron', sans-serif; font-size: clamp(24px, 5vw, 38px);
+    margin: 12px 0 6px; letter-spacing: 2px;
+}
+
+@media (max-width: 640px) {
+    .a-hud { top: 46px; left: 12px; }
+}

@@ -4,1392 +4,637 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Spaceverse - Explore the Solar System</title>
+    <title>Spaceverse — Mission Deck</title>
+    <meta name="description" content="Your Spaceverse flight deck: 3D and VR solar system, mission tracker, launch archive, astronomical events and an AI space-traffic simulator.">
+    <meta name="theme-color" content="#04060f">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+
+    <link rel="stylesheet" href="/public/css/liquid-glass.css">
+
     <style>
-        :root {
-            --space-dark: #050510;
-            --space-light: #1a1a3a;
-            --neon-blue: #00f3ff;
-            --neon-purple: #bc13fe;
-            --neon-amber: #ffb703;
-            --glass-bg: rgba(20, 20, 40, 0.4);
-            --glass-border: rgba(0, 243, 255, 0.3);
-            --glass-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
-            --text-main: #e2e8f0;
-        }
+        /* ═══════════════════════════════════════════════════════════════
+           MISSION DECK — page-local layout
+           The rocket lives on the landing page. A signed-in pilot opens
+           straight onto the deck.
+           ═══════════════════════════════════════════════════════════════ */
 
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        html {
-            font-family: 'Inter', system-ui, sans-serif;
-        }
-
-        body {
-            font-family: 'Inter', system-ui, sans-serif;
-            background: #000000;
-            color: var(--text-main);
-            overflow-x: hidden;
+        /* ── Hero ──────────────────────────────────────────────────── */
+        .deck-hero {
             position: relative;
-            min-height: 100vh;
+            padding: calc(var(--dock-h) + clamp(4rem, 10vh, 7rem)) 0 clamp(2.5rem, 6vw, 4rem);
         }
 
-        /* Canvas Space Background */
-        #space-bg {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            z-index: -2;
-            display: block;
-        }
-
-        .navbar {
-            position: fixed;
-            top: 1.5rem;
-            left: 50%;
-            transform: translateX(-50%);
-            width: 98%;
-            max-width: 1800px;
-
-            /* Sci-Fi Geometry (Chamfered Tech Box) */
-            clip-path: polygon(25px 0, calc(100% - 25px) 0, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 25px 100%, 0 calc(100% - 25px), 0 25px);
-
-            /* Frosty Glassmorphism */
-            background: rgba(5, 10, 20, 0.7);
-            backdrop-filter: blur(24px) saturate(200%);
-            -webkit-backdrop-filter: blur(24px) saturate(200%);
-
-            padding: 0.8rem 2.5rem;
-            z-index: 1000;
-            display: flex;
-            justify-content: space-between;
+        .hero-grid {
+            display: grid;
+            gap: clamp(2rem, 4vw, 3.5rem);
             align-items: center;
+        }
+
+        @media (min-width: 1000px) {
+            .hero-grid {
+                grid-template-columns: 1.15fr 0.85fr;
+            }
+        }
+
+        .deck-hero .display {
+            margin-top: 0.4rem;
+        }
+
+        .deck-hero .lede {
+            max-width: 54ch;
+            margin-top: 1.4rem;
+        }
+
+        .hero-cta {
+            display: flex;
             flex-wrap: wrap;
-
-            /* Inner telemetry glow and structural pseudo-bordering through shadows */
-            box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.15), inset 0 0 60px rgba(0, 0, 0, 0.9);
-            transition: all 0.4s ease;
-            border: none;
+            gap: 0.75rem;
+            margin-top: 2rem;
         }
 
-        /* Nav Brackets matching the clip-path angles perfectly */
-        .nav-bracket {
-            position: absolute;
-            top: 0;
-            bottom: 0;
-            width: 35px;
-            background: transparent;
-            pointer-events: none;
-            z-index: 10;
+        /* ── Flight status panel ───────────────────────────────────────
+           Only shows things that are actually true: the signed-in callsign,
+           the real clock, and how many modules the deck exposes. */
+        .status-panel {
+            padding: clamp(1.4rem, 2.6vw, 1.9rem);
         }
 
-        .nav-bracket.left {
-            left: 0;
-            border-left: 2px solid var(--neon-blue);
-            clip-path: polygon(0 25px, 25px 0, 100% 0, 100% 100%, 25px 100%, 0 calc(100% - 25px));
-            box-shadow: inset 10px 0 20px -5px rgba(0, 243, 255, 0.4);
-        }
-
-        .nav-bracket.right {
-            right: 0;
-            border-right: 2px solid var(--neon-blue);
-            clip-path: polygon(0 0, calc(100% - 25px) 0, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 0 100%);
-            box-shadow: inset -10px 0 20px -5px rgba(0, 243, 255, 0.4);
-        }
-
-        .navbar:hover {
-            box-shadow: inset 0 0 30px rgba(0, 243, 255, 0.25), inset 0 0 80px rgba(0, 0, 0, 0.95);
-        }
-
-        .logo {
-            font-size: 1.8rem;
-            font-weight: 800;
-            color: var(--neon-blue);
-            text-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        .logo-icon {
-            width: 45px;
-            height: 45px;
-            position: relative;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .logo-planet {
-            width: 30px;
-            height: 30px;
-            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #005b99);
-            border-radius: 50%;
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.8), inset -5px -5px 10px rgba(0, 0, 0, 0.4);
-            animation: planetRotate 10s linear infinite;
-        }
-
-        .logo-ring {
-            position: absolute;
-            width: 48px;
-            height: 14px;
-            border: 2px solid var(--neon-purple);
-            border-radius: 50%;
-            transform: rotateX(70deg);
-            box-shadow: 0 0 15px rgba(188, 19, 254, 0.8);
-            animation: ringPulse 3s infinite alternate;
-        }
-
-        @keyframes planetRotate {
-            100% {
-                transform: rotate(360deg);
-            }
-        }
-
-        @keyframes ringPulse {
-            100% {
-                box-shadow: 0 0 25px rgba(188, 19, 254, 1);
-                border-width: 3px;
-            }
-        }
-
-        .nav-content {
+        .status-head {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            flex-grow: 1;
-            margin-left: 2rem;
+            gap: 1rem;
+            padding-bottom: 1rem;
+            margin-bottom: 1rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.09);
         }
 
-        /* ─── Smooth Skip Helper ───────── */
-        body.is-skipping-launch .launch-engine {
-            height: 0 !important;
-            min-height: 0 !important;
-            overflow: hidden !important;
-            visibility: hidden !important;
-            padding: 0 !important;
-            margin: 0 !important;
+        .status-head h2 {
+            font-size: 0.72rem;
+            font-weight: 600;
+            letter-spacing: 0.22em;
+            text-transform: uppercase;
+            color: var(--ink-3);
         }
 
-        .nav-links {
+        .status-row {
             display: flex;
-            gap: 2.5rem;
-            list-style: none;
-            margin: 0 auto;
-        }
-
-        .nav-links a {
-            color: var(--text-main);
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 1rem;
-            letter-spacing: 0.5px;
-            position: relative;
-            display: inline-flex;
-            align-items: center;
-            min-height: 44px;
-            padding: 0.5rem 0;
-            transition: color 0.3s;
-        }
-
-        .nav-links a::after {
-            content: '';
-            position: absolute;
-            bottom: -4px;
-            left: 0;
-            width: 100%;
-            height: 2px;
-            background: var(--neon-blue);
-            box-shadow: 0 0 10px var(--neon-blue);
-            transform: scaleX(0);
-            transform-origin: right;
-            transition: transform 0.4s cubic-bezier(0.86, 0, 0.07, 1);
-        }
-
-        .nav-links a:hover {
-            color: #fff;
-            text-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
-        }
-
-        .nav-links a:hover::after {
-            transform: scaleX(1);
-            transform-origin: left;
-        }
-
-        /* Scanning laser above the link */
-        .nav-links a::before {
-            content: '';
-            position: absolute;
-            top: -4px;
-            left: 0;
-            width: 15px;
-            height: 2px;
-            background: #fff;
-            box-shadow: 0 0 10px #fff, 0 0 20px var(--neon-blue);
-            opacity: 0;
-            transition: opacity 0.2s;
-        }
-
-        .nav-links a:hover::before {
-            opacity: 1;
-            animation: scanLaser 1s infinite linear;
-        }
-
-        @keyframes scanLaser {
-            0% {
-                left: 0%;
-                opacity: 0;
-            }
-
-            10% {
-                opacity: 1;
-            }
-
-            90% {
-                opacity: 1;
-            }
-
-            100% {
-                left: 100%;
-                opacity: 0;
-            }
-        }
-
-        .auth-buttons {
-            display: flex;
-            gap: 1.2rem;
-            align-items: center;
-        }
-
-        .hamburger {
-            display: none;
-            cursor: pointer;
-            font-size: 1.8rem;
-            color: var(--neon-blue);
-            background: none;
-            border: none;
-            padding: 0.5rem;
-        }
-
-        #userInfo {
-            display: none;
-            align-items: center;
-            gap: 1.5rem;
-        }
-
-        #welcomeText {
-            color: var(--neon-blue);
-            font-family: 'Orbitron', monospace;
-            font-weight: 700;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 1rem;
+            padding: 0.55rem 0;
             font-size: 0.85rem;
-            letter-spacing: 2px;
-            padding: 0.6rem 1.4rem;
-            background: rgba(0, 15, 30, 0.8);
-            border: 1px solid rgba(0, 243, 255, 0.3);
-            border-radius: 0;
-            /* Tech sharp edges */
-            box-shadow: inset 0 0 15px rgba(0, 243, 255, 0.1);
-            position: relative;
         }
 
-        /* Terminal blinking cursor attached natively to User data string */
-        #welcomeText::after {
-            content: ' _';
-            animation: blink 1s step-end infinite;
+        .status-row + .status-row {
+            border-top: 1px solid rgba(255, 255, 255, 0.055);
         }
 
-        @keyframes blink {
-            50% {
-                opacity: 0;
-            }
+        .status-row dt {
+            color: var(--ink-3);
         }
 
-        #userInfo .btn-secondary {
-            background: rgba(255, 77, 77, 0.1);
-            color: #ff4d4d;
-            border: 1px solid #ff4d4d;
-        }
-
-        #userInfo .btn-secondary:hover {
-            background: #ff4d4d;
-            color: white;
-            box-shadow: 0 0 20px rgba(255, 77, 77, 0.6);
-        }
-
-        /* Unified Sci-Fi Buttons */
-        .btn {
-            padding: 0.7rem 1.8rem;
-            border-radius: 30px;
-            cursor: pointer;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Inter', sans-serif;
-            font-size: 1rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-            position: relative;
-            overflow: hidden;
-            z-index: 1;
-        }
-
-        .btn-primary {
-            background: transparent;
-            color: var(--neon-blue);
-            border: 1px solid var(--neon-blue);
-            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
-        }
-
-        .btn-primary::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--neon-blue);
-            z-index: -1;
-            transform: scaleX(0);
-            transform-origin: left;
-            transition: transform 0.4s ease;
-        }
-
-        .btn-primary:hover {
-            color: #000;
-            box-shadow: 0 0 25px rgba(0, 243, 255, 0.8);
-            border-color: transparent;
-        }
-
-        .btn-primary:hover::before {
-            transform: scaleX(1);
-        }
-
-        .btn-secondary {
-            background: rgba(0, 243, 255, 0.03);
-            color: var(--neon-blue);
-            border: 1px solid var(--neon-blue);
-            box-shadow: 0 0 10px rgba(0, 243, 255, 0.2);
-            backdrop-filter: blur(10px);
-            z-index: 1;
-        }
-
-        .btn-secondary::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: var(--neon-blue);
-            z-index: -1;
-            transform: scaleX(0);
-            transform-origin: left;
-            transition: transform 0.4s ease;
-        }
-
-        .btn-secondary:hover {
-            border-color: transparent;
-            box-shadow: 0 0 25px rgba(0, 243, 255, 0.6);
-            color: #000;
-        }
-
-        .btn-secondary:hover::before {
-            transform: scaleX(1);
-        }
-
-        /* Hero Section */
-        .hero {
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            position: relative;
-            padding-top: 80px;
-        }
-
-        .hero-content {
-            z-index: 2;
-            max-width: 1400px;
-            padding: 2rem;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .title-container {
-            position: relative;
-            margin-bottom: 2rem;
-        }
-
-        .hero h1 {
-            font-family: 'Orbitron', Arial, sans-serif;
-            font-size: 7.5rem;
-            /* Increased font size */
-            line-height: 1.1;
-            font-weight: 300;
-            /* Sleek, elegant weight */
-            background: linear-gradient(180deg, #ffffff 30%, #a0aec0 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            text-transform: uppercase;
-            letter-spacing: 8px;
-            margin-bottom: 1.5rem;
-            animation: float 8s ease-in-out infinite;
-        }
-
-        .hero h1 strong {
-            font-weight: 800;
-            /* Contrast between light and bold text */
-            background: linear-gradient(180deg, #ffffff 0%, #00f3ff 100%);
-            -webkit-background-clip: text;
-            background-clip: text;
-            -webkit-text-fill-color: transparent;
-            filter: drop-shadow(0 0 20px rgba(0, 243, 255, 0.6)) drop-shadow(0 0 40px rgba(0, 243, 255, 0.4));
-            /* Glow effect for SPACEVERSE */
-        }
-
-        @keyframes float {
-
-            0%,
-            100% {
-                transform: translateY(0);
-            }
-
-            50% {
-                transform: translateY(-8px);
-            }
-        }
-
-        .hero-overline {
-            font-family: 'Inter', sans-serif;
-            color: var(--neon-blue);
-            font-size: 1rem;
-            font-weight: 600;
-            letter-spacing: 8px;
-            text-transform: uppercase;
-            margin-bottom: 2rem;
-            opacity: 0.9;
-            text-shadow: 0 0 10px rgba(0, 243, 255, 0.4);
-        }
-
-        .hero p {
-            font-family: 'Inter', sans-serif;
-            font-size: 1.2rem;
-            max-width: 700px;
-            margin: 0 auto 4rem;
-            color: #8a9bb2;
-            line-height: 1.8;
-            font-weight: 300;
-            letter-spacing: 0.5px;
-        }
-
-        .cta-buttons {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-            gap: 1.5rem;
-            width: 100%;
-            max-width: 1200px;
-            perspective: 1000px;
-            /* Enable 3D space for cards */
-        }
-
-        .mission-card {
-            position: relative;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-top: 1px solid rgba(255, 255, 255, 0.3);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-decoration: none;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            text-align: center;
-            overflow: hidden;
-            transition: all 0.5s cubic-bezier(0.23, 1, 0.320, 1);
-            backdrop-filter: blur(16px) saturate(150%);
-            -webkit-backdrop-filter: blur(16px) saturate(150%);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 2px 10px rgba(255, 255, 255, 0.05);
-            transform-style: preserve-3d;
-        }
-
-        /* Glare effect across the glass */
-        .mission-card::after {
-            content: '';
-            position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
-            background: radial-gradient(circle at center, rgba(255, 255, 255, 0.1) 0%, transparent 50%);
-            opacity: 0;
-            transition: opacity 0.4s ease;
-            pointer-events: none;
-            z-index: 1;
-        }
-
-        .mission-card .card-content {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 0.8rem;
-            position: relative;
-            z-index: 2;
-            transition: transform 0.4s ease;
-        }
-
-        .mission-card .card-icon {
-            font-size: 2.2rem;
-            filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.3));
-            margin-bottom: 0.2rem;
-            transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
-        }
-
-        .mission-card .card-text {
-            font-family: 'Inter', sans-serif;
-            font-size: 0.95rem;
-            font-weight: 500;
-            color: #e2e8f0;
-            letter-spacing: 1px;
-            text-transform: uppercase;
-        }
-
-        /* "Out of the box" 3D Pop Hover Effect */
-        .mission-card:hover {
-            transform: translateY(-5px) scale(1.03) rotateX(4deg) rotateY(-2deg);
-            border-top-color: rgba(255, 255, 255, 0.6);
-            border-color: rgba(0, 243, 255, 0.4);
-            background: rgba(30, 40, 60, 0.4);
-            box-shadow: -5px 15px 40px rgba(0, 0, 0, 0.6), inset 0 2px 20px rgba(255, 255, 255, 0.1);
-        }
-
-        .mission-card:hover::after {
-            opacity: 1;
-            animation: glareSweep 2s infinite linear;
-        }
-
-        @keyframes glareSweep {
-            0% {
-                transform: translate(-30%, -30%);
-            }
-
-            100% {
-                transform: translate(30%, 30%);
-            }
-        }
-
-        .mission-card:hover .card-icon {
-            transform: translateZ(20px) scale(1.1);
-            filter: drop-shadow(0 0 20px rgba(0, 243, 255, 0.6));
-        }
-
-        .mission-card:hover .card-content {
-            transform: translateZ(10px);
-        }
-
-        .mission-card:hover .card-text {
-            color: #ffffff;
-            text-shadow: 0 0 12px rgba(255, 255, 255, 0.8);
-        }
-
-        /* Premium Features Section */
-        .features {
-            padding: 8rem 2rem;
-            max-width: 1400px;
-            margin: 0 auto;
-            position: relative;
-            z-index: 2;
-        }
-
-        .features h2 {
-            text-align: center;
-            font-size: 3.5rem;
-            margin-bottom: 4rem;
-            font-weight: 800;
+        .status-row dd {
+            margin: 0;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.86rem;
             color: #fff;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            text-shadow: 0 0 20px rgba(188, 19, 254, 0.6);
+            font-variant-numeric: tabular-nums;
+            text-align: right;
         }
 
-        .feature-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            /* Reduced from 320px to make them narrower */
-            gap: 2rem;
-            perspective: 1000px;
-        }
-
-        .feature-card-wrapper {
-            background: transparent;
-            height: 220px;
-            /* Reduced from 280px */
-            perspective: 1000px;
-        }
-
-        .feature-card-inner {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            text-align: center;
-            transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            transform-style: preserve-3d;
-        }
-
-        .feature-card-wrapper:hover .feature-card-inner {
-            transform: rotateY(180deg);
-        }
-
-        .feature-card-front,
-        .feature-card-back {
-            position: absolute;
-            width: 100%;
-            height: 100%;
-            -webkit-backface-visibility: hidden;
-            backface-visibility: hidden;
-
-            /* Glassmorphism theme */
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            border-top: 1px solid rgba(255, 255, 255, 0.3);
-            border-radius: 20px;
-            padding: 1.5rem;
-            /* Reduced padding */
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            backdrop-filter: blur(16px) saturate(150%);
-            -webkit-backdrop-filter: blur(16px) saturate(150%);
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 2px 10px rgba(255, 255, 255, 0.05);
-        }
-
-        .feature-card-front h3 {
-            font-size: 1.1rem;
-            /* Scaled down text */
-            font-weight: 700;
-            letter-spacing: 1px;
-            color: #fff;
-            text-transform: uppercase;
-        }
-
-        .feature-card-back {
-            transform: rotateY(180deg);
-            background: rgba(30, 40, 60, 0.5);
-            /* Slightly darker/tinted back */
-            border-color: rgba(0, 243, 255, 0.3);
-            box-shadow: 0 15px 40px rgba(0, 243, 255, 0.15);
-            padding: 1.5rem;
-        }
-
-        .feature-card-back p {
-            font-size: 0.9rem;
-            /* Scaled down text */
-            line-height: 1.5;
-            color: #e2e8f0;
-            font-weight: 400;
+        .status-panel dl {
             margin: 0;
         }
 
-        .feature-icon {
-            font-size: 3rem;
-            /* Scaled down icon */
-            margin-bottom: 1rem;
-            filter: drop-shadow(0 0 20px rgba(0, 243, 255, 0.4));
-            transition: transform 0.5s ease;
+        /* ── Mission deck grid ─────────────────────────────────────── */
+        .module {
+            display: flex;
+            flex-direction: column;
+            padding: clamp(1.3rem, 2.2vw, 1.7rem);
+            color: inherit;
         }
 
-        .feature-card-wrapper:hover .feature-icon {
-            transform: scale(1.1);
+        .module h3 {
+            font-size: 1.06rem;
+            margin-bottom: 0.45rem;
         }
 
-        .feature-card h3 {
-            font-size: 1.5rem;
-            margin-bottom: 1rem;
-            color: #fff;
-            font-weight: 700;
-            letter-spacing: 0.5px;
+        .module p {
+            flex: 1;
+            font-size: 0.86rem;
+            line-height: 1.65;
+            color: var(--ink-3);
         }
 
-        .feature-card p {
-            color: #a0aec0;
-            line-height: 1.6;
-            font-size: 1.05rem;
-        }
-
-        /* Glass Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(8px);
-        }
-
-        .modal-content {
-            background: rgba(15, 15, 25, 0.85);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            margin: 10% auto;
-            padding: 3rem;
-            border-radius: 24px;
-            width: 90%;
-            max-width: 450px;
-            border: 1px solid rgba(0, 243, 255, 0.4);
-            box-shadow: 0 0 50px rgba(0, 243, 255, 0.15);
-            position: relative;
-            transform: scale(0.9);
-            animation: modalPop 0.3s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-
-        @keyframes modalPop {
-            100% {
-                transform: scale(1);
-            }
-        }
-
-        .modal-content h2 {
-            color: #fff;
-            font-size: 2rem;
-            margin-bottom: 2rem;
-            text-align: center;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-            text-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
-        }
-
-        .close {
+        .module-tag {
             position: absolute;
-            top: 20px;
-            right: 25px;
-            color: #a0aec0;
-            font-size: 32px;
-            font-weight: 300;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .close:hover {
-            color: var(--neon-blue);
-            transform: rotate(90deg);
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-            position: relative;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #a0aec0;
-            font-size: 0.9rem;
+            top: 1.1rem;
+            right: 1.1rem;
+            font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 0.6rem;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            color: var(--ink-4);
         }
 
-        .form-group input {
-            width: 100%;
-            padding: 1rem 1.2rem;
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 12px;
-            background: rgba(0, 0, 0, 0.3);
-            color: white;
+        /* ── Capability cards ──────────────────────────────────────────
+           The old build flipped these on hover, which hid the description
+           behind an interaction. Glass reveals instead: the copy is always
+           present, and the surface simply lights up. */
+        .cap {
+            padding: clamp(1.3rem, 2.2vw, 1.7rem);
+        }
+
+        .cap h3 {
+            display: flex;
+            align-items: center;
+            gap: 0.7rem;
             font-size: 1rem;
-            transition: all 0.3s;
+            margin-bottom: 0.7rem;
         }
 
-        .form-group input:focus {
-            outline: none;
-            border-color: var(--neon-blue);
-            box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
-            background: rgba(0, 243, 255, 0.05);
+        .cap-glyph {
+            display: grid;
+            place-items: center;
+            width: 38px;
+            height: 38px;
+            flex: none;
+            font-size: 1.1rem;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+        }
+
+        .cap p {
+            font-size: 0.86rem;
+            line-height: 1.68;
+            color: var(--ink-3);
+        }
+
+        /* ── Warp transition ───────────────────────────────────────────
+           Kept from the previous build: the jump into the solar system is
+           the one place a hard cut would feel wrong. */
+        #warp-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: none;
+            place-items: center;
+            background: radial-gradient(circle at 50% 50%, rgba(6, 10, 24, 0.55) 0%, #01030a 72%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #warp-overlay.active {
+            display: grid;
+        }
+
+        .warp-streaks {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+        }
+
+        .warp-streak {
+            position: absolute;
+            width: 2px;
+            height: 0;
+            transform-origin: 50% 0;
+            background: linear-gradient(to bottom, rgba(255, 255, 255, 0.95), rgba(34, 211, 238, 0));
+            opacity: 0;
+        }
+
+        .warp-center-text {
+            position: relative;
+            font-family: 'Space Grotesk', system-ui, sans-serif;
+            font-size: clamp(1rem, 2.6vw, 1.7rem);
+            font-weight: 600;
+            letter-spacing: 0.42em;
+            text-transform: uppercase;
+            color: #fff;
+            text-shadow: 0 0 30px rgba(34, 211, 238, 0.9);
+            opacity: 0;
+        }
+
+        /* ── Google button inside the glass modals ─────────────────── */
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 0.9rem;
+            margin: 1.3rem 0;
+            font-size: 0.68rem;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            color: var(--ink-4);
+        }
+
+        .divider::before,
+        .divider::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: rgba(255, 255, 255, 0.11);
         }
 
         .google-btn {
             display: flex;
             align-items: center;
             justify-content: center;
-            background: rgba(255, 255, 255, 0.1);
-            color: #fff;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            border-radius: 30px;
-            padding: 0.7rem;
-            margin-top: 1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            font-weight: 500;
-            font-family: 'Inter', sans-serif;
-            text-transform: uppercase;
+            min-height: 48px;
             font-size: 0.9rem;
-            letter-spacing: 1px;
+            font-weight: 500;
+            color: var(--ink);
+            border-radius: var(--r-sm);
+            background: rgba(255, 255, 255, 0.055);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.13), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            cursor: pointer;
+            transition: background-color var(--t-fast) ease, transform var(--t-fast) var(--ease-glass);
         }
 
         .google-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
-        }
-
-        .google-icon {
-            width: 20px;
-            margin-right: 12px;
-        }
-
-        .divider {
-            display: flex;
-            align-items: center;
-            text-align: center;
-            color: rgba(255,255,255,0.4);
-            margin: 1.5rem 0 0.5rem 0;
-            font-size: 0.8rem;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-        .divider::before, .divider::after {
-            content: '';
-            flex: 1;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        .divider::before { margin-right: .5em; }
-        .divider::after { margin-left: .5em; }
-
-        @media (max-width: 1024px) {
-            .hero h1 {
-                font-size: 6rem;
-            }
-
-            .nav-content {
-                display: none;
-                flex-direction: column;
-                width: 100%;
-                background: transparent;
-                padding-top: 1rem;
-            }
-
-            .nav-content.active {
-                display: flex;
-            }
-
-            .nav-links {
-                display: flex;
-                flex-direction: column;
-                width: 100%;
-                margin-bottom: 1rem;
-            }
-
-            .hamburger {
-                display: block;
-            }
-
-            .auth-buttons {
-                display: flex;
-                flex-direction: column;
-                width: 100%;
-            }
-
-            #userInfo {
-                flex-direction: column;
-                width: 100%;
-                gap: 1rem;
-            }
-        }
-
-        /* Features Responsive */
-        @media (max-width: 768px) {
-            .features {
-                margin-top: 50vh;
-                padding: 3rem 1rem;
-            }
-
-            .navbar {
-                padding: 0.8rem 1.5rem;
-                clip-path: none;
-                border: 1px solid rgba(0, 243, 255, 0.3);
-                border-radius: 20px;
-            }
-
-            .nav-bracket {
-                display: none;
-            }
-
-            .hero h1 {
-                font-size: 4rem;
-            }
-
-            .hero p {
-                font-size: 1.1rem;
-            }
-
-            .features h2 {
-                font-size: 2.5rem;
-            }
-
-            .auth-buttons .btn {
-                padding: 0.5rem 1rem;
-                font-size: 0.9rem;
-            }
-        }
-    </style>
-    <link rel="stylesheet" href="/public/css/interstellar-launch.css">
-
-    <!-- Warp-Speed Transition Overlay Styles -->
-    <style>
-        /* ─── Warp Transition Overlay ───────── */
-        #warp-overlay {
-            position: fixed;
-            inset: 0;
-            z-index: 9999;
-            background: #000;
-            pointer-events: none;
-            opacity: 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            overflow: hidden;
-        }
-
-        #warp-overlay.active {
-            pointer-events: all;
-        }
-
-        /* Streak container */
-        .warp-streaks {
-            position: absolute;
-            inset: 0;
-            overflow: hidden;
-        }
-
-        .warp-streak {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            width: 2px;
-            height: 0;
-            border-radius: 99px;
-            transform-origin: top left;
-            opacity: 0;
-            background: linear-gradient(to bottom, rgba(0, 243, 255, 0.9), rgba(188, 19, 254, 0.5));
-        }
-
-        .warp-center-text {
-            font-family: 'Orbitron', sans-serif;
-            font-size: clamp(1rem, 3vw, 2.5rem);
-            letter-spacing: 6px;
-            text-transform: uppercase;
-            color: #fff;
-            opacity: 0;
-            z-index: 2;
-            text-align: center;
-            text-shadow: 0 0 30px rgba(0, 243, 255, 0.8);
-        }
-
-        /* ─── Skip Intro Button ───────── */
-        .skip-launch-btn {
-            position: fixed;
-            bottom: 2rem;
-            right: 2rem;
-            z-index: 10000;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            padding: 0.6rem 1.1rem;
-            font-family: 'Orbitron', sans-serif;
-            font-size: 0.8rem;
-            letter-spacing: 0.15em;
-            text-transform: uppercase;
-            color: var(--text-main);
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            border-radius: 6px;
-            backdrop-filter: blur(8px);
-            cursor: pointer;
-            opacity: 0.75;
-            transition: opacity 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
-        }
-
-        .skip-launch-btn:hover {
-            opacity: 1;
-            border-color: var(--neon-blue);
+            background: rgba(255, 255, 255, 0.1);
             transform: translateY(-1px);
         }
 
-        .skip-launch-btn:focus-visible {
-            outline: 2px solid var(--neon-blue);
-            outline-offset: 2px;
-        }
-
-        /* Hide once the launch is skipped/complete */
-        body.is-skipping-launch .skip-launch-btn {
-            display: none;
-        }
-
-        @media (max-width: 600px) {
-            .skip-launch-btn {
-                bottom: 1rem;
-                right: 1rem;
-                padding: 0.5rem 0.9rem;
-                font-size: 0.7rem;
-            }
-        }
-
-        /* Special glow on the Explore Solar System card */
-        #exploreLink {
-            position: relative;
-            cursor: pointer;
-        }
-
-        #exploreLink::after {
-            content: '';
-            position: absolute;
-            inset: -4px;
-            border-radius: inherit;
-            background: transparent;
-            border: 2px solid rgba(0, 243, 255, 0);
-            transition: all 0.4s ease;
-            pointer-events: none;
-        }
-
-        #exploreLink:hover::after {
-            border-color: rgba(0, 243, 255, 0.7);
-            box-shadow: 0 0 25px rgba(0, 243, 255, 0.35), inset 0 0 20px rgba(0, 243, 255, 0.1);
+        .lg-modal-panel h2 {
+            margin-bottom: 1.4rem;
+            font-size: 1.35rem;
         }
     </style>
-    <!-- GSAP & Lenis via CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/ScrollTrigger.min.js"></script>
-    <script src="https://unpkg.com/@studio-freight/lenis@1.0.33/dist/lenis.min.js"></script>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&family=Orbitron:wght@500;700;900&display=swap"
-        rel="stylesheet">
 </head>
 
-<body class="launch-active">
-    <script>
-        // Early skip check to prevent flicker
-        if (sessionStorage.getItem('hasSeenLaunch') === 'true') {
-            document.body.classList.add('is-skipping-launch');
-        }
-    </script>
+<!-- data-lg: built on the design system, take the full base layer. -->
 
-    <!-- Warp Speed Overlay -->
+<body data-lg>
     <div id="warp-overlay">
         <div class="warp-streaks" id="warpStreaks"></div>
-        <div class="warp-center-text" id="warpText">INITIATING WARP DRIVE</div>
+        <div class="warp-center-text" id="warpText">Initiating Warp Drive</div>
     </div>
 
-    <!-- Skip Intro -->
-    <button type="button" class="skip-launch-btn" id="skipLaunchBtn" aria-label="Skip intro animation">
-        Skip intro <span aria-hidden="true">&rarr;</span>
-    </button>
-    <script>
-        (function () {
-            var btn = document.getElementById('skipLaunchBtn');
-            if (!btn) return;
-            // Already seen this session: no intro to skip.
-            if (sessionStorage.getItem('hasSeenLaunch') === 'true') {
-                btn.style.display = 'none';
-                return;
-            }
-            btn.addEventListener('click', function () {
-                sessionStorage.setItem('hasSeenLaunch', 'true');
-                document.body.classList.add('is-skipping-launch');
-                window.scrollTo(0, 0);
-                try { if (window.ScrollTrigger) window.ScrollTrigger.refresh(); } catch (e) {}
-            });
-        })();
-    </script>
+    <canvas class="lg-stars" id="space-bg" aria-hidden="true"></canvas>
 
-    <!-- SECTION: Launch Engine -->
-    <section class="launch-engine">
-        <div class="launch-sticky">
-            <canvas id="nebula-canvas"></canvas>
-            <canvas id="ship-canvas"></canvas>
-
-            <div class="hud-overlay">
-                <div class="hud-corner top-left">
-                    <div class="mission-timer">T-MINUS 00:00:00</div>
-                    <div class="hud-label">PRE-LAUNCH DIAGNOSTICS</div>
-                    <div class="radar-circle"></div>
-                </div>
-
-                <div class="hud-corner top-right">
-                    <div class="hud-telemetry">
-                        <div>VELOCITY: <span id="telemetry-vel">0.0</span> km/s</div>
-                        <div>ALTITUDE: <span id="telemetry-alt">0.0</span> km</div>
-                        <div>FUEL: <span id="telemetry-fuel">100</span>%</div>
-                    </div>
-                </div>
-
-                <div class="hud-center">
-                    <div class="hud-phase" id="phase-text" role="status" aria-live="polite">IDLE</div>
-                    <div class="scanning-line"></div>
-                </div>
-
-                <div class="hud-corner bottom-left">
-                    <div class="compass-ring"></div>
-                    <div class="hud-label">NAV: <span id="mode-text">STANDBY</span></div>
-                </div>
-
-                <div class="hud-corner bottom-right">
-                    <div class="engine-bar">
-                        <div class="engine-fill" id="telemetry-thrust"></div>
-                    </div>
-                    <div class="hud-label">THRUST RATING</div>
-                </div>
-
-                <div class="grid-overlay"></div>
-            </div>
-        </div>
-    </section>
-    <canvas id="space-bg"></canvas>
-
-    <nav class="navbar">
-        <div class="nav-bracket left"></div>
-        <div class="logo">
-            <div class="logo-icon">
-                <div class="logo-planet"></div>
-                <div class="logo-ring"></div>
-            </div>
+    <!-- ═══════════════════════════════════════════════════════════════
+         DOCK
+         ═══════════════════════════════════════════════════════════════ -->
+    <header class="dock glass glass--thin r-pill">
+        <a class="dock-logo" href="/">
+            <span class="dock-mark" aria-hidden="true"></span>
             <span>Spaceverse</span>
+        </a>
+        <ul class="dock-nav">
+            <li><a href="#deck">Mission Deck</a></li>
+            <li><a href="#capabilities">Capabilities</a></li>
+            <li><a href="/community-scenarios">Community</a></li>
+            <li><a href="/reviews">Reviews</a></li>
+        </ul>
+        <div class="dock-actions">
+            <span class="pilot-chip" data-pilot-chip hidden>
+                <span class="pilot-avatar">E</span>
+                <span class="pilot-name">Explorer</span>
+            </span>
+            <button type="button" class="btn btn--ghost btn--sm btn--hide-sm" data-lg-logout data-signed-in
+                hidden>Sign out</button>
+            <button type="button" class="btn btn--ghost btn--sm btn--hide-sm" data-lg-open="loginModal"
+                data-signed-out hidden>Login</button>
+            <button type="button" class="btn btn--primary btn--sm btn--hide-sm" data-lg-open="registerModal"
+                data-signed-out hidden>Sign Up</button>
+            <button type="button" class="dock-burger" aria-label="Open menu" aria-expanded="false">
+                <span></span><span></span><span></span>
+            </button>
         </div>
-        <div class="nav-content" id="navContent">
-            <ul class="nav-links" id="navLinks">
-                <li><a href="#home">Home</a></li>
-                <li><a href="#features">Features</a></li>
-                <li><a href="/community-scenarios">Community</a></li>
-                <li><a href="/reviews">Reviews</a></li>
-            </ul>
-            <div class="auth-buttons" id="authButtons">
-                <button class="btn btn-secondary" onclick="openModal('loginModal')">Login</button>
-                <button class="btn btn-primary" onclick="openModal('registerModal')">Sign Up</button>
-            </div>
-            <div class="user-info" id="userInfo" style="display: none;">
-                <span id="welcomeText"></span>
-                <button class="btn btn-secondary" onclick="logout()">Logout</button>
-            </div>
-        </div>
-        <button class="hamburger" id="hamburgerBtn" aria-label="Toggle menu">☰</button>
-        <div class="nav-bracket right"></div>
+    </header>
+
+    <nav class="dock-sheet glass glass--deep" aria-label="Mobile menu">
+        <a href="#deck">Mission Deck</a>
+        <a href="#capabilities">Capabilities</a>
+        <a href="/community-scenarios">Community</a>
+        <a href="/reviews">Reviews</a>
+        <button type="button" data-lg-logout data-signed-in hidden>Sign out</button>
+        <button type="button" data-lg-open="loginModal" data-signed-out hidden>Login</button>
     </nav>
 
-    <section class="hero" id="home">
-        <div class="hero-content">
-            <span class="hero-overline">Initiating Exploration Protocol</span>
-            <div class="title-container">
-                <h1 aria-label="Mission Spaceverse">MISSION<br><strong>SPACEVERSE</strong></h1>
+    <!-- ═══════════════════════════════════════════════════════════════
+         HERO
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="deck-hero" id="home">
+        <div class="wrap">
+            <div class="hero-grid">
+                <div class="reveal">
+                    <span class="chip"><span class="dot" aria-hidden="true"></span>All systems nominal</span>
+                    <h1 class="display">Mission<br><em>Spaceverse</em></h1>
+                    <p class="lede">You are cleared for the whole system. Nine live modules — planets in true scale,
+                        WebXR, mission telemetry, an AI traffic simulator and the deep-field ride. Pick a destination.
+                    </p>
+                    <div class="hero-cta">
+                        <a href="#deck" class="btn btn--primary btn--lg">Open the deck</a>
+                        <a href="/solar-system" class="btn btn--ghost btn--lg" id="exploreLink">Fly the solar
+                            system</a>
+                    </div>
+                </div>
+
+                <aside class="status-panel glass glass--deep reveal" aria-label="Flight status">
+                    <div class="status-head">
+                        <h2>Flight Status</h2>
+                        <span class="chip"><span class="dot" aria-hidden="true"></span>Online</span>
+                    </div>
+                    <dl>
+                        <div class="status-row">
+                            <dt>Callsign</dt>
+                            <dd id="statusCallsign">—</dd>
+                        </div>
+                        <div class="status-row">
+                            <dt>Mission clock (UTC)</dt>
+                            <dd id="statusClock">--:--:--</dd>
+                        </div>
+                        <div class="status-row">
+                            <dt>Modules online</dt>
+                            <dd id="statusModules">9</dd>
+                        </div>
+                        <div class="status-row">
+                            <dt>Render pipeline</dt>
+                            <dd id="statusRender">checking…</dd>
+                        </div>
+                        <div class="status-row">
+                            <dt>Session mode</dt>
+                            <dd id="statusMode">—</dd>
+                        </div>
+                    </dl>
+                </aside>
             </div>
-            <p>Embark on an incredible journey through our solar system. Explore planets in stunning 3D, interact with
-                advanced mission telemetry, and uncover the wonders of deep space like never before.</p>
-            <div class="cta-buttons">
-                <a href="/solar-system" id="exploreLink" class="mission-card">
-                    <div class="card-content">
-                        <span class="card-icon">🌍</span>
-                        <span class="card-text">Explore Solar System</span>
-                    </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         MISSION DECK
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="section" id="deck" style="padding-top:clamp(2rem,5vw,3.5rem);">
+        <div class="wrap">
+            <div class="section-head reveal">
+                <span class="eyebrow">Mission Deck</span>
+                <h2 class="h2">Nine ways into the system</h2>
+                <p class="lede">Every module runs in this tab. No install, no plugin.</p>
+            </div>
+
+            <div class="grid grid-3 reveal-group">
+                <a href="/solar-system" class="module glass glass--tap glass--cyan" data-lg-tilt id="solarModule">
+                    <span class="module-tag">3D</span>
+                    <div class="tile-icon" aria-hidden="true">🌍</div>
+                    <h3 class="h3">Solar System</h3>
+                    <p>All eight planets in true relative scale, with real orbital periods and axial tilt.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
                 </a>
-                <a href="/vr-solar-system" id="vrLink" class="mission-card">
-                    <div class="card-content">
-                        <span class="card-icon">🥽</span>
-                        <span class="card-text">VR Solar System</span>
-                    </div>
+
+                <a href="/games" class="module glass glass--tap glass--violet" data-lg-tilt id="arcadeLink">
+                    <span class="module-tag">Arcade</span>
+                    <div class="tile-icon" aria-hidden="true">🕹️</div>
+                    <h3 class="h3">The Arcade</h3>
+                    <p>Ten quick space games. Gravity runs, chain-reaction demolition, orbital golf,
+                        katamari junk, re-entry. Five seconds to learn, one more try every time.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
                 </a>
-                <a href="/vr-ride" id="vrRideLink" class="mission-card">
-                    <div class="card-content">
-                        <span class="card-icon">🎢</span>
-                        <span class="card-text">Deep Field VR Ride</span>
-                    </div>
+
+                <a href="/mission/kessler" class="module glass glass--tap glass--amber" data-lg-tilt id="kesslerLink">
+                    <span class="module-tag">Mission</span>
+                    <div class="tile-icon" aria-hidden="true">🛰️</div>
+                    <h3 class="h3">Kessler Run</h3>
+                    <p>You are the traffic controller. One collision makes debris, debris makes more
+                        collisions. Hold the cascade off for two and a half minutes.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
                 </a>
-                <a href="/space-traffic-simulator" id="simulateLink" class="mission-card">
-                    <div class="card-content">
-                        <span class="card-icon">🚀</span>
-                        <span class="card-text">Space Traffic Simulator</span>
-                    </div>
+
+                <a href="/vr-solar-system" class="module glass glass--tap glass--violet" data-lg-tilt id="vrLink">
+                    <span class="module-tag">WebXR</span>
+                    <div class="tile-icon" aria-hidden="true">🥽</div>
+                    <h3 class="h3">VR Solar System</h3>
+                    <p>The same system rendered for a headset. Stand inside the orbits and look up.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
                 </a>
-                <a href="/mission-tracker" class="mission-card">
-                    <div class="card-content">
-                        <span class="card-icon">🛰️</span>
-                        <span class="card-text">Mission Tracker</span>
-                    </div>
+
+                <a href="/vr-ride" class="module glass glass--tap glass--rose" data-lg-tilt id="vrRideLink">
+                    <span class="module-tag">Ride</span>
+                    <div class="tile-icon" aria-hidden="true">🎢</div>
+                    <h3 class="h3">VR Deep Space Ride</h3>
+                    <p>A roller-coaster on rails through a galaxy field, at a speed no rocket will manage.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
                 </a>
-                <a href="/artemis-2" class="mission-card">
-                    <div class="card-content">
-                        <span class="card-icon">🌙</span>
-                        <span class="card-text">Artemis 2</span>
-                    </div>
+
+                <a href="/space-traffic-simulator" class="module glass glass--tap glass--amber" data-lg-tilt
+                    id="simulateLink">
+                    <span class="module-tag">AI</span>
+                    <div class="tile-icon" aria-hidden="true">🚀</div>
+                    <h3 class="h3">Traffic Simulator</h3>
+                    <p>Invent an orbital scenario; the model scores it for collision risk and sustainability.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
                 </a>
-                <a href="/space-launches" class="mission-card">
-                    <div class="card-content">
-                        <span class="card-icon">🎬</span>
-                        <span class="card-text">Launch Videos</span>
-                    </div>
+
+                <a href="/mission-tracker" class="module glass glass--tap glass--cyan" data-lg-tilt>
+                    <span class="module-tag">Live</span>
+                    <div class="tile-icon" aria-hidden="true">🛰️</div>
+                    <h3 class="h3">Mission Tracker</h3>
+                    <p>Current and upcoming missions from agencies worldwide, with historical context.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
                 </a>
-                <a href="/astronomical-events" class="mission-card">
-                    <div class="card-content">
-                        <span class="card-icon">🌌</span>
-                        <span class="card-text">Astro Events</span>
-                    </div>
+
+                <a href="/artemis-2" class="module glass glass--tap glass--violet" data-lg-tilt>
+                    <span class="module-tag">Mission</span>
+                    <div class="tile-icon" aria-hidden="true">🌙</div>
+                    <h3 class="h3">Artemis 2</h3>
+                    <p>NASA's return to lunar orbit: 3D trajectory, crew profiles and a cost breakdown.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
                 </a>
-                <a href="/quiz" id="takeQuizBtn" class="mission-card">
-                    <div class="card-content">
-                        <span class="card-icon">🧠</span>
-                        <span class="card-text">Take Quiz</span>
-                    </div>
+
+                <a href="/space-launches" class="module glass glass--tap glass--rose" data-lg-tilt>
+                    <span class="module-tag">Archive</span>
+                    <div class="tile-icon" aria-hidden="true">🎬</div>
+                    <h3 class="h3">Launch Archive</h3>
+                    <p>Iconic launches from NASA and ISRO, from Apollo 11 through Chandrayaan-3.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
+                </a>
+
+                <a href="/astronomical-events" class="module glass glass--tap glass--amber" data-lg-tilt>
+                    <span class="module-tag">Calendar</span>
+                    <div class="tile-icon" aria-hidden="true">🌌</div>
+                    <h3 class="h3">Astro Events</h3>
+                    <p>Eclipses, meteor showers and conjunctions — what is coming and where to look.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
+                </a>
+
+                <a href="/quiz" class="module glass glass--tap glass--cyan" data-lg-tilt id="takeQuizBtn">
+                    <span class="module-tag">Test</span>
+                    <div class="tile-icon" aria-hidden="true">🧠</div>
+                    <h3 class="h3">Quiz Bot</h3>
+                    <p>Per-planet questions that get harder as you go. Scores are kept for your session.</p>
+                    <span class="card-go">Launch
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <line x1="5" y1="12" x2="19" y2="12"></line>
+                            <polyline points="12 5 19 12 12 19"></polyline>
+                        </svg>
+                    </span>
                 </a>
             </div>
         </div>
     </section>
 
-    <section class="features" id="features">
-        <h2>Mission Capabilities</h2>
-        <div class="feature-grid">
-            <div class="feature-card-wrapper">
-                <div class="feature-card-inner">
-                    <div class="feature-card-front">
-                        <div class="feature-icon">🌍</div>
-                        <h3>3D Planet Models</h3>
-                    </div>
-                    <div class="feature-card-back">
-                        <p>Explore detailed 3D models of all planets with realistic textures and accurate orbital
-                            mechanics.</p>
-                    </div>
-                </div>
+    <!-- ═══════════════════════════════════════════════════════════════
+         CAPABILITIES
+         ═══════════════════════════════════════════════════════════════ -->
+    <section class="section" id="capabilities">
+        <div class="wrap">
+            <div class="section-head reveal">
+                <span class="eyebrow">Under the hood</span>
+                <h2 class="h2">What the platform actually does</h2>
+                <p class="lede">The parts that make the modules above work.</p>
             </div>
 
-            <div class="feature-card-wrapper">
-                <div class="feature-card-inner">
-                    <div class="feature-card-front">
-                        <div class="feature-icon">🔄</div>
-                        <h3>Orbital Mechanics</h3>
-                    </div>
-                    <div class="feature-card-back">
-                        <p>Watch planets orbit the sun and rotate on their axes with scientifically accurate speeds and
-                            distances.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="feature-card-wrapper">
-                <div class="feature-card-inner">
-                    <div class="feature-card-front">
-                        <div class="feature-icon">🤖</div>
-                        <h3>Quiz Bot</h3>
-                    </div>
-                    <div class="feature-card-back">
-                        <p>Test your knowledge with our intelligent quiz system featuring questions about each planet.
-                        </p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="feature-card-wrapper">
-                <div class="feature-card-inner">
-                    <div class="feature-card-front">
-                        <div class="feature-icon">👤</div>
-                        <h3>User Accounts</h3>
-                    </div>
-                    <div class="feature-card-back">
-                        <p>Create your account to track quiz scores and save your exploration progress in the cloud.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="feature-card-wrapper">
-                <div class="feature-card-inner">
-                    <div class="feature-card-front">
-                        <div class="feature-icon">🚀</div>
-                        <h3>Space Traffic Simulator</h3>
-                    </div>
-                    <div class="feature-card-back">
-                        <p>Create hypothetical space scenarios and visualize their impact on orbital congestion and
-                            collision risk with our AI simulator.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="feature-card-wrapper">
-                <div class="feature-card-inner">
-                    <div class="feature-card-front">
-                        <div class="feature-icon">🛰️</div>
-                        <h3>Mission Tracker</h3>
-                    </div>
-                    <div class="feature-card-back">
-                        <p>Track live space missions from agencies worldwide. View upcoming launches and historical
-                            achievements.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="feature-card-wrapper">
-                <div class="feature-card-inner">
-                    <div class="feature-card-front">
-                        <div class="feature-icon">🌙</div>
-                        <h3>Artemis 2 Experience</h3>
-                    </div>
-                    <div class="feature-card-back">
-                        <p>Dive deep into NASA's Artemis 2 mission with 3D visualization, cost breakdown, and crew
-                            details.</p>
-                    </div>
-                </div>
-            </div>
-
-            <div class="feature-card-wrapper">
-                <div class="feature-card-inner">
-                    <div class="feature-card-front">
-                        <div class="feature-icon">🎬</div>
-                        <h3>Historic Launches</h3>
-                    </div>
-                    <div class="feature-card-back">
-                        <p>Watch iconic rocket launches from NASA and ISRO on YouTube. Relive historic moments from
-                            Apollo 11 to Chandrayaan-3.</p>
-                    </div>
-                </div>
+            <div class="grid grid-4 reveal-group">
+                <article class="cap glass">
+                    <h3 class="h3"><span class="cap-glyph" aria-hidden="true">🌍</span>3D Planet Models</h3>
+                    <p>Detailed models of every planet with real surface textures and accurate relative radii.</p>
+                </article>
+                <article class="cap glass">
+                    <h3 class="h3"><span class="cap-glyph" aria-hidden="true">🔄</span>Orbital Mechanics</h3>
+                    <p>Planets orbit and rotate on their axes at scientifically accurate speeds and distances.</p>
+                </article>
+                <article class="cap glass">
+                    <h3 class="h3"><span class="cap-glyph" aria-hidden="true">🤖</span>Quiz Engine</h3>
+                    <p>Per-planet question banks with difficulty that escalates as your score climbs.</p>
+                </article>
+                <article class="cap glass">
+                    <h3 class="h3"><span class="cap-glyph" aria-hidden="true">👤</span>Pilot Accounts</h3>
+                    <p>Sign in to carry quiz scores and exploration progress across the session.</p>
+                </article>
+                <article class="cap glass">
+                    <h3 class="h3"><span class="cap-glyph" aria-hidden="true">🚀</span>Traffic Modelling</h3>
+                    <p>Hypothetical launch scenarios scored for orbital congestion and collision risk.</p>
+                </article>
+                <article class="cap glass">
+                    <h3 class="h3"><span class="cap-glyph" aria-hidden="true">🛰️</span>Live Mission Data</h3>
+                    <p>Mission feeds from agencies worldwide, with upcoming launches and past milestones.</p>
+                </article>
+                <article class="cap glass">
+                    <h3 class="h3"><span class="cap-glyph" aria-hidden="true">🌙</span>Artemis Deep Dive</h3>
+                    <p>3D trajectory visualisation, programme cost breakdown and full crew details.</p>
+                </article>
+                <article class="cap glass">
+                    <h3 class="h3"><span class="cap-glyph" aria-hidden="true">🥽</span>WebXR Output</h3>
+                    <p>Headset-native rendering for the solar system and the deep-field ride.</p>
+                </article>
             </div>
         </div>
     </section>
 
-    <!-- Login Modal -->
-    <div id="loginModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>Login to Spaceverse</h2>
+    <footer class="lg-footer">
+        <div class="wrap">
+            <span>Spaceverse — an interactive solar system.</span>
+            <span>Demo build: authentication is simulated.</span>
+        </div>
+    </footer>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         MODALS
+         ═══════════════════════════════════════════════════════════════ -->
+    <div id="loginModal" class="lg-modal">
+        <div class="lg-modal-panel glass glass--deep">
+            <button type="button" class="lg-modal-close" data-lg-close aria-label="Close">&times;</button>
+            <h2 class="h3">Login to Spaceverse</h2>
             <form id="loginForm">
-                <div class="form-group">
-                    <label for="loginUsername">Username / Callsign:</label>
-                    <input type="text" id="loginUsername" placeholder="Enter your callsign" required>
+                <div class="field">
+                    <label for="loginUsername">Callsign</label>
+                    <input class="input" type="text" id="loginUsername" placeholder="Enter your callsign" required>
                 </div>
-                <div class="form-group">
-                    <label for="loginPassword">Access Code:</label>
-                    <input type="password" id="loginPassword" placeholder="Enter access code" required>
+                <div class="field">
+                    <label for="loginPassword">Access Code</label>
+                    <input class="input" type="password" id="loginPassword" placeholder="Enter access code" required>
                 </div>
-                <button type="submit" class="btn btn-primary"
-                    style="width: 100%; margin-top: 1rem;">Authenticate</button>
-                    
-                <div class="divider">OR</div>
-                
+                <button type="submit" class="btn btn--primary btn--block btn--lg"
+                    style="margin-top:0.4rem;">Authenticate</button>
+
+                <div class="divider">or</div>
+
                 <div class="google-btn" onclick="signInWithGoogle()">
-                    <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="width: 20px; height: 20px; margin-right: 12px;">
-                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"
+                        style="width:20px;height:20px;margin-right:12px;">
+                        <path fill="#EA4335"
+                            d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z">
+                        </path>
+                        <path fill="#4285F4"
+                            d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z">
+                        </path>
+                        <path fill="#FBBC05"
+                            d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z">
+                        </path>
+                        <path fill="#34A853"
+                            d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z">
+                        </path>
                         <path fill="none" d="M0 0h48v48H0z"></path>
                     </svg>
                     Sign in with Google
@@ -1398,126 +643,104 @@
         </div>
     </div>
 
-    <!-- Register Modal -->
-    <div id="registerModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>Join Spaceverse</h2>
+    <div id="registerModal" class="lg-modal">
+        <div class="lg-modal-panel glass glass--deep">
+            <button type="button" class="lg-modal-close" data-lg-close aria-label="Close">&times;</button>
+            <h2 class="h3">Join Spaceverse</h2>
             <form id="registerForm">
-                <div class="form-group">
-                    <label for="registerUsername">Callsign (Username):</label>
-                    <input type="text" id="registerUsername" placeholder="Create a callsign" required>
+                <div class="field">
+                    <label for="registerUsername">Callsign</label>
+                    <input class="input" type="text" id="registerUsername" placeholder="Create a callsign" required>
                 </div>
-                <div class="form-group">
-                    <label for="registerEmail">Comm-Link (Email):</label>
-                    <input type="email" id="registerEmail" placeholder="Enter your email" required>
+                <div class="field">
+                    <label for="registerEmail">Comm-link</label>
+                    <input class="input" type="email" id="registerEmail" placeholder="Enter your email" required>
                 </div>
-                <div class="form-group">
-                    <label for="registerPassword">Access Code (Password):</label>
-                    <input type="password" id="registerPassword" placeholder="Create access code" required>
+                <div class="field">
+                    <label for="registerPassword">Access Code</label>
+                    <input class="input" type="password" id="registerPassword" placeholder="Create access code"
+                        required>
                 </div>
-                <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">Initialize
-                    Account</button>
+                <button type="submit" class="btn btn--primary btn--block btn--lg" style="margin-top:0.4rem;">Initialise
+                    account</button>
 
-                <div class="divider">OR</div>
-                
+                <div class="divider">or</div>
+
                 <div class="google-btn" onclick="signInWithGoogle()">
-                    <svg class="google-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" style="width: 20px; height: 20px; margin-right: 12px;">
-                        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
-                        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
-                        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
-                        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"></path>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48"
+                        style="width:20px;height:20px;margin-right:12px;">
+                        <path fill="#EA4335"
+                            d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z">
+                        </path>
+                        <path fill="#4285F4"
+                            d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z">
+                        </path>
+                        <path fill="#FBBC05"
+                            d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z">
+                        </path>
+                        <path fill="#34A853"
+                            d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z">
+                        </path>
                         <path fill="none" d="M0 0h48v48H0z"></path>
                     </svg>
-                    Sign in with Google
+                    Sign up with Google
                 </div>
             </form>
         </div>
     </div>
 
+    <!-- ═══════════════════════════════════════════════════════════════
+         DESIGN SYSTEM RUNTIME
+         ═══════════════════════════════════════════════════════════════ -->
+    <script src="/public/js/liquid-glass.js"></script>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         DECK LOGIC
+         ═══════════════════════════════════════════════════════════════ -->
     <script>
-        // Helper: configure links/buttons that require authentication
+        /* Gate the modules that need a session. Signed out, they open the
+           login modal instead of bouncing off the server's auth redirect. */
         function setupAuthLinks(user) {
-            const explore = document.getElementById('exploreLink');
-            const simulate = document.getElementById('simulateLink');
-            const takeQuizBtn = document.getElementById('takeQuizBtn');
-
-            if (explore) {
-                if (user && user.loggedIn) {
-                    explore.href = '/solar-system';
-                    explore.onclick = null;
+            const gated = ['solarModule', 'simulateLink', 'takeQuizBtn', 'vrLink', 'vrRideLink'];
+            const signedIn = !!(user && user.loggedIn);
+            gated.forEach(id => {
+                const el = document.getElementById(id);
+                if (!el) return;
+                if (signedIn) {
+                    el.removeAttribute('data-gated');
+                    el.onclick = null;
                 } else {
-                    explore.href = '#';
-                    explore.onclick = (e) => { e.preventDefault(); openModal('loginModal'); };
+                    el.setAttribute('data-gated', '');
+                    el.onclick = (e) => {
+                        e.preventDefault();
+                        document.getElementById('loginModal').classList.add('is-open');
+                        document.body.classList.add('is-locked');
+                    };
                 }
-            }
-
-            if (simulate) {
-                if (user && user.loggedIn) {
-                    simulate.href = '/space-traffic-simulator';
-                    simulate.onclick = null;
-                } else {
-                    simulate.href = '#';
-                    simulate.onclick = (e) => { e.preventDefault(); openModal('loginModal'); };
-                }
-            }
-
-            if (takeQuizBtn) {
-                if (user && user.loggedIn) {
-                    takeQuizBtn.onclick = () => { window.location.href = '/quiz'; };
-                } else {
-                    takeQuizBtn.onclick = () => { openModal('loginModal'); };
-                }
-            }
+            });
         }
 
-        // Hamburger menu toggle
-        document.getElementById('hamburgerBtn').addEventListener('click', function () {
-            document.getElementById('navContent').classList.toggle('active');
-        });
-        // CSS handles starfield now
-
-        // Modal functions
-        function openModal(modalId) {
-            document.getElementById(modalId).style.display = 'block';
+        function closeModal(id) {
+            const m = document.getElementById(id);
+            if (!m) return;
+            m.classList.remove('is-open');
+            document.body.classList.remove('is-locked');
         }
 
-        function closeModal(modalId) {
-            document.getElementById(modalId).style.display = 'none';
-        }
-
-        // Close modal when clicking outside
-        window.onclick = function (event) {
-            if (event.target.classList.contains('modal')) {
-                event.target.style.display = 'none';
-            }
-        }
-
-        // Close buttons
-        document.querySelectorAll('.close').forEach(closeBtn => {
-            closeBtn.onclick = function () {
-                this.closest('.modal').style.display = 'none';
-            }
-        });
-
-        // Authentication functions
         async function login(username, password) {
             try {
                 const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify({ username, password })
                 });
                 const data = await response.json();
-
                 if (data.success) {
-                    updateUIForLoggedInUser(data.username);
                     closeModal('loginModal');
-                    // reconfigure auth links immediately
-                    setupAuthLinks({ loggedIn: true, username: data.username });
-                    alert('Login successful!');
+                    window.location.reload();
                 } else {
-                    alert(data.error);
+                    alert(data.error || 'Login failed.');
                 }
             } catch (error) {
                 alert('Login failed. Please try again.');
@@ -1529,235 +752,156 @@
                 const response = await fetch('/api/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify({ username, email, password })
                 });
                 const data = await response.json();
-
                 if (data.success) {
-                    updateUIForLoggedInUser(username);
                     closeModal('registerModal');
-                    alert('Registration successful!');
+                    window.location.reload();
                 } else {
-                    alert(data.error);
+                    alert(data.error || 'Registration failed.');
                 }
             } catch (error) {
                 alert('Registration failed. Please try again.');
             }
         }
 
+        // Kept as a global: the design system's [data-lg-logout] hook calls
+        // LiquidGlass.logout(), but older links on other pages still call this.
         async function logout() {
-            try {
-                await fetch('/api/logout', { method: 'POST' });
-                updateUIForLoggedOutUser();
-                alert('Logged out successfully!');
-            } catch (error) {
-                alert('Logout failed.');
-            }
+            return window.LiquidGlass.logout();
         }
 
-        function updateUIForLoggedInUser(username) {
-            document.getElementById('authButtons').style.display = 'none';
-            document.getElementById('userInfo').style.display = 'flex';
-            document.getElementById('welcomeText').textContent = `PILOT_ID::${username}`;
-        }
-
-        function updateUIForLoggedOutUser() {
-            document.getElementById('authButtons').style.display = 'flex';
-            document.getElementById('userInfo').style.display = 'none';
-        }
-
-        // Form submissions
         document.getElementById('loginForm').addEventListener('submit', function (e) {
             e.preventDefault();
-            const username = document.getElementById('loginUsername').value;
-            const password = document.getElementById('loginPassword').value;
-            login(username, password);
+            login(document.getElementById('loginUsername').value,
+                document.getElementById('loginPassword').value);
         });
 
         document.getElementById('registerForm').addEventListener('submit', function (e) {
             e.preventDefault();
-            const username = document.getElementById('registerUsername').value;
-            const email = document.getElementById('registerEmail').value;
-            const password = document.getElementById('registerPassword').value;
-            register(username, email, password);
+            register(document.getElementById('registerUsername').value,
+                document.getElementById('registerEmail').value,
+                document.getElementById('registerPassword').value);
         });
 
-        function startQuiz() {
-            window.location.href = '/quiz';
-        }
+        /* ── Flight status panel ──────────────────────────────────────
+           Everything here is measured, not decorative: the real clock, the
+           real module count, the real renderer, the real session. */
+        (function () {
+            const clock = document.getElementById('statusClock');
+            const modules = document.getElementById('statusModules');
+            const render = document.getElementById('statusRender');
 
-        // Check if user is already logged in
-        async function checkAuthStatus() {
-            try {
-                const response = await fetch('/api/user');
-                const data = await response.json();
+            if (modules) modules.textContent = String(document.querySelectorAll('.module').length);
 
-                if (data.loggedIn) {
-                    updateUIForLoggedInUser(data.username);
-                    setupAuthLinks({ loggedIn: true, username: data.username });
-                }
-            } catch (error) {
-                console.log('Not logged in');
-                setupAuthLinks({ loggedIn: false });
+            if (render) {
+                let label = 'Canvas 2D';
+                try {
+                    const gl = document.createElement('canvas').getContext('webgl2') ||
+                        document.createElement('canvas').getContext('webgl');
+                    label = gl ? (gl instanceof WebGL2RenderingContext ? 'WebGL 2' : 'WebGL 1') : 'Canvas 2D';
+                } catch (e) { /* context creation blocked */ }
+                render.textContent = label;
             }
-        }
 
-        // Initialize
+            if (clock) {
+                const tick = () => {
+                    const d = new Date();
+                    const p = n => String(n).padStart(2, '0');
+                    clock.textContent =
+                        `${p(d.getUTCHours())}:${p(d.getUTCMinutes())}:${p(d.getUTCSeconds())}`;
+                };
+                tick();
+                setInterval(tick, 1000);
+            }
+        })();
+
+        /* ── Session ──────────────────────────────────────────────── */
         document.addEventListener('DOMContentLoaded', function () {
-            checkAuthStatus();
-
-            // Allow native scrolling, LaunchExperience will handle the intro
-            document.body.classList.remove('launch-active');
+            window.LiquidGlass.session().then(function (user) {
+                window.LiquidGlass.paintPilot(user);
+                setupAuthLinks(user);
+                const callsign = document.getElementById('statusCallsign');
+                const mode = document.getElementById('statusMode');
+                if (callsign) callsign.textContent = user.loggedIn ? (user.username || 'Explorer') : 'not signed in';
+                if (mode) mode.textContent = user.loggedIn ? (user.demo ? 'demo' : 'standard') : 'guest';
+            });
         });
     </script>
-    <!-- Three.js + addons for Space Shuttle 3D Launch -->
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
-    <script src="/public/js/home-launch.js"></script>
+
     <script src="/public/js/chat-widget.js" defer></script>
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         STARFIELD
+         ═══════════════════════════════════════════════════════════════ -->
     <script>
-        /* ====================================================
-           REALISTIC SPACE BACKGROUND — Canvas Star Engine
-           ====================================================
-           - 3 parallax depth layers (far/mid/near)
-           - 500+ stars with individual twinkle phases
-           - Star color variety: white, blue-white, yellow, orange-red
-           - Shooting stars at random intervals
-           - Subtle nebula cloud overlays
-           ==================================================== */
         (function () {
             const canvas = document.getElementById('space-bg');
+            if (!canvas) return;
             const ctx = canvas.getContext('2d');
+            const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-            // Resize canvas to fill viewport
             function resize() {
                 canvas.width = window.innerWidth;
                 canvas.height = window.innerHeight;
             }
             resize();
-            window.addEventListener('resize', () => { resize(); initStars(); });
 
-            // Star color palette – realistic spectral tints
             const STAR_COLORS = [
-                { r: 255, g: 255, b: 255 },  // pure white
-                { r: 200, g: 220, b: 255 },  // blue-white
-                { r: 180, g: 200, b: 255 },  // blue
-                { r: 255, g: 245, b: 220 },  // warm white
-                { r: 255, g: 220, b: 160 },  // yellow
-                { r: 255, g: 180, b: 100 },  // orange
-                { r: 255, g: 150, b: 120 },  // red dwarf
+                { r: 255, g: 255, b: 255 }, { r: 200, g: 220, b: 255 }, { r: 180, g: 200, b: 255 },
+                { r: 255, g: 245, b: 220 }, { r: 255, g: 220, b: 160 }, { r: 255, g: 180, b: 100 },
+                { r: 255, g: 150, b: 120 }
             ];
+            const LAYERS = [{ count: 230, maxR: 0.6 }, { count: 150, maxR: 1.1 }, { count: 70, maxR: 1.7 }];
 
-            // Layer config: count, speed multiplier, max radius
-            const LAYERS = [
-                { count: 250, speed: 0.0, maxR: 0.6 },  // far – tiny, static
-                { count: 180, speed: 0.0, maxR: 1.1 },  // mid
-                { count: 90, speed: 0.0, maxR: 1.8 },  // near – large, bright
-            ];
-
-            let stars = [];
-            let shooters = [];
-            let nebulae = [];
-
-            function randRange(min, max) { return Math.random() * (max - min) + min; }
-            function randInt(min, max) { return Math.floor(randRange(min, max)); }
+            let stars = [], shooters = [], lastShooter = 0;
+            const rand = (a, b) => Math.random() * (b - a) + a;
+            const randInt = (a, b) => Math.floor(rand(a, b));
 
             function initStars() {
                 stars = [];
                 const W = canvas.width, H = canvas.height;
-
                 LAYERS.forEach((layer, li) => {
                     for (let i = 0; i < layer.count; i++) {
-                        const col = STAR_COLORS[randInt(0, STAR_COLORS.length)];
                         stars.push({
-                            x: randRange(0, W),
-                            y: randRange(0, H),
-                            r: randRange(0.15, layer.maxR),
-                            baseAlpha: randRange(0.4, 1.0),
-                            alpha: 0,
-                            twinkleSpeed: randRange(0.003, 0.025),
-                            twinkleOffset: randRange(0, Math.PI * 2),
-                            color: col,
-                            layer: li,
-                            glowMult: li === 2 ? randRange(2.5, 5) : (li === 1 ? randRange(1.5, 3) : 1),
+                            x: rand(0, W), y: rand(0, H), r: rand(0.15, layer.maxR),
+                            baseAlpha: rand(0.35, 0.95), alpha: 0,
+                            twinkleSpeed: rand(0.003, 0.025), twinkleOffset: rand(0, Math.PI * 2),
+                            color: STAR_COLORS[randInt(0, STAR_COLORS.length)], layer: li,
+                            glowMult: li === 2 ? rand(2.5, 5) : (li === 1 ? rand(1.5, 3) : 1)
                         });
                     }
                 });
-
-                // Pre-bake a few nebula blobs
-                nebulae = [];
-                const nebulaConfigs = [
-                    { cx: 0.15, cy: 0.50, r: 0.25, col: '188,19,254', a: 0.045 },
-                    { cx: 0.85, cy: 0.30, r: 0.28, col: '0,180,255', a: 0.040 },
-                    { cx: 0.50, cy: 0.85, r: 0.20, col: '255,120,20', a: 0.030 },
-                    { cx: 0.70, cy: 0.10, r: 0.18, col: '80,220,180', a: 0.025 },
-                ];
-                nebulaConfigs.forEach(n => nebulae.push({
-                    cx: n.cx * W, cy: n.cy * H,
-                    r: n.r * Math.max(W, H),
-                    col: n.col, a: n.a,
-                }));
             }
 
             function spawnShooter() {
                 const W = canvas.width, H = canvas.height;
-                const angle = randRange(-0.6, -0.2);  // mostly downward right
+                const angle = rand(-0.6, -0.2);
                 shooters.push({
-                    x: randRange(0, W),
-                    y: randRange(0, H * 0.5),
-                    len: randRange(60, 180),
-                    speed: randRange(6, 14),
-                    alpha: 1,
-                    dx: Math.cos(angle),
-                    dy: Math.sin(angle) * 0.5 + 0.5,
-                    life: 1,
+                    x: rand(0, W), y: rand(0, H * 0.5), len: rand(60, 180), speed: rand(6, 14),
+                    dx: Math.cos(angle), dy: Math.sin(angle) * 0.5 + 0.5, life: 1
                 });
             }
 
-            let t = 0;
-            let lastShooter = 0;
-
             function draw(ts) {
-                t = ts * 0.001;
+                const t = ts * 0.001;
                 const W = canvas.width, H = canvas.height;
+                // Transparent clear: the aurora field behind must show through.
+                ctx.clearRect(0, 0, W, H);
 
-                // ── Background fill ──────────────────────────────────────────
-                ctx.fillStyle = '#000000';
-                ctx.fillRect(0, 0, W, H);
-
-                // ── Nebula blobs ─────────────────────────────────────────────
-                nebulae.forEach(n => {
-                    const grad = ctx.createRadialGradient(n.cx, n.cy, 0, n.cx, n.cy, n.r);
-                    grad.addColorStop(0, `rgba(${n.col}, ${n.a})`);
-                    grad.addColorStop(0.5, `rgba(${n.col}, ${n.a * 0.4})`);
-                    grad.addColorStop(1, `rgba(${n.col}, 0)`);
-                    ctx.fillStyle = grad;
-                    ctx.beginPath();
-                    ctx.arc(n.cx, n.cy, n.r, 0, Math.PI * 2);
-                    ctx.fill();
-                });
-
-                // ── Stars ────────────────────────────────────────────────────
                 stars.forEach(s => {
                     const flicker = 0.5 + 0.5 * Math.sin(t * s.twinkleSpeed * 60 + s.twinkleOffset);
-                    s.alpha = s.baseAlpha * (0.55 + 0.45 * flicker);
-
-                    const r = s.r;
+                    s.alpha = s.baseAlpha * (reduceMotion ? 1 : (0.55 + 0.45 * flicker));
                     const { r: cr, g: cg, b: cb } = s.color;
 
-                    // Glow halo for brighter / nearer stars
                     if (s.glowMult > 1) {
                         const gVal = Math.max(0, s.alpha - 0.2);
-                        const glowR = r * s.glowMult;
+                        const glowR = s.r * s.glowMult;
                         const grd = ctx.createRadialGradient(s.x, s.y, 0, s.x, s.y, glowR);
-                        grd.addColorStop(0, `rgba(${cr},${cg},${cb},${gVal * 0.6})`);
-                        grd.addColorStop(0.4, `rgba(${cr},${cg},${cb},${gVal * 0.15})`);
+                        grd.addColorStop(0, `rgba(${cr},${cg},${cb},${gVal * 0.55})`);
+                        grd.addColorStop(0.4, `rgba(${cr},${cg},${cb},${gVal * 0.14})`);
                         grd.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
                         ctx.fillStyle = grd;
                         ctx.beginPath();
@@ -1765,96 +909,74 @@
                         ctx.fill();
                     }
 
-                    // Star core
                     ctx.globalAlpha = s.alpha;
                     ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
                     ctx.beginPath();
-                    ctx.arc(s.x, s.y, r, 0, Math.PI * 2);
+                    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
                     ctx.fill();
-
-                    // Cross-diffraction spike for bright near stars
-                    if (s.layer === 2 && s.r > 1.3 && s.alpha > 0.7) {
-                        ctx.globalAlpha = s.alpha * 0.3;
-                        ctx.strokeStyle = `rgb(${cr},${cg},${cb})`;
-                        ctx.lineWidth = 0.5;
-                        const sLen = r * 4;
-                        ctx.beginPath();
-                        ctx.moveTo(s.x - sLen, s.y); ctx.lineTo(s.x + sLen, s.y);
-                        ctx.moveTo(s.x, s.y - sLen); ctx.lineTo(s.x, s.y + sLen);
-                        ctx.stroke();
-                    }
                 });
                 ctx.globalAlpha = 1;
 
-                // ── Shooting stars ───────────────────────────────────────────
-                if (ts - lastShooter > randRange(1800, 5000)) {
-                    spawnShooter();
-                    lastShooter = ts;
+                if (!reduceMotion) {
+                    if (ts - lastShooter > rand(2200, 6000)) { spawnShooter(); lastShooter = ts; }
+                    shooters = shooters.filter(s => s.life > 0);
+                    shooters.forEach(s => {
+                        s.life -= 0.015;
+                        s.x += s.dx * s.speed;
+                        s.y += s.dy * s.speed;
+                        const tail = ctx.createLinearGradient(s.x - s.dx * s.len, s.y - s.dy * s.len, s.x, s.y);
+                        tail.addColorStop(0, 'rgba(255,255,255,0)');
+                        tail.addColorStop(1, `rgba(255,255,255,${s.life * 0.85})`);
+                        ctx.strokeStyle = tail;
+                        ctx.lineWidth = 1.4;
+                        ctx.beginPath();
+                        ctx.moveTo(s.x - s.dx * s.len, s.y - s.dy * s.len);
+                        ctx.lineTo(s.x, s.y);
+                        ctx.stroke();
+                    });
                 }
-                shooters = shooters.filter(s => s.life > 0);
-                shooters.forEach(s => {
-                    s.life -= 0.015;
-                    s.x += s.dx * s.speed;
-                    s.y += s.dy * s.speed;
-                    const tail = ctx.createLinearGradient(
-                        s.x - s.dx * s.len, s.y - s.dy * s.len, s.x, s.y
-                    );
-                    tail.addColorStop(0, `rgba(255,255,255,0)`);
-                    tail.addColorStop(1, `rgba(255,255,255,${s.life * 0.9})`);
-                    ctx.strokeStyle = tail;
-                    ctx.lineWidth = 1.5;
-                    ctx.beginPath();
-                    ctx.moveTo(s.x - s.dx * s.len, s.y - s.dy * s.len);
-                    ctx.lineTo(s.x, s.y);
-                    ctx.stroke();
-                });
 
                 requestAnimationFrame(draw);
             }
 
+            window.addEventListener('resize', () => { resize(); initStars(); });
             initStars();
             requestAnimationFrame(draw);
         })();
     </script>
 
     <!-- ═══════════════════════════════════════════════════════════════
-         WARP-SPEED TRANSITION SCRIPT
+         WARP TRANSITION — the jump into the solar system
          ═══════════════════════════════════════════════════════════════ -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.2/gsap.min.js"></script>
     <script>
         (function () {
             const exploreLink = document.getElementById('exploreLink');
             if (!exploreLink || typeof gsap === 'undefined') return;
+            if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
             const overlay = document.getElementById('warp-overlay');
             const streakBox = document.getElementById('warpStreaks');
             const warpText = document.getElementById('warpText');
             const STREAK_COUNT = 80;
 
-            // Build streaks
             for (let i = 0; i < STREAK_COUNT; i++) {
                 const el = document.createElement('div');
                 el.className = 'warp-streak';
-                const angle = (360 / STREAK_COUNT) * i;
-                el.style.transform = `rotate(${angle}deg)`;
+                el.style.transform = `rotate(${(360 / STREAK_COUNT) * i}deg)`;
                 streakBox.appendChild(el);
             }
-
             const streaks = streakBox.querySelectorAll('.warp-streak');
 
             exploreLink.addEventListener('click', function (e) {
+                // A gated link opens the login modal instead; don't warp there.
+                if (exploreLink.hasAttribute('data-gated')) return;
                 e.preventDefault();
                 const dest = exploreLink.getAttribute('href') + '?warp=1';
-
                 overlay.classList.add('active');
 
-                const tl = gsap.timeline({
-                    onComplete: () => window.location.href = dest
-                });
-
-                // Phase 1: Fade in overlay from transparent
+                const tl = gsap.timeline({ onComplete: () => window.location.href = dest });
                 tl.to(overlay, { opacity: 1, duration: 0.25, ease: 'power2.in' });
-
-                // Phase 2: Animate star streaks outward — warp effect
                 tl.to(streaks, {
                     height: () => 20 + Math.random() * 250,
                     opacity: () => 0.4 + Math.random() * 0.6,
@@ -1862,11 +984,7 @@
                     stagger: { each: 0.005, from: 'random' },
                     ease: 'power3.out'
                 }, '-=0.1');
-
-                // Phase 3: Text pulse in
                 tl.to(warpText, { opacity: 1, scale: 1.08, duration: 0.4, ease: 'power2.out' }, '-=0.3');
-
-                // Phase 4: Streaks elongate wildly — hyper-jump
                 tl.to(streaks, {
                     height: () => 400 + Math.random() * 600,
                     opacity: 0,
@@ -1874,15 +992,15 @@
                     stagger: { each: 0.003, from: 'center' },
                     ease: 'power4.in'
                 }, '+=0.15');
-
-                // Phase 5: Fade to full black → navigate
                 tl.to(overlay, { opacity: 1, background: '#000', duration: 0.3, ease: 'none' }, '-=0.1');
                 tl.to(warpText, { opacity: 0, duration: 0.2 }, '-=0.1');
             });
         })();
     </script>
-    
-    <!-- Firebase SDK Setup -->
+
+    <!-- ═══════════════════════════════════════════════════════════════
+         FIREBASE — Google sign-in
+         ═══════════════════════════════════════════════════════════════ -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-app.js";
         import { getAuth, signInWithPopup, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.10.0/firebase-auth.js";
@@ -1900,23 +1018,20 @@
         const auth = getAuth(app);
         const provider = new GoogleAuthProvider();
 
-        window.signInWithGoogle = async function() {
+        window.signInWithGoogle = async function () {
             try {
                 const result = await signInWithPopup(auth, provider);
                 const token = await result.user.getIdToken();
 
-                // Send the generated token to our Node.js backend to establish a persistent session
                 const response = await fetch('/api/google-login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
+                    credentials: 'same-origin',
                     body: JSON.stringify({ idToken: token })
                 });
 
                 const data = await response.json();
                 if (data.success) {
-                    closeModal('loginModal');
-                    closeModal('registerModal');
-                    // Automatically refresh the page to update the UI and links!
                     window.location.reload();
                 } else {
                     alert('Login failed: ' + data.error);

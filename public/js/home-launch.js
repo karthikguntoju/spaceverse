@@ -33,8 +33,12 @@ class LaunchExperience {
         this.telThrust = document.getElementById('telemetry-thrust');
         this.timerElem = document.querySelector('.mission-timer');
 
-        // Check if user has already seen the launch in this session
-        this.isSkipped = sessionStorage.getItem('hasSeenLaunch') === 'true';
+        // Check if user has already seen the launch in this session.
+        // `data-force-launch` (the landing page) opts out of the skip: there the
+        // launch is the point of the page, not an intro to get past.
+        let seen = false;
+        try { seen = sessionStorage.getItem('hasSeenLaunch') === 'true'; } catch (e) { /* storage blocked */ }
+        this.isSkipped = seen && !document.body.hasAttribute('data-force-launch');
 
         // Mouse parallax tracking
         this.mouse = { x: 0, y: 0 };
@@ -61,7 +65,7 @@ class LaunchExperience {
             document.body.classList.remove('is-skipping-launch');
             
             // Jump to the exact bottom of the launch engine
-            const jumpPos = engine.offsetHeight || (8 * window.innerHeight);
+            const jumpPos = (engine && engine.offsetHeight) || (8 * window.innerHeight);
             window.scrollTo(0, jumpPos);
             
             // Ensure ScrollTrigger and particles know we are at the end
@@ -109,9 +113,14 @@ class LaunchExperience {
        LENIS SMOOTH SCROLL
     ──────────────────────────────────────────────────────────── */
     setupLenis() {
+        if (typeof Lenis === 'undefined') return;   // CDN blocked: fall back to native scroll
         const lenis = new Lenis({ duration: 1.2, smooth: true });
         const raf = t => { lenis.raf(t); requestAnimationFrame(raf); };
         requestAnimationFrame(raf);
+        // Exposed so page-level UI (e.g. the landing page's auto-scroll cue) can
+        // drive the same smooth-scroll instance instead of fighting it.
+        this.lenis = lenis;
+        window.lenis = lenis;
     }
 
     /* ────────────────────────────────────────────────────────────

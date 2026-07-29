@@ -81,42 +81,11 @@ const simulationSchema = new mongoose.Schema({
   }
 });
 
-const userScoreSchema = new mongoose.Schema({
-  userId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-    unique: true
-  },
-  scores: {
-    safetyScore: { type: Number, default: 0, min: 0, max: 100 },
-    sustainabilityScore: { type: Number, default: 0, min: 0, max: 100 },
-    efficiencyScore: { type: Number, default: 0, min: 0, max: 100 }
-  },
-  level: {
-    type: String,
-    default: 'Safe Launcher',
-    enum: ['Safe Launcher', 'Orbital Optimizer', 'Space Sustainability Engineer']
-  },
-  badges: [{
-    id: String,
-    name: String,
-    earnedAt: { type: Date, default: Date.now }
-  }],
-  achievements: [{
-    id: String,
-    name: String,
-    description: String,
-    progress: Number,
-    target: Number,
-    earnedAt: Date
-  }],
-  totalSimulations: { type: Number, default: 0 },
-  lastUpdated: {
-    type: Date,
-    default: Date.now
-  }
-});
+// The progression schema moved out to models/user-score.js when game missions
+// started writing to it too. It is no longer this feature's private record, and
+// leaving it defined inside a router named "simulator" made it impossible to
+// find. Behaviour is unchanged; see that file for the migration notes.
+const { userScoreSchema, syncTotals } = require('../models/user-score');
 
 const scenarioHistorySchema = new mongoose.Schema({
   userId: {
@@ -308,20 +277,12 @@ async function updateGamificationScores(userId, simulationResults) {
     userScore.scores.sustainabilityScore = Math.min(100, Math.max(0, userScore.scores.sustainabilityScore + sustainabilityChange));
     userScore.scores.efficiencyScore = Math.min(100, Math.max(0, userScore.scores.efficiencyScore + efficiencyChange));
 
-    // Update level based on average score
-    const avgScore = (userScore.scores.safetyScore + userScore.scores.sustainabilityScore + userScore.scores.efficiencyScore) / 3;
-
-    if (avgScore >= 80) {
-      userScore.level = 'Space Sustainability Engineer';
-    } else if (avgScore >= 60) {
-      userScore.level = 'Orbital Optimizer';
-    } else {
-      userScore.level = 'Safe Launcher';
-    }
-
-    // Increment total simulations
+    // Level and totalScore are derived, not assigned here. syncTotals owns that
+    // rule now so the simulator and the game missions cannot drift apart on what
+    // a rank means. Its first three thresholds reproduce the average-based rule
+    // this function used to apply inline.
     userScore.totalSimulations += 1;
-    userScore.lastUpdated = new Date();
+    syncTotals(userScore);
 
     // Check for new badges
     const newBadges = [];
@@ -681,29 +642,14 @@ router.post('/run', ensureAuthenticated, async (req, res) => {
 // GET /api/simulator/leaderboard - Get leaderboard
 router.get('/leaderboard', ensureAuthenticated, async (req, res) => {
   try {
-    // Get top 10 users by total score (sum of all three scores)
-    const leaderboard = await UserScore.aggregate([
-      {
-        $project: {
-          userId: 1,
-          scores: 1,
-          level: 1,
-          totalScore: {
-            $add: [
-              "$scores.safetyScore",
-              "$scores.sustainabilityScore",
-              "$scores.efficiencyScore"
-            ]
-          }
-        }
-      },
-      {
-        $sort: { totalScore: -1 }
-      },
-      {
-        $limit: 10
-      }
-    ]);
+    // Top 10 by stored totalScore. This used to $add the three axes inside an
+    // aggregate and sort on the computed field, which no index can serve, so
+    // ranking anyone read the whole collection. totalScore is now maintained on
+    // write and indexed descending, making this an index scan of 10 documents.
+    const leaderboard = await UserScore.find({}, 'userId scores level totalScore')
+      .sort({ totalScore: -1 })
+      .limit(10)
+      .lean();
 
     // Populate user information
     const userIds = leaderboard.map(entry => entry.userId);
@@ -716,10 +662,20 @@ router.get('/leaderboard', ensureAuthenticated, async (req, res) => {
     });
 
     // Format leaderboard data
+    // Documents written before totalScore was stored have no such field. Fall
+    // back to deriving it so the board reads correctly on a database that has
+    // not had scripts/migrate-user-scores.js run against it yet. Those rows sort
+    // as 0 until the migration runs, but they never render as blank.
+    const derivedTotal = (entry) => {
+      if (typeof entry.totalScore === 'number') return entry.totalScore;
+      const s = entry.scores || {};
+      return (s.safetyScore || 0) + (s.sustainabilityScore || 0) + (s.efficiencyScore || 0);
+    };
+
     const formattedLeaderboard = leaderboard.map((entry, index) => ({
       rank: index + 1,
       username: userMap[entry.userId.toString()] || 'Unknown User',
-      totalScore: entry.totalScore,
+      totalScore: derivedTotal(entry),
       level: entry.level
     }));
 
@@ -728,24 +684,11 @@ router.get('/leaderboard', ensureAuthenticated, async (req, res) => {
     let currentUserRank = null;
 
     if (currentUserScore) {
-      const currentUserTotal =
-        currentUserScore.scores.safetyScore +
-        currentUserScore.scores.sustainabilityScore +
-        currentUserScore.scores.efficiencyScore;
-
+      // Second full scan removed for the same reason: a $expr/$add comparison
+      // cannot use an index, so finding one player's rank read every document.
+      // A plain range count on the indexed field does the same job.
       const higherScoresCount = await UserScore.countDocuments({
-        $expr: {
-          $gt: [
-            {
-              $add: [
-                "$scores.safetyScore",
-                "$scores.sustainabilityScore",
-                "$scores.efficiencyScore"
-              ]
-            },
-            currentUserTotal
-          ]
-        }
+        totalScore: { $gt: currentUserScore.totalScore || 0 }
       });
 
       currentUserRank = higherScoresCount + 1;
@@ -757,10 +700,11 @@ router.get('/leaderboard', ensureAuthenticated, async (req, res) => {
       currentUser: {
         rank: currentUserRank,
         username: req.session.username,
-        totalScore: currentUserScore ?
-          currentUserScore.scores.safetyScore +
-          currentUserScore.scores.sustainabilityScore +
-          currentUserScore.scores.efficiencyScore : 0,
+        // Read the stored total rather than re-deriving it from the three axes.
+        // Re-deriving here would omit missionXp, so a player's own total would
+        // disagree with their own row in the leaderboard above — in the same
+        // response.
+        totalScore: currentUserScore ? currentUserScore.totalScore : 0,
         level: currentUserScore ? currentUserScore.level : 'Safe Launcher'
       }
     });
@@ -852,7 +796,12 @@ router.get('/scores', ensureAuthenticated, async (req, res) => {
       level: userScore.level,
       badges: userScore.badges,
       achievements: userScore.achievements,
-      totalSimulations: userScore.totalSimulations
+      totalSimulations: userScore.totalSimulations,
+      // Mission progression. Without these the dashboard can show a player's
+      // simulator scores but not the rank they actually earned playing.
+      missionXp: userScore.missionXp || 0,
+      totalMissions: userScore.totalMissions || 0,
+      totalScore: userScore.totalScore || 0
     });
 
   } catch (error) {

@@ -1,0 +1,604 @@
+/* ═══════════════════════════════════════════════════════════════════════
+   LIQUID GLASS — THEME BRIDGE
+   ═══════════════════════════════════════════════════════════════════════
+   Retrofits the material onto the feature pages (solar system, quiz,
+   tracker, simulator, reviews, …) without rewriting a thousand lines of
+   layout each.
+
+   It works in two passes:
+
+     1. Re-point the legacy design tokens. Every one of those pages defines
+        its own :root palette — neon cyan on near-black, hard borders, heavy
+        glows. Redefining those variables re-colours whatever the page
+        already built, including rules this file never names.
+
+     2. Re-material the shared component vocabulary — .panel, .card, .btn,
+        inputs, navbar, modal — as actual glass.
+
+   MUST be linked AFTER the page's own <style> block: these rules win on
+   source order, not on specificity wars.
+
+   Deliberately standalone — liquid-glass.css is NOT loaded alongside it.
+   That file owns bare class names (.card, .btn, .stat, .section) that these
+   pages already use for their own components, and dropping it in here would
+   restyle them by accident. The aurora rules it needs are duplicated at the
+   bottom of this file for exactly that reason.
+
+   Pages keep their own layout, scripts and behaviour. Nothing here changes
+   what a page does, only what it is made of.
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Pass 1: repoint the legacy palette ────────────────────────────── */
+:root {
+    /* Backgrounds — pushed to transparent-friendly values so the aurora
+       field mounted by the runtime is visible underneath. */
+    --bg: #04060f;
+    --space-dark: #04060f;
+    --space-light: #0b1024;
+    --panel: rgba(255, 255, 255, 0.055);
+    --panel-bg: rgba(255, 255, 255, 0.055);
+    --card-bg: rgba(255, 255, 255, 0.055);
+    --glass: rgba(255, 255, 255, 0.055);
+    --glass-bg: rgba(255, 255, 255, 0.055);
+
+    /* Edges — hairline white instead of glowing neon outlines */
+    --glass-border: rgba(255, 255, 255, 0.14);
+    --line: rgba(255, 255, 255, 0.1);
+
+    /* --muted / --muted-strong are deliberately NOT repointed. The name means
+       a surface tint on some pages (reviews, community) and a body-text
+       colour on others (the VR launcher). Remapping it to a 6%-alpha white
+       turned every paragraph on the VR page invisible. Ambiguous token: leave
+       each page's own value alone. */
+
+    /* Accents */
+    --accent: #22d3ee;
+    --accent-2: #a78bfa;
+    --accent2: #a78bfa;
+    --neon-blue: #22d3ee;
+    --cyan: #22d3ee;
+    --cyan-dim: rgba(34, 211, 238, 0.45);
+    --blue: #38bdf8;
+    --neon-purple: #a78bfa;
+    --neon-amber: #fbbf24;
+    --gold: #fbbf24;
+    --gold-dim: rgba(251, 191, 36, 0.45);
+
+    /* Semantic */
+    --success: #34d399;
+    --error: #fb7185;
+    --danger: #fb7185;
+    --warning: #fbbf24;
+
+    /* Ink */
+    --text: #f2f6ff;
+    --text-main: #f2f6ff;
+
+    /* Depth + shape */
+    --glass-shadow: 0 30px 70px -20px rgba(0, 0, 0, 0.72);
+    --radius: 20px;
+
+    /* Neon text glow was the old signature. Glass does not glow; it
+       refracts. Zeroing this cleans up dozens of rules at once. */
+    --text-glow: none;
+}
+
+/* ── Page shell ────────────────────────────────────────────────────── */
+body.lg-lite {
+    background: #04060f;
+    color: var(--text);
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+/* Legacy pages paint their own starfields onto an opaque black fill. Left
+   alone that sheet covers the aurora and every panel above it has nothing
+   but black to refract. Screen blending drops the black and keeps the
+   stars — the same trick the launch frame uses. */
+body.lg-lite > canvas#space-bg,
+body.lg-lite > canvas#stars,
+body.lg-lite > canvas#starfield {
+    mix-blend-mode: screen;
+    opacity: 0.9;
+}
+
+/* Orbitron at wide tracking, wrapped in a neon halo, was the old signature.
+   Glass does not glow — light arrives from the material behind the type, so
+   the halo has to go. These pages bury the rules in deep selectors, hence
+   the !important: chasing each one individually is not worth it. */
+.lg-lite h1,
+.lg-lite h2,
+.lg-lite h3,
+.lg-lite h4,
+.lg-lite .section-title,
+.lg-lite .panel-title,
+.lg-lite .card-title,
+.lg-lite .title-text,
+.lg-lite [class*='-title'] {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif !important;
+    letter-spacing: -0.015em !important;
+    text-transform: none !important;
+    text-shadow: none !important;
+}
+
+.lg-lite h1,
+.lg-lite h2 {
+    font-weight: 600;
+}
+
+/* Same treatment for the wordmark and any other haloed label */
+.lg-lite .logo,
+.lg-lite .logo span,
+.lg-lite .logo a,
+.lg-lite .nav-links a,
+.lg-lite .eyebrow,
+.lg-lite .hud-label,
+.lg-lite .stat-val,
+.lg-lite .stat-label,
+.lg-lite .stat-value,
+.lg-lite .metric-value,
+.lg-lite .metric-label,
+.lg-lite .score-value,
+.lg-lite .detail-value,
+.lg-lite .detail-label,
+.lg-lite .mission-detail-value,
+.lg-lite .mission-detail-label {
+    text-shadow: none !important;
+}
+
+.lg-lite .logo,
+.lg-lite .logo span {
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif !important;
+    font-weight: 600;
+    letter-spacing: -0.02em !important;
+    text-transform: none !important;
+}
+
+/* ── Pass 2: re-material the shared vocabulary ─────────────────────── */
+.lg-lite .panel,
+.lg-lite .card,
+.lg-lite .result-card,
+.lg-lite .planet-card,
+.lg-lite .scenario-card,
+.lg-lite .review-card,
+.lg-lite .mission-card,
+.lg-lite .feature-card,
+.lg-lite .detail-section,
+.lg-lite .info-panel,
+.lg-lite .metric,
+.lg-lite .stat,
+.lg-lite .stat-item,
+.lg-lite .timeline-item,
+.lg-lite .traffic-controls,
+.lg-lite .controls-panel,
+.lg-lite #info-panel,
+.lg-lite #controlsHelp,
+.lg-lite .legend,
+.lg-lite .quiz-container,
+.lg-lite .score-display,
+.lg-lite .mission-details,
+.lg-lite .visibility-map,
+.lg-lite .calendar-day,
+.lg-lite .side-planet,
+.lg-lite .top-actions,
+.lg-lite .modal-content {
+    /* No `position` here on purpose. Several of these surfaces are absolutely
+       positioned overlays (the traffic-visualisation control panels, for one)
+       and forcing `relative` drops them into normal flow, where they stretch
+       full-width across the scene. The bridge uses no pseudo-elements, so it
+       has nothing to anchor anyway. */
+    background: rgba(255, 255, 255, 0.055) !important;
+    backdrop-filter: blur(26px) saturate(185%);
+    -webkit-backdrop-filter: blur(26px) saturate(185%);
+    border: none !important;
+    border-radius: 22px !important;
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+        inset 0 -1px 0 0 rgba(255, 255, 255, 0.05),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.09),
+        0 30px 70px -20px rgba(0, 0, 0, 0.72) !important;
+    text-shadow: none;
+}
+
+/* Hover lift for the ones that are actually clickable */
+.lg-lite .planet-card:hover,
+.lg-lite .scenario-card:hover,
+.lg-lite .mission-card:hover,
+.lg-lite .feature-card:hover,
+.lg-lite .calendar-day:hover {
+    transform: translateY(-4px);
+    background: rgba(255, 255, 255, 0.085) !important;
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.34),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.14),
+        0 48px 110px -28px rgba(0, 0, 0, 0.8) !important;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────── */
+.lg-lite .btn,
+.lg-lite .top-btn,
+.lg-lite .filter-btn,
+.lg-lite .tab-btn,
+.lg-lite .view-btn,
+.lg-lite .traffic-btn,
+.lg-lite .nav-btn,
+.lg-lite .pill-btn,
+.lg-lite .watch-btn,
+.lg-lite .back-home-btn,
+.lg-lite .nav-back-btn,
+.lg-lite .back-btn,
+.lg-lite .logout-btn,
+.lg-lite .btn-feature,
+.lg-lite .btn-out,
+.lg-lite .submit-btn,
+.lg-lite button[type='submit'],
+/* Plain class selectors, not `button.btn-primary`: the accent rule further
+   down targets `.btn-primary`, and a tag-qualified selector here would
+   out-specify it and keep every primary action grey. */
+.lg-lite .btn-secondary,
+.lg-lite .btn-primary {
+    /* Material only. No `position` and no `display`: some of these are
+       absolutely positioned overlays and some are full-width block buttons,
+       and overriding either wrecks the page's layout. */
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    color: #f2f6ff;
+    background: rgba(255, 255, 255, 0.07) !important;
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    border: none !important;
+    border-radius: 999px !important;
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.3),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.1),
+        0 14px 40px -14px rgba(0, 0, 0, 0.6) !important;
+    text-shadow: none;
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+        background-color 0.34s ease, box-shadow 0.34s ease;
+}
+
+.lg-lite .btn:hover,
+.lg-lite .top-btn:hover,
+.lg-lite .filter-btn:hover,
+.lg-lite .tab-btn:hover,
+.lg-lite .view-btn:hover,
+.lg-lite .traffic-btn:hover,
+.lg-lite .nav-btn:hover,
+.lg-lite .pill-btn:hover,
+.lg-lite .watch-btn:hover,
+.lg-lite .back-home-btn:hover,
+.lg-lite .nav-back-btn:hover,
+.lg-lite .logout-btn:hover,
+.lg-lite .back-btn:hover,
+.lg-lite .btn-feature:hover {
+    transform: translateY(-2px);
+    background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* The nav "Back to Home" anchors were sized entirely by inline styles that
+   the redesign stripped. Without a box of their own they collapse to inline
+   text and collide with the control beside them. Scoped to <a> so the
+   absolutely positioned and full-width button variants are left alone. */
+.lg-lite a.nav-back-btn,
+.lg-lite a.back-home-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.45rem;
+    min-height: 40px;
+    padding: 0 1.15rem;
+    font-size: 0.86rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+/* Destructive action keeps a warning tint rather than a neon red outline */
+.lg-lite .logout-btn {
+    color: #fda4af !important;
+}
+
+.lg-lite .logout-btn:hover {
+    color: #fff !important;
+    background: rgba(251, 113, 133, 0.22) !important;
+}
+
+.lg-lite .btn:active,
+.lg-lite .top-btn:active,
+.lg-lite .filter-btn:active {
+    transform: translateY(0) scale(0.978);
+}
+
+/* The affirmative action on each page keeps the aurora core */
+.lg-lite .btn-primary,
+.lg-lite .pill-btn.primary,
+.lg-lite .submit-btn,
+.lg-lite button[type='submit'],
+.lg-lite .filter-btn.active,
+.lg-lite .tab-btn.active,
+.lg-lite .view-btn.active,
+.lg-lite .traffic-btn.active,
+.lg-lite .watch-btn {
+    color: #02121a !important;
+    background:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.05) 42%, transparent 60%),
+        linear-gradient(100deg, #22d3ee 0%, #2dd4bf 34%, #a78bfa 100%) !important;
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.65),
+        0 10px 30px -8px rgba(34, 211, 238, 0.55) !important;
+}
+
+/* ── Fields ────────────────────────────────────────────────────────── */
+.lg-lite input[type='text'],
+.lg-lite input[type='email'],
+.lg-lite input[type='password'],
+.lg-lite input[type='number'],
+.lg-lite input[type='search'],
+.lg-lite textarea,
+.lg-lite select,
+.lg-lite .form-control {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.045) !important;
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    border: none !important;
+    border-radius: 14px !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.11),
+        inset 0 2px 5px 0 rgba(0, 0, 0, 0.3) !important;
+    transition: box-shadow 0.34s ease, background-color 0.34s ease;
+}
+
+.lg-lite input:focus,
+.lg-lite textarea:focus,
+.lg-lite select:focus,
+.lg-lite .form-control:focus {
+    outline: none;
+    background: rgba(255, 255, 255, 0.08) !important;
+    box-shadow:
+        inset 0 0 0 1px rgba(34, 211, 238, 0.65),
+        0 0 0 4px rgba(34, 211, 238, 0.14) !important;
+}
+
+/* ── Legacy navbar → floating glass dock ───────────────────────────── */
+.lg-lite .navbar {
+    position: fixed;
+    top: 12px;
+    left: 50%;
+    right: auto;
+    z-index: 900;
+    width: min(1240px, calc(100vw - 2rem));
+    padding: 0.55rem 0.75rem 0.55rem 1.15rem;
+    transform: translateX(-50%);
+    background: rgba(8, 12, 28, 0.55) !important;
+    backdrop-filter: blur(26px) saturate(185%);
+    -webkit-backdrop-filter: blur(26px) saturate(185%);
+    border: none !important;
+    border-radius: 999px !important;
+    /* Several pages chamfer the bar with a clip-path. That polygon survives
+       border-radius and would cut the corners off the pill. */
+    clip-path: none !important;
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.24),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.09),
+        0 30px 70px -20px rgba(0, 0, 0, 0.72) !important;
+}
+
+/* Corner brackets were part of the old HUD language. Glass has no corners
+   to bracket. */
+.lg-lite .nav-bracket {
+    display: none !important;
+}
+
+.lg-lite .navbar .nav-links a {
+    color: rgba(226, 234, 255, 0.72);
+    text-shadow: none;
+    border-radius: 999px;
+    transition: color 0.18s ease, background-color 0.18s ease;
+}
+
+/* Space the bar's trailing controls; several pages relied on inline margins */
+.lg-lite .navbar .nav-content,
+.lg-lite .navbar .user-info {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+}
+
+.lg-lite .navbar .nav-links a:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+}
+
+/* ── Modals ────────────────────────────────────────────────────────── */
+.lg-lite .modal {
+    background: rgba(2, 4, 10, 0.62) !important;
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+}
+
+.lg-lite .modal-content {
+    background: rgba(255, 255, 255, 0.075) !important;
+    backdrop-filter: blur(40px) saturate(210%);
+    -webkit-backdrop-filter: blur(40px) saturate(210%);
+}
+
+/* ── Loading states ────────────────────────────────────────────────── */
+.lg-lite .spinner {
+    border-color: rgba(255, 255, 255, 0.12) !important;
+    border-top-color: #22d3ee !important;
+}
+
+/* ── Strip the old neon signature ──────────────────────────────────── */
+.lg-lite .logo,
+.lg-lite .logo span,
+.lg-lite .hud-label,
+.lg-lite .stat-val,
+.lg-lite .metric-value,
+.lg-lite .score-value,
+.lg-lite .fact-value {
+    text-shadow: none !important;
+}
+
+/* Scrollbars, to match the system pages */
+.lg-lite ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.lg-lite ::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.lg-lite ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.12);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 99px;
+}
+
+/* ── Guards ────────────────────────────────────────────────────────── */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+
+    .lg-lite .panel,
+    .lg-lite .card,
+    .lg-lite .modal-content,
+    .lg-lite .navbar,
+    .lg-lite .btn {
+        background: rgba(11, 16, 36, 0.94) !important;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+
+    .lg-lite *,
+    .lg-lite *::before,
+    .lg-lite *::after {
+        animation-duration: 0.01ms !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+@media (max-width: 640px) {
+    .lg-lite .navbar {
+        width: calc(100vw - 1.4rem);
+        border-radius: 22px !important;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   AURORA FIELD
+   Duplicated from liquid-glass.css on purpose — see the header note. The
+   shared runtime injects this markup on every page, and without something
+   coloured behind them the panels above are just grey boxes.
+   ═══════════════════════════════════════════════════════════════════════ */
+.lg-aurora {
+    position: fixed;
+    inset: 0;
+    z-index: -2;
+    overflow: hidden;
+    pointer-events: none;
+    background:
+        radial-gradient(120% 80% at 50% -10%, #0d1430 0%, transparent 60%),
+        linear-gradient(180deg, #04060f 0%, #060a18 50%, #04060f 100%);
+}
+
+.lg-orb {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(84px);
+    opacity: 0.72;
+    will-change: transform;
+    transform: translate3d(var(--ox, 0px), var(--oy, 0px), 0);
+}
+
+.lg-orb.o1 {
+    width: 52vw;
+    height: 52vw;
+    top: -14vh;
+    left: -10vw;
+    background: radial-gradient(circle, rgba(34, 211, 238, 0.85), transparent 66%);
+    animation: lgt-orb-a 26s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+}
+
+.lg-orb.o2 {
+    width: 46vw;
+    height: 46vw;
+    top: 18vh;
+    right: -12vw;
+    background: radial-gradient(circle, rgba(167, 139, 250, 0.8), transparent 66%);
+    animation: lgt-orb-b 32s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+}
+
+.lg-orb.o3 {
+    width: 40vw;
+    height: 40vw;
+    bottom: -16vh;
+    left: 24vw;
+    background: radial-gradient(circle, rgba(232, 121, 249, 0.62), transparent 66%);
+    animation: lgt-orb-c 38s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate;
+}
+
+.lg-orb.o4 {
+    width: 32vw;
+    height: 32vw;
+    top: 54vh;
+    left: 2vw;
+    background: radial-gradient(circle, rgba(251, 191, 36, 0.42), transparent 66%);
+    animation: lgt-orb-b 44s cubic-bezier(0.22, 1, 0.36, 1) infinite alternate-reverse;
+}
+
+@keyframes lgt-orb-a {
+    to {
+        transform: translate3d(calc(var(--ox, 0px) + 12vw), calc(var(--oy, 0px) + 8vh), 0) scale(1.15);
+    }
+}
+
+@keyframes lgt-orb-b {
+    to {
+        transform: translate3d(calc(var(--ox, 0px) - 10vw), calc(var(--oy, 0px) + 12vh), 0) scale(1.2);
+    }
+}
+
+@keyframes lgt-orb-c {
+    to {
+        transform: translate3d(calc(var(--ox, 0px) + 8vw), calc(var(--oy, 0px) - 10vh), 0) scale(0.88);
+    }
+}
+
+.lg-grid {
+    position: fixed;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0.5;
+    background-image:
+        linear-gradient(rgba(120, 160, 255, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(120, 160, 255, 0.045) 1px, transparent 1px);
+    background-size: 74px 74px;
+    mask-image: radial-gradient(120% 90% at 50% 30%, #000 20%, transparent 78%);
+    -webkit-mask-image: radial-gradient(120% 90% at 50% 30%, #000 20%, transparent 78%);
+}
+
+/* Ripple spawned by the shared runtime on .btn taps */
+.lg-ripple {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.55), transparent 70%);
+    transform: translate(-50%, -50%) scale(0);
+    pointer-events: none;
+    animation: lgt-ripple 0.62s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes lgt-ripple {
+    to {
+        transform: translate(-50%, -50%) scale(2.6);
+        opacity: 0;
+    }
+}
+
+@media (max-width: 640px) {
+    .lg-orb {
+        filter: blur(64px);
+    }
+}

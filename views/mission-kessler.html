@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Kessler Run — SpaceVerse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+    <style>
+        :root {
+            --accent: #64ffda;
+            --warn: #ff8b8b;
+            --line: rgba(122, 162, 255, 0.24);
+            --panel: rgba(8, 13, 24, 0.78);
+            --text: #e8eefc;
+            --muted: #9fb3cc;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; background: #03060f; color: var(--text); overflow: hidden;
+            font-family: 'Inter', system-ui, sans-serif;
+        }
+        #scene { position: fixed; inset: 0; }
+
+        .hud { position: fixed; z-index: 10; pointer-events: none; }
+        .hud > * { pointer-events: auto; }
+
+        #top-bar {
+            top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px;
+            padding: 12px 16px; background: linear-gradient(180deg, rgba(3, 6, 15, 0.9), transparent);
+        }
+        #brand { font-family: 'Orbitron', sans-serif; letter-spacing: 3px; font-size: 13px; color: var(--accent); }
+        .chip {
+            padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 13px; cursor: pointer;
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16);
+            color: var(--text); text-decoration: none; min-height: 38px; display: inline-flex; align-items: center;
+        }
+        .chip:hover { border-color: var(--accent); }
+        .spacer { flex: 1; }
+
+        #stats {
+            top: 64px; left: 16px; width: min(260px, calc(100% - 32px));
+            background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+            padding: 14px 16px; backdrop-filter: blur(12px);
+        }
+        .row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; margin: 5px 0; }
+        .row span { color: var(--muted); }
+        .row b { font-variant-numeric: tabular-nums; }
+        .meter { height: 7px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin-top: 4px; }
+        .meter i { display: block; height: 100%; width: 0%; transition: width 0.2s linear; }
+        #risk-fill { background: linear-gradient(90deg, #64ffda, #fbbf24, #ff5a5a); }
+        #fuel-fill { background: linear-gradient(90deg, #7aa2ff, #64ffda); }
+
+        #controls {
+            bottom: 16px; left: 50%; transform: translateX(-50%);
+            display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
+            background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
+            padding: 10px 14px; backdrop-filter: blur(12px); max-width: calc(100% - 32px);
+        }
+        #sel-label { font-size: 13px; color: var(--muted); min-width: 130px; text-align: center; }
+
+        #flash {
+            top: 50%; left: 50%; transform: translate(-50%, -50%);
+            font-family: 'Orbitron', sans-serif; font-size: clamp(16px, 3vw, 26px); letter-spacing: 3px;
+            opacity: 0; transition: opacity 0.15s; text-shadow: 0 0 24px currentColor;
+        }
+        #flash.show { opacity: 1; }
+        #flash.collision { color: var(--warn); }
+        #flash.no-fuel { color: #fbbf24; }
+
+        #brief, #done {
+            inset: 0; display: flex; align-items: center; justify-content: center; padding: 20px;
+            background: radial-gradient(circle at 50% 45%, rgba(9, 20, 40, 0.8), rgba(3, 5, 12, 0.96));
+            backdrop-filter: blur(4px); position: fixed; z-index: 20;
+        }
+        #done { display: none; }
+        .card {
+            width: min(620px, 100%); background: linear-gradient(160deg, rgba(18, 30, 55, 0.94), rgba(8, 13, 24, 0.94));
+            border: 1px solid var(--line); border-radius: 20px; padding: 26px; text-align: center;
+        }
+        .card h1 { font-family: 'Orbitron', sans-serif; letter-spacing: 3px; margin: 0 0 10px; font-size: clamp(22px, 4vw, 34px); }
+        .card p { color: var(--muted); line-height: 1.6; font-size: 14.5px; }
+        .card .keys { font-size: 13px; color: var(--muted); margin-top: 14px; }
+        kbd {
+            background: rgba(255, 255, 255, 0.1); border-radius: 5px; padding: 2px 7px;
+            font-family: 'JetBrains Mono', monospace; font-size: 12px;
+        }
+        .big { font-size: 40px; font-weight: 800; margin: 10px 0; }
+        .note { color: #ffb46b; font-size: 13px; margin-top: 10px; }
+        .actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
+    </style>
+</head>
+<body>
+    <div id="scene"></div>
+
+    <div class="hud" id="top-bar">
+        <a href="/app" class="chip">← Deck</a>
+        <div id="brand">KESSLER RUN</div>
+        <div class="spacer"></div>
+        <button class="chip" id="btn-quit">Abandon run</button>
+    </div>
+
+    <div class="hud" id="stats">
+        <div class="row"><span>COLLISION RISK</span><b id="risk-val">0%</b></div>
+        <div class="meter"><i id="risk-fill"></i></div>
+        <div class="row" style="margin-top:10px"><span>FUEL</span><b id="fuel-val">100</b></div>
+        <div class="meter"><i id="fuel-fill" style="width:100%"></i></div>
+        <div class="row" style="margin-top:10px"><span>SATELLITES</span><b id="alive-val">0</b></div>
+        <div class="row"><span>DEBRIS</span><b id="debris-val">0</b></div>
+        <div class="row"><span>LOST</span><b id="lost-val">0</b></div>
+        <div class="row"><span>SURVIVED</span><b id="time-val">0:00</b></div>
+    </div>
+
+    <div class="hud" id="controls">
+        <button class="chip" id="btn-threat" style="border-color: #fbbf24; color: #fbbf24;">⚠ Select threat</button>
+        <button class="chip" id="btn-down">▼ Lower orbit</button>
+        <div id="sel-label">No satellite selected</div>
+        <button class="chip" id="btn-up">▲ Raise orbit</button>
+    </div>
+
+    <div class="hud" id="flash"></div>
+
+    <div id="brief">
+        <div class="card">
+            <h1>KESSLER RUN</h1>
+            <p>Satellites keep arriving. When two pass too close they collide, and the wreckage
+               becomes debris that never leaves and makes the next collision more likely. That
+               runaway is Kessler syndrome.</p>
+            <p>Hold it off for <b>two and a half minutes</b>. When a pair lights up <b style="color:#fbbf24">amber</b>,
+               a collision is seconds away: select one of them and raise or lower its orbit.
+               Fuel is limited — <b>ten</b> satellites lost and the field is gone.</p>
+            <div class="keys">
+                <kbd>Click</kbd> select · <kbd>T</kbd> select threat · <kbd>↑</kbd> raise · <kbd>↓</kbd> lower · <kbd>Esc</kbd> abandon
+            </div>
+            <div class="actions">
+                <button class="chip" id="btn-start" style="border-color:var(--accent); color:var(--accent)">Begin run</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="done">
+        <div class="card">
+            <h1 id="done-title">FIELD LOST</h1>
+            <div id="done-detail"></div>
+            <div class="big" id="done-score"></div>
+            <div class="note" id="done-note" style="display:none"></div>
+            <div class="actions">
+                <button class="chip" id="btn-again" style="border-color:var(--accent); color:var(--accent)">Run it again</button>
+                <a href="/app" class="chip">Back to deck</a>
+            </div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "/lib/three/three.module.js",
+                "three/addons/": "/lib/three/addons/"
+            }
+        }
+    </script>
+    <script type="module" src="/public/js/game/kessler-page.js"></script>
+</body>
+</html>

@@ -1185,6 +1185,24 @@ export class SolarSystem {
         for (const [, b] of this.bodies) if (b.orbitLine) b.orbitLine.visible = v;
     }
 
+    /**
+     * Every key a player can point at and scan, planets and moons alike.
+     *
+     * Exists so a mission can ask "what is there to find?" without reaching into
+     * the scene graph. Filtered to bodies that actually carry a fact, because a
+     * hunt clue is the fact — a target without one has nothing to ask about.
+     */
+    scannableKeys() {
+        const keys = [];
+        for (const [key, b] of this.bodies) {
+            if (b.data && b.data.fact) keys.push(key);
+        }
+        for (const [key, m] of this.moonIndex) {
+            if (m.data && m.data.fact) keys.push(key);
+        }
+        return keys;
+    }
+
     setLabelsVisible(v) {
         for (const [, b] of this.bodies) if (b.label) b.label.visible = v;
     }

@@ -221,10 +221,14 @@
         
         .help-tooltip {
             position: fixed;
-            top: 20px;
+            /* Was top:20px, which ran into the centred traffic-toggle strip. */
+            top: 96px;
             right: 260px;
             background: rgba(0, 5, 20, 0.95);
-            border: 1px solid #64FFDA(8, 64, 84, 0.3);
+            /* Was `1px solid #64FFDA(8, 64, 84, 0.3)` — a hex colour with an
+               rgba argument list, so the whole declaration was invalid and
+               dropped. */
+            border: 1px solid rgba(100, 255, 218, 0.3);
             border-radius: 12px;
             padding: 10px 15px;
             color: #fff;
@@ -276,7 +280,9 @@
         
         .back-btn {
             position: absolute;
-            top: 20px;
+            /* Clears the traffic toggle strip, which also anchors top-left.
+               At top:20px the two sat on top of each other. */
+            top: 112px;
             left: 20px;
             background: rgba(255,215,0,.06);
             border: 1px solid rgba(255,215,0,.25);
@@ -487,6 +493,18 @@
         }
     </style>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
+
+    <!-- ═══ Liquid Glass ═══════════════════════════════════════════════
+         Loaded last on purpose: the bridge re-materials this page's own
+         components as glass, and it wins on source order. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/public/css/liquid-glass-theme.css">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+    <script src="/public/js/liquid-glass.js" defer></script>
 </head>
 <body>
     <a href="/space-traffic-simulator" class="back-btn">← Back to Simulator</a>

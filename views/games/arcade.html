@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <title>Arcade — SpaceVerse</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+    <style>
+        :root {
+            --accent: #64ffda;
+            --amber: #fbbf24;
+            --violet: #b48bff;
+            --rose: #ff8ba7;
+            --blue: #7aa2ff;
+            --line: rgba(122, 162, 255, 0.22);
+            --panel: rgba(10, 16, 30, 0.72);
+            --text: #e8eefc;
+            --muted: #9fb3cc;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; min-height: 100vh; color: var(--text);
+            font-family: 'Inter', system-ui, sans-serif;
+            background: #03060f;
+            overflow-x: hidden;
+        }
+        #stars { position: fixed; inset: 0; z-index: 0; }
+
+        .wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
+
+        header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+        .chip {
+            padding: 9px 16px; border-radius: 999px; font-size: 13.5px; cursor: pointer;
+            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16);
+            color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+        }
+        .chip:hover { border-color: var(--accent); }
+        h1 {
+            font-family: 'Orbitron', sans-serif; letter-spacing: 4px; margin: 22px 0 6px;
+            font-size: clamp(26px, 5vw, 44px);
+            background: linear-gradient(90deg, #64ffda, #7aa2ff, #b48bff);
+            -webkit-background-clip: text; background-clip: text; color: transparent;
+        }
+        .sub { color: var(--muted); max-width: 640px; line-height: 1.6; margin: 0 0 30px; font-size: 15px; }
+
+        .grid {
+            display: grid; gap: 16px;
+            grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+        }
+        .game {
+            position: relative; display: flex; flex-direction: column; gap: 8px;
+            background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
+            padding: 20px 20px 18px; text-decoration: none; color: var(--text);
+            backdrop-filter: blur(10px); overflow: hidden;
+            transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+        }
+        .game:hover { transform: translateY(-4px); border-color: var(--c, var(--accent)); box-shadow: 0 12px 40px -18px var(--c, var(--accent)); }
+        .game::before {
+            content: ''; position: absolute; inset: 0 0 auto; height: 3px;
+            background: linear-gradient(90deg, transparent, var(--c, var(--accent)), transparent);
+            opacity: 0.7;
+        }
+        .icon { font-size: 34px; line-height: 1; filter: drop-shadow(0 0 14px var(--c, var(--accent))); }
+        .tag {
+            position: absolute; top: 16px; right: 16px; font-size: 11px; letter-spacing: 1.5px;
+            text-transform: uppercase; color: var(--c, var(--accent)); border: 1px solid var(--c, var(--accent));
+            border-radius: 999px; padding: 3px 10px; opacity: 0.85;
+        }
+        .game h2 { font-family: 'Orbitron', sans-serif; font-size: 17px; letter-spacing: 1.5px; margin: 4px 0 0; }
+        .game p { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 0; flex: 1; }
+        .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 12.5px; }
+        .play { color: var(--c, var(--accent)); font-weight: 600; letter-spacing: 0.5px; }
+        .best { color: var(--muted); font-variant-numeric: tabular-nums; }
+        .best b { color: var(--text); }
+    </style>
+</head>
+<body>
+    <canvas id="stars"></canvas>
+    <div class="wrap">
+        <header>
+            <a href="/app" class="chip">← Deck</a>
+        </header>
+        <h1>THE ARCADE</h1>
+        <p class="sub">Ten quick games set in the SpaceVerse. No briefings, no simulations — pick one,
+            play in five seconds, chase your best score.</p>
+
+        <div class="grid" id="grid">
+            <a class="game" href="/games/gravity-runner" style="--c:#64ffda" data-slug="gravity-runner">
+                <span class="tag">Reflex</span>
+                <span class="icon">☄️</span>
+                <h2>GRAVITY RUNNER</h2>
+                <p>One button. Thrust or drift while planets drag you in. Skim close for speed — clip the surface and you're dust.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/kessler-reversed" style="--c:#fbbf24" data-slug="kessler-reversed">
+                <span class="tag">Chaos</span>
+                <span class="icon">💥</span>
+                <h2>KESSLER REVERSED</h2>
+                <p>You get ONE shot into a field of 200 satellites. Aim it, fire it, watch the chain reaction ripple. Score = destruction.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/last-station" style="--c:#ff8ba7" data-slug="last-station">
+                <span class="tag">Defense</span>
+                <span class="icon">🛡️</span>
+                <h2>LAST STATION</h2>
+                <p>Debris spirals in from every side. Aim your laser and vaporize it — but big rocks split when shot. Protect the station.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/junk-katamari" style="--c:#b48bff" data-slug="junk-katamari">
+                <span class="tag">Chaos</span>
+                <span class="icon">🧲</span>
+                <h2>SPACE JUNK KATAMARI</h2>
+                <p>You're a runaway bolt. Eat smaller junk to grow — a screw, a wrench, a satellite, a station. Anything ringed red shears pieces back off you.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/re-entry" style="--c:#ff8b5a" data-slug="re-entry">
+                <span class="tag">Reflex</span>
+                <span class="icon">🔥</span>
+                <h2>RE-ENTRY</h2>
+                <p>Mach 25, falling. Too steep and you burn, too shallow and you skip off into space. Sixty seconds of pure tension.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/asteroid-miner" style="--c:#7aa2ff" data-slug="asteroid-miner">
+                <span class="tag">Risk</span>
+                <span class="icon">⛏️</span>
+                <h2>ASTEROID MINER</h2>
+                <p>Tractor ore out of a tumbling field and haul it home before your oxygen runs out. One more chunk... or enough air to get back?</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/slingshot-golf" style="--c:#8dffa0" data-slug="slingshot-golf">
+                <span class="tag">Puzzle</span>
+                <span class="icon">⛳</span>
+                <h2>SLINGSHOT GOLF</h2>
+                <p>Planet-to-planet golf. One flick sets the launch — gravity does the rest. Par 3. Hole 9 needs a double gravity assist.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/solar-sailor" style="--c:#ffd35a" data-slug="solar-sailor">
+                <span class="tag">Race</span>
+                <span class="icon">⛵</span>
+                <h2>SOLAR SAILOR</h2>
+                <p>No engine. Tilt your light-sail and let the Sun push you through the gates. Momentum is the enemy and the ride.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/planet-defense" style="--c:#5ad7ff" data-slug="planet-defense">
+                <span class="tag">Defense</span>
+                <span class="icon">🗼</span>
+                <h2>PLANET DEFENSE</h2>
+                <p>Asteroid waves stream down the orbit lanes. Place lasers and gravity wells on the rings, upgrade between waves, hold Earth.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/orbit-weaver" style="--c:#c9a0ff" data-slug="orbit-weaver">
+                <span class="tag">Puzzle</span>
+                <span class="icon">🕸️</span>
+                <h2>ORBIT WEAVER</h2>
+                <p>Cover every signal zone with the satellites you're given. Low orbits are narrow and strong, high orbits wide and weak, and two on one ring collide.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Best scores live in localStorage under one key per game.
+        document.querySelectorAll('.game').forEach((card) => {
+            const best = localStorage.getItem('spaceverse.arcade.' + card.dataset.slug + '.best');
+            if (best) card.querySelector('.best').innerHTML = 'BEST <b>' + Number(best).toLocaleString() + '</b>';
+        });
+
+        // Drifting starfield background.
+        const cv = document.getElementById('stars');
+        const cx = cv.getContext('2d');
+        let W, H, stars;
+        function reset() {
+            W = cv.width = innerWidth; H = cv.height = innerHeight;
+            stars = Array.from({ length: 160 }, () => ({
+                x: Math.random() * W, y: Math.random() * H,
+                r: Math.random() * 1.4 + 0.3, s: Math.random() * 8 + 2
+            }));
+        }
+        reset();
+        addEventListener('resize', reset);
+        (function tick() {
+            cx.clearRect(0, 0, W, H);
+            for (const st of stars) {
+                st.y += st.s * 0.016;
+                if (st.y > H) { st.y = -2; st.x = Math.random() * W; }
+                cx.globalAlpha = 0.25 + st.r * 0.4;
+                cx.fillStyle = '#cfe0ff';
+                cx.fillRect(st.x, st.y, st.r, st.r);
+            }
+            cx.globalAlpha = 1;
+            requestAnimationFrame(tick);
+        })();
+    </script>
+</body>
+</html>

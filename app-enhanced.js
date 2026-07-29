@@ -5,6 +5,7 @@ const cors = require('cors');
 const session = require('express-session');
 const MongoStore = require('connect-mongo').default || require('connect-mongo');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const path = require('path');
 require('dotenv').config();
 require('dns').setServers(['8.8.8.8', '8.8.4.4']);
@@ -71,6 +72,21 @@ app.use(cors({ credentials: true, origin: true }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Shared MongoDB connection options. Defaults are tuned for a stable datacenter
+// link; on a home/hotspot connection a brief drop would otherwise surface as
+// `MongoNetworkError: connect ETIMEDOUT` instead of being retried transparently.
+const MONGO_CONNECT_OPTIONS = {
+    serverSelectionTimeoutMS: 30000, // ride out short outages before failing a query
+    connectTimeoutMS: 30000,
+    socketTimeoutMS: 45000,
+    heartbeatFrequencyMS: 15000,     // fewer monitor pings => less noise on a flaky link
+    maxPoolSize: 10,
+    minPoolSize: 1,
+    maxIdleTimeMS: 60000,
+    retryWrites: true,
+    retryReads: true
+};
+
 // Session middleware (must be before routes that need it).
 // Use a persistent MongoDB-backed store when a URI is available so sessions
 // survive server restarts (otherwise the default in-memory store logs everyone
@@ -83,11 +99,18 @@ const sessionOptions = {
 };
 if (process.env.MONGODB_URI) {
     try {
-        sessionOptions.store = MongoStore.create({
+        const store = MongoStore.create({
             mongoUrl: process.env.MONGODB_URI,
             collectionName: 'sessions',
-            ttl: 24 * 60 * 60 // 1 day, matches cookie maxAge
+            ttl: 24 * 60 * 60, // 1 day, matches cookie maxAge
+            // Same resilience settings as the main pool: on a flaky link (hotspot,
+            // tethering) a short drop should be waited out, not surfaced as an error.
+            mongoOptions: MONGO_CONNECT_OPTIONS
         });
+        // Without this listener a transient network drop emits an unhandled 'error'
+        // event and dumps a full driver stack trace to the console.
+        store.on('error', (e) => console.warn('Session store (transient):', e.message));
+        sessionOptions.store = store;
         console.log('Session store: MongoDB (persistent across restarts)');
     } catch (e) {
         console.warn('Failed to init MongoStore, using in-memory sessions:', e.message);
@@ -98,7 +121,29 @@ if (process.env.MONGODB_URI) {
 app.use(session(sessionOptions));
 
 // Route handlers (must be before static file middleware)
+// `/` is the front door: signed-out visitors get the marketing landing page
+// (rocket launch intro -> about -> features -> sign in); signed-in pilots get
+// the Spaceverse app itself.
 app.get('/', (req, res) => {
+    if (req.session && req.session.userId) {
+        return res.sendFile(path.join(__dirname, 'views', 'home.html'));
+    }
+    res.sendFile(path.join(__dirname, 'views', 'landing.html'));
+});
+
+// Browsers request /favicon.ico unprompted on every page; without this each
+// view logged a 404 in the console.
+app.get('/favicon.ico', (req, res) => {
+    res.type('image/svg+xml').sendFile(path.join(__dirname, 'public', 'favicon.svg'));
+});
+
+// Explicit landing route so a signed-in user can still revisit the intro.
+app.get('/landing', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'landing.html'));
+});
+
+// Explicit app route (mirrors what `/` serves once authenticated).
+app.get('/app', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'home.html'));
 });
 
@@ -162,6 +207,30 @@ app.get('/vr-ride', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'vr-working.html'));
 });
 
+// Kessler Run. Its own page rather than surgery on space-traffic-visualization,
+// whose orbit rendering lives inside a 1600-line inline script with no module
+// boundary and no tests. A small self-contained page is the cheaper trade.
+app.get('/mission/kessler', ensureAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'mission-kessler.html'));
+});
+
+// The Arcade. Ten small self-contained canvas games, each a single HTML page
+// with two plain scripts. The slug is checked against a fixed list rather than
+// passed to sendFile, so no request can walk out of views/games.
+const ARCADE_GAMES = [
+    'gravity-runner', 'kessler-reversed', 'last-station', 'junk-katamari', 're-entry',
+    'asteroid-miner', 'slingshot-golf', 'solar-sailor', 'planet-defense', 'orbit-weaver'
+];
+
+app.get('/games', ensureAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'games', 'arcade.html'));
+});
+
+app.get('/games/:slug', ensureAuthenticated, (req, res) => {
+    if (!ARCADE_GAMES.includes(req.params.slug)) return res.redirect('/games');
+    res.sendFile(path.join(__dirname, 'views', 'games', `${req.params.slug}.html`));
+});
+
 // Planet detail page
 app.get('/planet', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'planet-detail.html'));
@@ -222,37 +291,86 @@ function ensureAuthenticated(req, res, next) {
 // MongoDB connection with optional Atlas support. If no MONGODB_URI is provided
 // the server will continue running and use the local `planets.json` fallback.
 const uri = process.env.MONGODB_URI;
-let dbConnected = false;
+// Seed from the driver's actual state rather than assuming disconnected. The
+// events below only fire on TRANSITIONS, so if a connection is already open when
+// this module loads (anything that requires the app after connecting — a test
+// harness, a script, a worker) 'connected' has already fired and would never
+// fire again, leaving the flag stuck at false and the whole app serving
+// file-backed data against a perfectly healthy database.
+let dbConnected = mongoose.connection.readyState === 1;
+
+// Keep `dbConnected` in sync with the driver instead of setting it once at
+// startup. Previously a drop after boot left it stuck at `true` (queries then
+// hung) and a failed first attempt left it stuck at `false` (the app served
+// file-backed data forever, which breaks auth, quiz and simulator).
+mongoose.connection.on('connected', () => { dbConnected = true; });
+mongoose.connection.on('reconnected', () => {
+    dbConnected = true;
+    console.log('MongoDB reconnected.');
+});
+mongoose.connection.on('disconnected', () => {
+    dbConnected = false;
+    console.warn('MongoDB disconnected - serving file-backed data until it returns.');
+});
+// The driver retries network blips on its own; log them as one line rather than
+// letting an unhandled 'error' event print a full stack trace per attempt.
+mongoose.connection.on('error', (err) => {
+    console.warn('MongoDB (transient):', err.message);
+});
 
 async function initializeDatabase() {
-    if (uri) {
+    if (!uri) {
+        console.warn('MONGODB_URI environment variable is not set. Running in file-backed mode (no DB).');
+        return;
+    }
+
+    try {
+        await mongoose.connect(uri, MONGO_CONNECT_OPTIONS);
+        dbConnected = true;
+        console.log('MongoDB connection established successfully.');
+        console.log('Connected to:', uri.includes('mongodb+srv') ? 'MongoDB Atlas' : 'Local MongoDB');
+
+        // Only insert enhanced data when we have a live DB connection
+        if (typeof insertEnhancedPlanetData === 'function') {
+            try {
+                await insertEnhancedPlanetData();
+                console.log('Enhanced planet data insert completed');
+            } catch (err) {
+                if (err.code !== 11000) {
+                    console.error('Failed to insert enhanced planet data:', err);
+                }
+            }
+        } else {
+            console.log('Enhanced planet data insert skipped - function not defined');
+        }
+    } catch (err) {
+        dbConnected = false;
+        console.error('MongoDB connection error:', err.message);
+        console.warn('Continuing without MongoDB - retrying in the background.');
+        retryDatabaseConnection();
+    }
+}
+
+// Retry the initial connection until it succeeds, so a server started while the
+// network is down recovers on its own instead of needing a manual restart.
+let dbRetryTimer = null;
+function retryDatabaseConnection(attempt = 1) {
+    if (dbRetryTimer) return;
+    const delay = Math.min(30000, 2000 * 2 ** (attempt - 1)); // 2s, 4s, 8s ... capped at 30s
+    dbRetryTimer = setTimeout(async () => {
+        dbRetryTimer = null;
+        if (mongoose.connection.readyState === 1) return;
+        console.log(`Retrying MongoDB connection (attempt ${attempt})...`);
         try {
-            await mongoose.connect(uri);
+            await mongoose.connect(uri, MONGO_CONNECT_OPTIONS);
             dbConnected = true;
             console.log('MongoDB connection established successfully.');
-            console.log('Connected to:', uri.includes('mongodb+srv') ? 'MongoDB Atlas' : 'Local MongoDB');
-
-            // Only insert enhanced data when we have a live DB connection
-            if (typeof insertEnhancedPlanetData === 'function') {
-                try {
-                    await insertEnhancedPlanetData();
-                    console.log('Enhanced planet data insert completed');
-                } catch (err) {
-                    if (err.code !== 11000) {
-                        console.error('Failed to insert enhanced planet data:', err);
-                    }
-                }
-            } else {
-                console.log('Enhanced planet data insert skipped - function not defined');
-            }
         } catch (err) {
-            dbConnected = false;
-            console.error('MongoDB connection error:', err);
-            console.warn('Continuing without MongoDB - falling back to file-based planet data.');
+            console.warn('MongoDB retry failed:', err.message);
+            retryDatabaseConnection(attempt + 1);
         }
-    } else {
-        console.warn('MONGODB_URI environment variable is not set. Running in file-backed mode (no DB).');
-    }
+    }, delay);
+    dbRetryTimer.unref?.(); // don't hold the process open just for a retry
 }
 
 // User Schema for Login System
@@ -261,6 +379,12 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true },
     password: { type: String, required: true },
     firebaseUid: { type: String, default: null },
+    // Demo pilots are real User documents so progression has something stable to
+    // hang off, but they were never authenticated. Their email is synthesised on
+    // a reserved TLD and their password is random and discarded, so they can
+    // never be logged into through the real Firebase/bcrypt path. The login
+    // handler also rejects them explicitly rather than relying on that alone.
+    isDemo: { type: Boolean, default: false },
     createdAt: { type: Date, default: Date.now },
     quizScores: [{
         score: Number,
@@ -275,6 +399,10 @@ const User = mongoose.model('User', userSchema);
 const simulatorRoute = require('./routes/simulator');
 simulatorRoute.initializeModels();
 app.use('/api/simulator', simulatorRoute.router);
+
+// Game missions. Mounted after initializeModels() because it resolves the
+// UserScore model by name, which only exists once the line above has run.
+app.use('/api/game', require('./routes/game'));
 
 // Planet Schema (Enhanced)
 const planetSchema = new mongoose.Schema({
@@ -302,9 +430,143 @@ const Planet = mongoose.model('Planet', planetSchema);
 const J2000 = Date.UTC(2000, 0, 1, 12, 0, 0);
 
 // Authentication Routes
+// ---------------------------------------------------------------------------
+// DEMO AUTH MODE
+// While the product is being demoed there is no real account system: any
+// callsign/access code combination is accepted and a session is minted on the
+// spot. Nothing is written to MongoDB and Firebase is never contacted.
+// Set DEMO_AUTH=false in .env to restore the real Firebase + MongoDB flow.
+// ---------------------------------------------------------------------------
+const DEMO_AUTH = String(process.env.DEMO_AUTH || 'true').toLowerCase() !== 'false';
+if (DEMO_AUTH) {
+    console.log('Auth mode: DEMO (any credentials accepted, no database writes)');
+}
+
+// Turn whatever the visitor typed into a display name. Falls back to a generic
+// callsign so a blank submission still produces a usable session.
+function demoCallsign(raw) {
+    const name = String(raw || '').trim().replace(/\s+/g, ' ').slice(0, 32);
+    return name || 'Explorer';
+}
+
+// Suffix alphabet with the ambiguous glyphs removed (no 0/O, no 1/I/L). A
+// callsign is something a player reads off a screen and types back in later, so
+// it has to survive being handwritten on a sticker at a booth.
+const CALLSIGN_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+
+function callsignSuffix() {
+    const bytes = crypto.randomBytes(3);
+    let out = '';
+    for (let i = 0; i < 3; i++) out += CALLSIGN_ALPHABET[bytes[i] % CALLSIGN_ALPHABET.length];
+    return out;
+}
+
+// Mint an in-memory session. Fallback for when Mongo is unreachable: `userId` is
+// a syntactically valid ObjectId so any downstream route that casts it keeps
+// working, but no matching User document exists and nothing persists.
+function startEphemeralSession(req, username) {
+    req.session.userId = new mongoose.Types.ObjectId().toString();
+    req.session.username = username;
+    req.session.isDemo = true;
+    req.session.ephemeral = true;
+    req.session.quizScores = [];
+}
+
+/**
+ * Resolve a typed callsign to a durable demo pilot.
+ *
+ *   typed "Nova"      -> no exact match -> creates "Nova-K4M", returns it
+ *   typed "Nova-K4M"  -> exact match    -> resumes that pilot, rank intact
+ *
+ * New pilots ALWAYS get a suffix. Without it, two people typing "Nova" would
+ * silently share one record and one rank, which is the failure mode this exists
+ * to prevent — a collision now produces a visibly different pilot instead. The
+ * cost is that returning players have to type their full callsign, which is why
+ * it is echoed back on every response and shown in the HUD.
+ *
+ * Note the security posture, which is unchanged from before: demo mode has no
+ * password, so typing someone's exact full callsign resumes their pilot. That is
+ * inherent to passwordless access and is why demo mode must not be treated as an
+ * account system.
+ */
+async function resolveDemoPilot(typed) {
+    const base = demoCallsign(typed);
+
+    const existing = await User.findOne({ username: base, isDemo: true });
+    if (existing) return existing;
+
+    // Random and immediately discarded. Nothing can authenticate as this pilot
+    // through the real login path, which additionally rejects isDemo users.
+    const throwaway = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10);
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+        const callsign = `${base.slice(0, 28)}-${callsignSuffix()}`;
+        try {
+            return await User.create({
+                username: callsign,
+                // .invalid is reserved by RFC 2606 and can never resolve, so a
+                // synthesised address here can never collide with a real one.
+                email: `${callsign.toLowerCase()}@demo.invalid`,
+                password: throwaway,
+                isDemo: true
+            });
+        } catch (err) {
+            // 11000 is a duplicate key: the suffix collided. Try another.
+            if (err && err.code === 11000) continue;
+            throw err;
+        }
+    }
+    throw new Error('Could not allocate a callsign after 5 attempts');
+}
+
+// Attach a durable demo pilot to the session, falling back to an ephemeral one
+// if the database is unreachable. A booth demo must still start when Atlas is
+// having a bad day; it just will not remember anything afterwards.
+async function startDemoSession(req, typed) {
+    if (!dbConnected) {
+        const callsign = demoCallsign(typed);
+        startEphemeralSession(req, callsign);
+        return callsign;
+    }
+
+    try {
+        const pilot = await resolveDemoPilot(typed);
+        req.session.userId = pilot._id.toString();
+        req.session.username = pilot.username;
+        req.session.isDemo = true;
+        req.session.ephemeral = false;
+        req.session.quizScores = [];
+        return pilot.username;
+    } catch (err) {
+        console.error('Demo pilot lookup failed, falling back to ephemeral:', err.message);
+        const callsign = demoCallsign(typed);
+        startEphemeralSession(req, callsign);
+        return callsign;
+    }
+}
+
+// Persist the session before responding. Without this the client can navigate
+// away before the (async, Mongo-backed) session store has flushed, which drops
+// the user straight back onto the landing page.
+function respondWithDemoSession(req, res, username, message) {
+    req.session.save((err) => {
+        if (err) {
+            console.error('Demo session save failed:', err.message);
+            return res.status(500).json({ error: 'Could not start session. Please try again.' });
+        }
+        res.json({ success: true, demo: true, message, username });
+    });
+}
+
 app.post('/api/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
+
+        if (DEMO_AUTH) {
+            const callsign = await startDemoSession(req, username || email);
+            return respondWithDemoSession(req, res, callsign,
+                `Demo pilot created. Your callsign is ${callsign} — type it to return to this rank.`);
+        }
 
         // Check if user already exists in local DB
         const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -356,9 +618,21 @@ app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
 
+        if (DEMO_AUTH) {
+            const callsign = await startDemoSession(req, username);
+            return respondWithDemoSession(req, res, callsign, `Demo access granted. Callsign: ${callsign}`);
+        }
+
         // Find user by their username to get the email (since Firebase requires email)
         const user = await User.findOne({ username });
         if (!user) {
+            return res.status(400).json({ error: 'Invalid credentials' });
+        }
+
+        // Demo pilots have a synthesised email and a random discarded password,
+        // so neither branch below could authenticate them anyway. Reject them
+        // explicitly rather than leaving that as an accident of the data.
+        if (user.isDemo) {
             return res.status(400).json({ error: 'Invalid credentials' });
         }
 
@@ -434,8 +708,17 @@ app.post('/api/google-login', async (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-    req.session.destroy();
-    res.json({ success: true, message: 'Logged out successfully' });
+    // `destroy` is async against the Mongo-backed store. Responding before it
+    // resolves let the very next request still read the old session, so the
+    // client could bounce straight back into the app after "signing out".
+    req.session.destroy((err) => {
+        if (err) {
+            console.error('Logout failed:', err.message);
+            return res.status(500).json({ error: 'Logout failed' });
+        }
+        res.clearCookie(sessionOptions.name || 'connect.sid', { path: '/' });
+        res.json({ success: true, message: 'Logged out successfully' });
+    });
 });
 
 app.get('/api/user', (req, res) => {
@@ -443,6 +726,10 @@ app.get('/api/user', (req, res) => {
         res.json({
             loggedIn: true,
             username: req.session.username,
+            demo: !!req.session.isDemo,
+            // No User document behind this session, so nothing it does will be
+            // remembered. The client surfaces this rather than pretending to save.
+            ephemeral: !!req.session.ephemeral,
             user: { id: req.session.userId, username: req.session.username }
         });
     } else {
@@ -459,7 +746,21 @@ app.post('/api/quiz/submit', async (req, res) => {
 
         const { score, totalQuestions } = req.body;
 
+        // Only EPHEMERAL sessions lack a User document — those are the fallback
+        // minted when Mongo is unreachable. Ordinary demo pilots now have a real
+        // durable record, so their scores persist like anyone else's. Keying this
+        // on isDemo (as it did before durable pilots existed) would silently
+        // throw away every demo score at the end of the visit.
+        if (req.session.ephemeral) {
+            req.session.quizScores = req.session.quizScores || [];
+            req.session.quizScores.push({ score, totalQuestions, completedAt: new Date() });
+            return res.json({ success: true, message: 'Quiz score saved for this session' });
+        }
+
         const user = await User.findById(req.session.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
         user.quizScores.push({ score, totalQuestions });
         await user.save();
 
@@ -475,7 +776,14 @@ app.get('/api/quiz/scores', async (req, res) => {
             return res.status(401).json({ error: 'Please login first' });
         }
 
+        if (req.session.ephemeral) {
+            return res.json({ scores: req.session.quizScores || [] });
+        }
+
         const user = await User.findById(req.session.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
         res.json({ scores: user.quizScores });
     } catch (error) {
         res.status(500).json({ error: 'Failed to fetch quiz scores' });
@@ -1153,11 +1461,25 @@ const insertEnhancedPlanetData = async () => {
 // Enhanced planet data insertion is performed only after a successful DB connection
 // (see connection logic earlier). No unconditional insertion here.
 
-// Export the app for Vercel
+// Export the app for Vercel, and for supertest.
 module.exports = app;
 
+// Only bind a port when this file is the process entry point. Required directly
+// (by a test, or by another module) it must stay inert: before this guard,
+// `require('./app-enhanced')` connected to Atlas and listened on a port as a
+// side effect, which makes the app untestable and leaks a server per test run.
+const IS_ENTRY_POINT = require.main === module;
+
+// Under test the module must be completely inert on require: no port, no Atlas
+// connection, and above all no insertEnhancedPlanetData() writing seed documents
+// into whatever database the connection string happens to point at. Tests own
+// their own database lifecycle.
+const IS_TEST = process.env.NODE_ENV === 'test';
+
 // Initialize database and start server only if not in Vercel environment
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+if (IS_TEST) {
+    // Intentionally empty. See IS_TEST above.
+} else if (IS_ENTRY_POINT && (process.env.NODE_ENV !== 'production' || !process.env.VERCEL)) {
     initializeDatabase().then(() => {
         // ... (remaining logic same as before, but wrapped)
         // Note: For brevity, I'm just showing the structural change
