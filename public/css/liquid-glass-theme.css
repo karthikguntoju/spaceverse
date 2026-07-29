@@ -298,9 +298,51 @@ body.lg-lite > canvas#starfield {
     white-space: nowrap;
 }
 
+/* A control has to look like one before it looks on-theme. `<button>` inherits
+   `cursor: default` from the UA sheet — only `<a>` gets a pointer for free — so
+   half the buttons on these pages gave no cursor feedback at all. Applied to
+   the runtime-tagged set so it covers every control, named here or not. */
+.lg-lite .lg-sheen {
+    cursor: pointer;
+}
+
+.lg-lite .lg-sheen:disabled,
+.lg-lite .lg-sheen[aria-disabled='true'],
+.lg-lite .lg-sheen.disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
+}
+
 /* Destructive action keeps a warning tint rather than a neon red outline */
 .lg-lite .logout-btn {
     color: #fda4af !important;
+}
+
+/* Logout has no CSS of its own on any of the five pages that show it, and the
+   bridge deliberately sets no `display` or padding on buttons (some are
+   full-width blocks, some absolute overlays). Left alone it collapsed to a
+   46x16px sliver of text jammed against "Back to Home" — a destructive action
+   with a 16px-tall hit area. Scoped to <button> so nothing else moves. */
+.lg-lite button.logout-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    min-height: 40px;
+    padding: 0 1.05rem;
+    font-size: 0.86rem;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+/* Finger targets need the full 44px; a mouse does not. */
+@media (pointer: coarse) {
+
+    .lg-lite button.logout-btn,
+    .lg-lite a.nav-back-btn,
+    .lg-lite a.back-home-btn {
+        min-height: 44px;
+    }
 }
 
 .lg-lite .logout-btn:hover {
