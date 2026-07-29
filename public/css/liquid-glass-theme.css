@@ -428,6 +428,48 @@ body.lg-lite > canvas#starfield {
         0 0 0 4px rgba(34, 211, 238, 0.14) !important;
 }
 
+/* ── Focus ──────────────────────────────────────────────────────────────
+   liquid-glass.css carries a focus ring, but it is scoped to `.lg`, so the
+   sixteen retrofitted pages had nothing: tabbing through them left the UA's
+   1px outline, which is invisible against dark glass. Keyboard users could
+   not tell what was focused on any page except the landing page.
+
+   Fields are excluded on purpose — their focus state already replaces the
+   outline with a cyan inset rim and a 4px halo, which reads more clearly
+   than a ring sitting outside a 14px radius. */
+.lg-lite :focus-visible {
+    outline: 2px solid #22d3ee;
+    outline-offset: 3px;
+}
+
+/* Pill controls: the ring has to follow the shape or it boxes the pill. The
+   full `outline` is restated (not just the offset) because a couple of pages
+   define their own `:focus-visible` at higher specificity — /solar-system's
+   `.pb-item` drew a 3px near-white ring — and a focus ring that changes
+   colour per page is the same inconsistency in a different place. */
+.lg-lite .btn:focus-visible,
+.lg-lite .lg-sheen:focus-visible,
+.lg-lite .navbar .nav-links a:focus-visible {
+    outline: 2px solid #22d3ee !important;
+    outline-offset: 3px;
+    border-radius: 999px;
+}
+
+/* Keyboard focus earns the same lift the pointer gets. Without this the only
+   feedback is the ring, and the control reads as inspected rather than armed. */
+.lg-lite .btn:focus-visible,
+.lg-lite .top-btn:focus-visible,
+.lg-lite .filter-btn:focus-visible,
+.lg-lite .tab-btn:focus-visible,
+.lg-lite .view-btn:focus-visible,
+.lg-lite .traffic-btn:focus-visible,
+.lg-lite .nav-back-btn:focus-visible,
+.lg-lite .back-btn:focus-visible,
+.lg-lite .back-home-btn:focus-visible,
+.lg-lite .watch-btn:focus-visible {
+    transform: translateY(-2px);
+}
+
 /* ── Legacy navbar → floating glass dock ───────────────────────────── */
 .lg-lite .navbar {
     position: fixed;
