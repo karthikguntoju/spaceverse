@@ -113,6 +113,64 @@
         }, { passive: true });
     }
 
+    /* ── Activate ─────────────────────────────────────────────────────
+       Roughly fifty-five things on this site are clickable <div>s: the quiz's
+       nine planet cards, twelve mission cards, fifteen event cards, twelve
+       video thumbnails, the five review stars, both Google sign-in rows. They
+       are wired with delegated click handlers, so they work with a mouse and
+       are completely unreachable with a keyboard — no tab stop, no focus, no
+       Enter. On /quiz that means the only way to pick a planet is to point at
+       it.
+
+       `cursor: pointer` is the page authoring its own intent: it means "this
+       is pressable". So anything carrying it that is not already a control
+       gets promoted to one. Doing it here rather than editing six files keeps
+       the guarantee in one place, and because the promoted element then
+       matches PRESSABLE it also picks up the sheen, the focus ring and the
+       right radius on the next pass. */
+    function activate() {
+        var SKIP = 'a[href],button,input,select,textarea,label,' +
+            '[role="button"],[role="link"],[role="tab"],[tabindex]';
+
+        function promote(el) {
+            if (el.matches(SKIP) || el.closest(SKIP)) return;
+            if (getComputedStyle(el).cursor !== 'pointer') return;
+            /* A parent with the same cursor means this is a child inheriting
+               it, not the target. Only the outermost element is the control. */
+            if (el.parentElement && getComputedStyle(el.parentElement).cursor === 'pointer') return;
+            /* Wrapping a real control means this is a container; promoting it
+               would add a dead tab stop in front of the actual button. */
+            if (el.querySelector('a[href],button,input,select,textarea')) return;
+            var r = el.getBoundingClientRect();
+            if (r.width < 24 || r.height < 14) return;
+            /* A pointer cursor on a whole region is a styling accident, not a
+               button. Anything that big is not what this is for. */
+            if (r.width * r.height > window.innerWidth * window.innerHeight * 0.4) return;
+
+            el.setAttribute('role', 'button');
+            el.setAttribute('tabindex', '0');
+        }
+
+        function sweep() {
+            Array.prototype.forEach.call(
+                document.querySelectorAll('div,span,li,td,tr'), promote);
+        }
+        sweep();
+
+        /* Enter and Space are what a button responds to. Space would otherwise
+           scroll the page out from under the press. */
+        document.addEventListener('keydown', function (e) {
+            if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+            var el = e.target;
+            if (!el || !el.getAttribute || el.getAttribute('role') !== 'button') return;
+            if (el.matches('a[href],button,input,select,textarea')) return;
+            e.preventDefault();
+            el.click();
+        });
+
+        return sweep;
+    }
+
     /* ── Controls ─────────────────────────────────────────────────────
        Tags every pressable control with what the stylesheets need to know
        about it. Two things, both of which CSS cannot work out on its own.
@@ -134,7 +192,7 @@
           stopped being a pill and become a surface, so it takes the panel
           radius instead. Height is the only way to tell, and only the DOM
           knows it. */
-    function controls() {
+    function controls(reactivate) {
         var SURFACE_H = 64;
 
         function tag(el) {
@@ -155,8 +213,11 @@
         }
 
         /* Idempotent, so re-running over the whole body is cheap and one pass
-           covers nodes added anywhere. */
+           covers nodes added anywhere. Promotion runs first: a card that just
+           became `role="button"` is a control from this pass on, so it picks up
+           the sheen and the right radius without a second mechanism. */
         function sweep() {
+            if (reactivate) reactivate();
             Array.prototype.forEach.call(document.querySelectorAll(CONTROLS), tag);
         }
         sweep();
@@ -477,7 +538,7 @@
         mountAurora();
         auroraParallax();
         specular();
-        controls();
+        controls(activate());
         tilt();
         ripple();
         dock();
