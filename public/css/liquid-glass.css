@@ -71,6 +71,12 @@
     --t-base: 0.34s;
     --t-slow: 0.62s;
 
+    /* The sheen travels at a near-constant rate: a reflection crossing a
+       surface does not accelerate. An ease-out here lurches off the mark and
+       then crawls, which is what reads as "not smooth". */
+    --sheen-t: 0.56s;
+    --ease-sheen: cubic-bezier(0.36, 0.15, 0.52, 0.9);
+
     /* Layout */
     --wrap: 1240px;
     --gutter: clamp(1.1rem, 4vw, 2.75rem);
@@ -622,24 +628,48 @@ html.lenis {
 }
 
 /* The sheen: a narrow band of light that sweeps across on hover, like a
-   reflection sliding over a curved surface. */
+   reflection sliding over a curved surface.
+
+   The band parks off the left edge and is only ever animated left-to-right.
+   Releasing the pointer must NOT play the sweep in reverse — a highlight that
+   crawls back across the face is the single most obvious tell that this is a
+   CSS transition and not light. So the return trip is instant, and it is
+   delayed until the band has cleared the right edge, where `overflow: hidden`
+   on the button hides the snap. Net effect: every sweep goes one way.
+
+   translate3d (not translateX) so the band gets its own compositor layer and
+   the sweep never repaints the button underneath it. */
 .btn::before {
     content: '';
     position: absolute;
-    inset: 0;
+    /* -1px so the band covers the rim too and leaves no seam at the edge */
+    inset: -1px;
     z-index: -1;
     border-radius: inherit;
     background: linear-gradient(105deg,
-            transparent 30%,
-            rgba(255, 255, 255, 0.4) 48%,
+            transparent 34%,
+            rgba(255, 255, 255, 0.38) 50%,
             transparent 66%);
-    transform: translateX(-130%);
-    transition: transform 0.75s var(--ease-glass);
+    transform: translate3d(-132%, 0, 0);
+    /* duration 0s, easing linear, delay --sheen-t */
+    transition: transform 0s linear var(--sheen-t);
     pointer-events: none;
 }
 
-.btn:hover::before {
-    transform: translateX(130%);
+.btn:hover::before,
+.btn:focus-visible::before {
+    transform: translate3d(132%, 0, 0);
+    transition: transform var(--sheen-t) var(--ease-sheen) 0s;
+}
+
+/* A sweep is decoration, so it is the first thing to go. Without this the
+   global reduced-motion rule only zeroes the duration — the delayed reset
+   still fires, and the band jumps across the face. */
+@media (prefers-reduced-motion: reduce) {
+
+    .btn::before {
+        display: none;
+    }
 }
 
 .btn:hover {
