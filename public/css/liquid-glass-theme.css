@@ -81,6 +81,11 @@
     /* Neon text glow was the old signature. Glass does not glow; it
        refracts. Zeroing this cleans up dozens of rules at once. */
     --text-glow: none;
+
+    /* Motion, mirrored from liquid-glass.css so the sheen on a retrofitted
+       page travels at exactly the same rate as one on the landing page. */
+    --sheen-t: 0.56s;
+    --ease-sheen: cubic-bezier(0.36, 0.15, 0.52, 0.9);
 }
 
 /* ── Page shell ────────────────────────────────────────────────────── */
@@ -307,6 +312,69 @@ body.lg-lite > canvas#starfield {
 .lg-lite .top-btn:active,
 .lg-lite .filter-btn:active {
     transform: translateY(0) scale(0.978);
+}
+
+/* ── The sheen ─────────────────────────────────────────────────────────
+   A narrow band of light that crosses the button on hover. It was the one
+   part of the material these pages never got: liquid-glass.css puts it on
+   `.btn::before`, and these pages call their buttons eleven other things,
+   so their buttons stayed inert while the two system pages swept. Result
+   was two different ideas of what pressing something feels like.
+
+   The runtime tags every pressable control with `.lg-sheen` from a single
+   class list, so this stays one rule instead of another selector chain.
+   `--rel` is separate because some of these controls are absolutely
+   positioned overlays; forcing `position: relative` on those drops them
+   into normal flow and they stretch across the scene.
+
+   Sweeps left-to-right only. The return is instant and delayed until the
+   band has cleared the right edge, where `overflow: hidden` hides the
+   snap — a highlight crawling backwards across a button is the clearest
+   possible tell that this is a transition and not light. */
+.lg-lite .lg-sheen {
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.lg-lite .lg-sheen--rel {
+    position: relative;
+}
+
+.lg-lite .lg-sheen::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    z-index: -1;
+    border-radius: inherit;
+    background: linear-gradient(105deg,
+            transparent 34%,
+            rgba(255, 255, 255, 0.38) 50%,
+            transparent 66%);
+    transform: translate3d(-132%, 0, 0);
+    /* duration 0s, easing linear, delay --sheen-t */
+    transition: transform 0s linear var(--sheen-t);
+    pointer-events: none;
+}
+
+.lg-lite .lg-sheen:hover::before,
+.lg-lite .lg-sheen:focus-visible::before {
+    transform: translate3d(132%, 0, 0);
+    transition: transform var(--sheen-t) var(--ease-sheen) 0s;
+}
+
+/* On the aurora-cored primary the band would read as a white wash rather
+   than a highlight, so it is dialled back instead of dropped. */
+.lg-lite .btn-primary.lg-sheen::before,
+.lg-lite .submit-btn.lg-sheen::before,
+.lg-lite .watch-btn.lg-sheen::before,
+.lg-lite .filter-btn.active.lg-sheen::before,
+.lg-lite .tab-btn.active.lg-sheen::before,
+.lg-lite .view-btn.active.lg-sheen::before,
+.lg-lite .traffic-btn.active.lg-sheen::before {
+    background: linear-gradient(105deg,
+            transparent 34%,
+            rgba(255, 255, 255, 0.26) 50%,
+            transparent 66%);
 }
 
 /* The affirmative action on each page keeps the aurora core */

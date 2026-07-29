@@ -638,8 +638,23 @@ html.lenis {
    on the button hides the snap. Net effect: every sweep goes one way.
 
    translate3d (not translateX) so the band gets its own compositor layer and
-   the sweep never repaints the button underneath it. */
-.btn::before {
+   the sweep never repaints the button underneath it.
+
+   `.lg-sheen` is the same treatment on controls that are not `.btn` — the
+   runtime tags them from one class list so this does not become a
+   thirty-selector chain. `--rel` is split out because some of those controls
+   are absolutely positioned overlays that must keep their own positioning. */
+.lg-sheen {
+    overflow: hidden;
+    isolation: isolate;
+}
+
+.lg-sheen--rel {
+    position: relative;
+}
+
+.btn::before,
+.lg-sheen::before {
     content: '';
     position: absolute;
     /* -1px so the band covers the rim too and leaves no seam at the edge */
@@ -657,7 +672,9 @@ html.lenis {
 }
 
 .btn:hover::before,
-.btn:focus-visible::before {
+.btn:focus-visible::before,
+.lg-sheen:hover::before,
+.lg-sheen:focus-visible::before {
     transform: translate3d(132%, 0, 0);
     transition: transform var(--sheen-t) var(--ease-sheen) 0s;
 }
@@ -667,7 +684,8 @@ html.lenis {
    still fires, and the band jumps across the face. */
 @media (prefers-reduced-motion: reduce) {
 
-    .btn::before {
+    .btn::before,
+    .lg-sheen::before {
         display: none;
     }
 }

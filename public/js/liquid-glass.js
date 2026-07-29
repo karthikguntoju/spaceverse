@@ -15,6 +15,30 @@
     var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     var coarse = window.matchMedia('(pointer: coarse)').matches;
 
+    /* Every class the site uses for a pressable control. The system pages know
+       exactly one of these (`.btn`); the retrofitted pages between them use the
+       other thirty, which is why their buttons all looked slightly different
+       from each other. Kept here rather than duplicated as a selector chain in
+       both stylesheets — the runtime tags the matches and the CSS styles one
+       class. Add a new button class here and it inherits the whole treatment. */
+    var CONTROLS = [
+        '.btn', '.btn-primary', '.btn-secondary', '.btn-feature', '.btn-out',
+        '.btn-gold', '.btn-icon', '.btn-back-small', '.submit-btn', '.top-btn',
+        '.filter-btn', '.tab-btn', '.view-btn', '.traffic-btn', '.nav-btn',
+        '.pill-btn', '.watch-btn', '.back-btn', '.back-home-btn',
+        '.nav-back-btn', '.logout-btn', '.link-btn', '.google-btn',
+        '.play-button', '.like-btn', '.comments-btn', '.ctrl-toggle',
+        '.view-toggle', '.pb-item', '.chip', '.a-btn', '.a-chip',
+        'button[type="submit"]'
+    ].join(',');
+
+    /* A sweep advertises "this is pressable", so it must not land on the
+       read-only pills that share the class vocabulary (.pilot-chip, stat
+       chips). Semantics, not `cursor: pointer`, decide: the cursor is one of
+       the things being corrected. */
+    var PRESSABLE = 'a[href],button,input[type="submit"],input[type="button"],' +
+        '[role="button"],[onclick],[data-lg-open],[data-lg-logout]';
+
     /* ── Aurora field ─────────────────────────────────────────────────
        Injected rather than hand-written into every page: the glass is
        meaningless without something coloured behind it, so this is not
@@ -82,6 +106,55 @@
             el.style.setProperty('--mx', '50%');
             el.style.setProperty('--my', '-40%');
         }, { passive: true });
+    }
+
+    /* ── Sheen ────────────────────────────────────────────────────────
+       The travelling highlight is the signature of a button in this system,
+       but only `.btn` ever carried it, so on sixteen of eighteen routes the
+       buttons sat inert while the two system pages swept. This tags the rest.
+
+       `::before { inset: -1px }` needs a positioned host, or it anchors to the
+       nearest positioned ancestor and paints a page-sized gradient. Several of
+       these controls are absolutely positioned overlays that must not be
+       forced to `relative` (it drops them into normal flow and they stretch
+       full width), so only the statically positioned ones get
+       `lg-sheen--rel` — the others already establish their own containing
+       block and need nothing. */
+    function sheen() {
+        if (reduced) return;
+
+        function tag(el) {
+            if (el.classList.contains('lg-sheen') || !el.matches(PRESSABLE)) return;
+            el.classList.add('lg-sheen');
+            if (getComputedStyle(el).position === 'static') {
+                el.classList.add('lg-sheen--rel');
+            }
+        }
+
+        /* Idempotent: tag() early-returns on anything already carrying the
+           class, so re-running over the whole body is cheap and lets one
+           pass cover nodes added anywhere. */
+        function sweep() {
+            Array.prototype.forEach.call(document.querySelectorAll(CONTROLS), tag);
+        }
+        sweep();
+
+        /* Half these pages build their action rows from fetched data, so the
+           controls do not exist at boot. Coalesced to one pass per frame, and
+           only when elements were actually added. */
+        var queued = false;
+        new MutationObserver(function (recs) {
+            if (queued) return;
+            for (var i = 0; i < recs.length; i++) {
+                for (var j = 0; j < recs[i].addedNodes.length; j++) {
+                    if (recs[i].addedNodes[j].nodeType === 1) {
+                        queued = true;
+                        requestAnimationFrame(function () { queued = false; sweep(); });
+                        return;
+                    }
+                }
+            }
+        }).observe(document.body, { childList: true, subtree: true });
     }
 
     /* ── Tilt ─────────────────────────────────────────────────────────
@@ -380,6 +453,7 @@
         mountAurora();
         auroraParallax();
         specular();
+        sheen();
         tilt();
         ripple();
         dock();
