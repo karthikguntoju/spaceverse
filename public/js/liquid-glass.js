@@ -23,13 +23,18 @@
        class. Add a new button class here and it inherits the whole treatment. */
     var CONTROLS = [
         '.btn', '.btn-primary', '.btn-secondary', '.btn-feature', '.btn-out',
-        '.btn-gold', '.btn-icon', '.btn-back-small', '.submit-btn', '.top-btn',
+        '.btn-gold', '.btn-back-small', '.submit-btn', '.top-btn',
         '.filter-btn', '.tab-btn', '.view-btn', '.traffic-btn', '.nav-btn',
         '.pill-btn', '.watch-btn', '.back-btn', '.back-home-btn',
         '.nav-back-btn', '.logout-btn', '.link-btn', '.google-btn',
-        '.play-button', '.like-btn', '.comments-btn', '.ctrl-toggle',
-        '.view-toggle', '.pb-item', '.chip', '.a-btn', '.a-chip',
+        '.like-btn', '.comments-btn', '.pb-item', '.chip', '.a-btn', '.a-chip',
         'button[type="submit"]'
+        /* Deliberately absent: `.btn-icon` (a <div> holding the emoji inside a
+           quiz card), `.view-toggle` and `.ctrl-toggle` (the wrappers around
+           the real controls), `.play-button` (a decorative triangle over a
+           video thumbnail). None of them are pressable, and the PRESSABLE
+           guard below would reject them anyway — listing them here only
+           implies they are controls. */
     ].join(',');
 
     /* A sweep advertises "this is pressable", so it must not land on the
@@ -108,32 +113,49 @@
         }, { passive: true });
     }
 
-    /* ── Sheen ────────────────────────────────────────────────────────
-       The travelling highlight is the signature of a button in this system,
-       but only `.btn` ever carried it, so on sixteen of eighteen routes the
-       buttons sat inert while the two system pages swept. This tags the rest.
+    /* ── Controls ─────────────────────────────────────────────────────
+       Tags every pressable control with what the stylesheets need to know
+       about it. Two things, both of which CSS cannot work out on its own.
 
-       `::before { inset: -1px }` needs a positioned host, or it anchors to the
-       nearest positioned ancestor and paints a page-sized gradient. Several of
-       these controls are absolutely positioned overlays that must not be
-       forced to `relative` (it drops them into normal flow and they stretch
-       full width), so only the statically positioned ones get
-       `lg-sheen--rel` — the others already establish their own containing
-       block and need nothing. */
-    function sheen() {
-        if (reduced) return;
+       1. `lg-sheen` — the travelling highlight. Only `.btn` ever carried it,
+          so on sixteen of eighteen routes the buttons sat inert while the two
+          system pages swept. `::before { inset: -1px }` needs a positioned
+          host or it anchors to the nearest positioned ancestor and paints a
+          page-sized gradient; several of these controls are absolutely
+          positioned overlays that must not be forced to `relative` (it drops
+          them into normal flow and they stretch full width), so only the
+          statically positioned ones get `lg-sheen--rel`.
+
+       2. `lg-surface` — a shape correction. The bridge sets
+          `border-radius: 999px` on everything it treats as a button, which is
+          right for a pill and wrong the moment a control is tall: the quiz's
+          252x122 planet buttons came out as lozenges, and Artemis's 1054x69
+          resource links as capsules. Past roughly 64px tall a control has
+          stopped being a pill and become a surface, so it takes the panel
+          radius instead. Height is the only way to tell, and only the DOM
+          knows it. */
+    function controls() {
+        var SURFACE_H = 64;
 
         function tag(el) {
-            if (el.classList.contains('lg-sheen') || !el.matches(PRESSABLE)) return;
-            el.classList.add('lg-sheen');
-            if (getComputedStyle(el).position === 'static') {
-                el.classList.add('lg-sheen--rel');
+            if (!el.matches(PRESSABLE)) return;
+            if (!el.classList.contains('lg-sheen')) {
+                if (!reduced) {
+                    el.classList.add('lg-sheen');
+                    if (getComputedStyle(el).position === 'static') {
+                        el.classList.add('lg-sheen--rel');
+                    }
+                }
             }
+            /* Re-checked on every pass, not just the first: a button that fits
+               on one line at desktop width wraps to two on a phone and crosses
+               the threshold. */
+            el.classList.toggle('lg-surface',
+                el.getBoundingClientRect().height > SURFACE_H);
         }
 
-        /* Idempotent: tag() early-returns on anything already carrying the
-           class, so re-running over the whole body is cheap and lets one
-           pass cover nodes added anywhere. */
+        /* Idempotent, so re-running over the whole body is cheap and one pass
+           covers nodes added anywhere. */
         function sweep() {
             Array.prototype.forEach.call(document.querySelectorAll(CONTROLS), tag);
         }
@@ -143,18 +165,20 @@
            controls do not exist at boot. Coalesced to one pass per frame, and
            only when elements were actually added. */
         var queued = false;
-        new MutationObserver(function (recs) {
+        function schedule() {
             if (queued) return;
+            queued = true;
+            requestAnimationFrame(function () { queued = false; sweep(); });
+        }
+        new MutationObserver(function (recs) {
             for (var i = 0; i < recs.length; i++) {
                 for (var j = 0; j < recs[i].addedNodes.length; j++) {
-                    if (recs[i].addedNodes[j].nodeType === 1) {
-                        queued = true;
-                        requestAnimationFrame(function () { queued = false; sweep(); });
-                        return;
-                    }
+                    if (recs[i].addedNodes[j].nodeType === 1) { schedule(); return; }
                 }
             }
         }).observe(document.body, { childList: true, subtree: true });
+
+        window.addEventListener('resize', schedule, { passive: true });
     }
 
     /* ── Tilt ─────────────────────────────────────────────────────────
@@ -453,7 +477,7 @@
         mountAurora();
         auroraParallax();
         specular();
-        sheen();
+        controls();
         tilt();
         ripple();
         dock();

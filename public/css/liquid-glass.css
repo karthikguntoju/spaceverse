@@ -653,6 +653,13 @@ html.lenis {
     position: relative;
 }
 
+/* Past roughly 64px tall a control has stopped being a pill and become a
+   surface, so it takes the panel radius. The runtime measures and tags —
+   height is the only way to tell and CSS cannot see it. */
+.lg .lg-surface {
+    border-radius: var(--r-md);
+}
+
 .btn::before,
 .lg-sheen::before {
     content: '';

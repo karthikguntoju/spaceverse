@@ -377,6 +377,19 @@ body.lg-lite > canvas#starfield {
             transparent 66%);
 }
 
+/* ── Shape ──────────────────────────────────────────────────────────────
+   A pill is right for a control that is much wider than it is tall. Applied
+   blindly it is wrong: the quiz's 252x122 planet buttons came out as
+   lozenges and Artemis's 1054x69 resource links as capsules, because the
+   rule above sets `border-radius: 999px` on anything it treats as a button.
+
+   Past roughly 64px tall a control has stopped being a pill and become a
+   surface, so it takes the panel radius instead. The runtime measures and
+   tags, because height is the only way to tell and CSS cannot see it. */
+.lg-lite .lg-surface {
+    border-radius: 22px !important;
+}
+
 /* The affirmative action on each page keeps the aurora core */
 .lg-lite .btn-primary,
 .lg-lite .pill-btn.primary,
