@@ -11,7 +11,7 @@
             --gold: #ffd700;
             --blue: #00b4d8;
             --glass: rgba(6,10,26,0.55);
-            --glass-border: rgba(255,215,0,0.08);
+            --glass-border: rgba(251,191,36,0.08);
             --muted: rgba(232,236,244,0.06);
         }
 
@@ -43,17 +43,17 @@
             -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
             margin-bottom:28px;
         }
-        .ld-bar{width:260px;height:3px;background:rgba(255,215,0,0.12);border-radius:4px;overflow:hidden;margin-bottom:14px;}
+        .ld-bar{width:260px;height:3px;background:rgba(251,191,36,0.12);border-radius:4px;overflow:hidden;margin-bottom:14px;}
         #progress{height:100%;width:0%;background:linear-gradient(90deg,var(--gold),#ffaa00);border-radius:4px;transition:width .2s;}
-        .loader-text{font-size:.7rem;letter-spacing:.3em;color:rgba(255,215,0,.45);font-weight:600;}
+        .loader-text{font-size:.7rem;letter-spacing:.3em;color:rgba(251,191,36,.45);font-weight:600;}
 
         /* ── MUSIC PLAYER ── */
         #music-player{position:fixed;bottom:80px;right:22px;z-index:100;display:flex;align-items:center;gap:10px;background:var(--glass);backdrop-filter:blur(20px);border:1px solid var(--glass-border);border-radius:40px;padding:8px 14px 8px 10px;transition:all .3s;}
-        #music-player:hover{border-color:rgba(255,215,0,.25);box-shadow:0 4px 24px rgba(255,215,0,.08);}
+        #music-player:hover{border-color:rgba(251,191,36,.25);box-shadow:0 4px 24px rgba(251,191,36,.08);}
         #mus-btn{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--gold),#ffaa00);border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;flex-shrink:0;transition:transform .2s,box-shadow .2s;}
-        #mus-btn:hover{transform:scale(1.1);box-shadow:0 0 16px rgba(255,215,0,.4);}
+        #mus-btn:hover{transform:scale(1.1);box-shadow:0 0 16px rgba(251,191,36,.4);}
         #mus-btn.playing{animation:pulse-gold 2s ease-in-out infinite;}
-        @keyframes pulse-gold{0%,100%{box-shadow:0 0 8px rgba(255,215,0,.3)}50%{box-shadow:0 0 20px rgba(255,215,0,.7)}}
+        @keyframes pulse-gold{0%,100%{box-shadow:0 0 8px rgba(251,191,36,.3)}50%{box-shadow:0 0 20px rgba(251,191,36,.7)}}
         .mus-info{display:flex;flex-direction:column;gap:1px;}
         .mus-title{font-size:.68rem;font-weight:700;color:var(--gold);letter-spacing:.5px;white-space:nowrap;}
         .mus-artist{font-size:.6rem;color:rgba(232,236,244,.4);}
@@ -111,7 +111,7 @@
             margin-bottom: 12px; 
             border-bottom: 1px solid rgba(230,241,255,0.03); 
             padding-bottom: 8px; 
-            color: #E6F1FF;
+            color: #f2f6ff;
         }
         .info-item span:first-child { font-weight: bold; color: #64FFDA; }
         
@@ -154,14 +154,14 @@
         .nav-btn .dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;}
         .nav-btn:hover { 
             color: var(--gold);
-            border-color: rgba(255,215,0,.2);
-            background: rgba(255,215,0,.04);
+            border-color: rgba(251,191,36,.2);
+            background: rgba(251,191,36,.04);
         }
         .nav-btn.active { 
             color: var(--gold);
-            border-color: rgba(255,215,0,.4);
-            background: rgba(255,215,0,.08);
-            box-shadow: 0 0 16px rgba(255,215,0,.12);
+            border-color: rgba(251,191,36,.4);
+            background: rgba(251,191,36,.08);
+            box-shadow: 0 0 16px rgba(251,191,36,.12);
         }
         
         #panel-planet-img { 
@@ -171,8 +171,8 @@
             border-radius: 50%; 
             object-fit: cover; 
             margin: 0 auto 20px auto; 
-            box-shadow: 0 0 15px rgba(100, 255, 218, 0.5); 
-            background-color: #000; 
+            box-shadow: 0 0 15px rgba(100, 255, 218, 0.5);
+            background-color: transparent;
         }
         
         .controls-panel {
@@ -206,8 +206,8 @@
         .control-group button {
             width: 100%;
             padding: 8px;
-            background: rgba(255,215,0,.06);
-            border: 1px solid rgba(255,215,0,.25);
+            background: rgba(251,191,36,.06);
+            border: 1px solid rgba(251,191,36,.25);
             color: var(--gold);
             border-radius: 8px;
             cursor: pointer;
@@ -216,7 +216,7 @@
             font-family:inherit;
         }
         .control-group button:hover {
-            background: rgba(255,215,0,.14);
+            background: rgba(251,191,36,.14);
         }
         
         .help-tooltip {
@@ -284,8 +284,8 @@
                At top:20px the two sat on top of each other. */
             top: 112px;
             left: 20px;
-            background: rgba(255,215,0,.06);
-            border: 1px solid rgba(255,215,0,.25);
+            background: rgba(251,191,36,.06);
+            border: 1px solid rgba(251,191,36,.25);
             color: var(--gold);
             padding: 8px 18px;
             border-radius: 25px;
@@ -295,14 +295,14 @@
             font-size:.82rem;font-weight:600;
         }
         .back-btn:hover {
-            background: rgba(255,215,0,.14);
+            background: rgba(251,191,36,.14);
             transform: translateY(-2px);
         }
         
         .quiz-btn {
             background: rgba(100, 255, 218, 0.06);
             border: 2px solid #64FFDA;
-            color: #E6F1FF;
+            color: #f2f6ff;
             padding: 8px 16px;
             border-radius: 20px;
             cursor: pointer;
@@ -330,7 +330,7 @@
             margin-bottom: 10px;
             border-left: 3px solid #64FFDA;
             font-size: 0.9em;
-            color: #E6F1FF;
+            color: #f2f6ff;
         }
 
         /* Visual layers */
@@ -440,8 +440,8 @@
         
         .traffic-btn {
             padding: 6px 12px;
-            background: rgba(255,215,0,.06);
-            border: 1px solid rgba(255,215,0,.2);
+            background: rgba(251,191,36,.06);
+            border: 1px solid rgba(251,191,36,.2);
             color: var(--text);
             border-radius: 8px;
             cursor: pointer;
@@ -449,10 +449,10 @@
             font-size: 0.82em;
         }
         .traffic-btn:hover {
-            background: rgba(255,215,0,.12);
+            background: rgba(251,191,36,.12);
         }
         .traffic-btn.active {
-            background: rgba(255,215,0,.15);
+            background: rgba(251,191,36,.15);
             border-color: var(--gold);
             color: var(--gold);
         }

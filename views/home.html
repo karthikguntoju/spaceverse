@@ -886,6 +886,10 @@
             }
 
             function draw(ts) {
+                // star-sky.js swaps #space-bg for its own canvas and raises
+                // this flag; this loop would be painting a detached node, so
+                // it stands down by not scheduling another frame.
+                if (window.__galaxyActive) return;
                 const t = ts * 0.001;
                 const W = canvas.width, H = canvas.height;
                 // Transparent clear: the aurora field behind must show through.
@@ -1041,6 +1045,8 @@
             }
         };
     </script>
+    <!-- Shared photographic night sky — takes over #space-bg -->
+    <script src="/public/js/star-sky.js" defer></script>
 </body>
 
 </html>

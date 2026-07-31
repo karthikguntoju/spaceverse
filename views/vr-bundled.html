@@ -10,7 +10,8 @@
             padding: 0;
             overflow: hidden;
             font-family: 'Inter', sans-serif;
-            background-color: #0D1117;
+            /* The bridge paints the void + aurora; no opaque legacy fill here. */
+            background-color: #04060f;
         }
         
         #vr-container {
@@ -23,38 +24,39 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: #E6F1FF;
+            color: #f2f6ff;
             font-size: 18px;
         }
-        
+
         #error {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            color: #ff6b6b;
+            color: #fb7185;
             font-size: 18px;
             text-align: center;
             display: none;
         }
-        
+
         #retry-btn {
             margin-top: 15px;
             padding: 10px 20px;
-            background-color: #64FFDA;
-            color: #0D1117;
+            background-color: #22d3ee;
+            color: #04060f;
             border: none;
             border-radius: 5px;
             cursor: pointer;
             font-weight: bold;
         }
-        
+
         .fallback-ui {
             width: 100vw;
             height: 100vh;
             position: relative;
-            background: radial-gradient(ellipse at center, #1a1a2e 0%, #16213e 100%);
-            color: #E6F1FF;
+            /* Was an opaque navy radial that covered the bridge's aurora. */
+            background: transparent;
+            color: #f2f6ff;
             font-family: 'Inter', sans-serif;
             overflow: hidden;
         }
@@ -80,6 +82,16 @@
         .neptune { background: linear-gradient(45deg, #4169e1, #000080); }
         .pluto { background: linear-gradient(45deg, #cdcdcd, #a9a9a9); }
     </style>
+    <!-- Liquid glass bridge + runtime. Loaded last on purpose: the bridge
+         re-materials this page's components as glass and wins on source order. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/public/css/liquid-glass-theme.css">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+    <script src="/public/js/liquid-glass.js" defer></script>
 </head>
 <body>
     <div id="vr-container"></div>
@@ -225,7 +237,8 @@
                         width: '100vw',
                         height: '100vh',
                         position: 'relative',
-                        backgroundColor: '#0D1117',
+                        // Page-level fill: transparent so the bridge's aurora shows.
+                        backgroundColor: 'transparent',
                         color: '#E6F1FF',
                         fontFamily: 'Inter, sans-serif',
                         overflow: 'hidden'

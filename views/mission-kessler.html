@@ -11,13 +11,19 @@
         rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
     <style>
+        /* Site tokens. These were a near-miss palette of their own — mint
+           #64ffda for the accent where the site uses cyan #22d3ee, #e8eefc ink
+           where the site uses #f2f6ff — which is most of why this page read as
+           belonging to a different product. The bridge re-points them anyway
+           (it loads after this block); kept in step so the page is still right
+           on its own. */
         :root {
-            --accent: #64ffda;
-            --warn: #ff8b8b;
-            --line: rgba(122, 162, 255, 0.24);
-            --panel: rgba(8, 13, 24, 0.78);
-            --text: #e8eefc;
-            --muted: #9fb3cc;
+            --accent: #22d3ee;
+            --warn: #fb7185;
+            --line: rgba(255, 255, 255, 0.1);
+            --panel: rgba(255, 255, 255, 0.055);
+            --text: #f2f6ff;
+            --muted: rgba(198, 210, 240, 0.62);
         }
         * { box-sizing: border-box; }
         body {
@@ -26,6 +32,15 @@
         }
         #scene { position: fixed; inset: 0; }
 
+        /* The scene canvas is opaque and covers the viewport, so the aurora
+           field the runtime mounts would never be seen — it would just animate
+           four blurred orbs behind an opaque surface for the whole session.
+           Chrome does not animate a `display: none` subtree, so this stops the
+           work. The bridge loads after this block but never sets `display` on
+           these, so the rule holds. */
+        .lg-aurora,
+        .lg-grid { display: none; }
+
         .hud { position: fixed; z-index: 10; pointer-events: none; }
         .hud > * { pointer-events: auto; }
 
@@ -33,40 +48,63 @@
             top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 12px;
             padding: 12px 16px; background: linear-gradient(180deg, rgba(3, 6, 15, 0.9), transparent);
         }
-        #brand { font-family: 'Orbitron', sans-serif; letter-spacing: 3px; font-size: 13px; color: var(--accent); }
-        .chip {
-            padding: 8px 14px; border-radius: 999px; font: inherit; font-size: 13px; cursor: pointer;
-            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16);
-            color: var(--text); text-decoration: none; min-height: 38px; display: inline-flex; align-items: center;
+        /* Was Orbitron at 3px tracking — the neon-HUD signature the rest of the
+           site dropped. Same treatment as the site wordmark now. */
+        #brand {
+            font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+            font-weight: 600; letter-spacing: -0.01em; font-size: 13px; color: var(--accent);
         }
-        .chip:hover { border-color: var(--accent); }
+        /* Size only; the material and hover come from the bridge, like every
+           other control on the site. The 1px rim was pre-redesign language. */
+        .chip {
+            padding: 0 14px; border-radius: 999px; font: inherit; font-size: 13px; cursor: pointer;
+            color: var(--text); text-decoration: none; min-height: 38px;
+            display: inline-flex; align-items: center; gap: 6px;
+        }
         .spacer { flex: 1; }
 
+        /* Glass panel: no border, hairline drawn with an inset shadow, same
+           recipe as .panel in the bridge. */
         #stats {
             top: 64px; left: 16px; width: min(260px, calc(100% - 32px));
-            background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
-            padding: 14px 16px; backdrop-filter: blur(12px);
+            background: rgba(255, 255, 255, 0.055); border: none; border-radius: 20px;
+            padding: 14px 16px;
+            backdrop-filter: blur(26px) saturate(185%);
+            -webkit-backdrop-filter: blur(26px) saturate(185%);
+            box-shadow:
+                inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.09),
+                0 30px 70px -20px rgba(0, 0, 0, 0.72);
         }
         .row { display: flex; justify-content: space-between; gap: 10px; font-size: 13px; margin: 5px 0; }
         .row span { color: var(--muted); }
         .row b { font-variant-numeric: tabular-nums; }
         .meter { height: 7px; border-radius: 99px; background: rgba(255, 255, 255, 0.1); overflow: hidden; margin-top: 4px; }
         .meter i { display: block; height: 100%; width: 0%; transition: width 0.2s linear; }
-        #risk-fill { background: linear-gradient(90deg, #64ffda, #fbbf24, #ff5a5a); }
-        #fuel-fill { background: linear-gradient(90deg, #7aa2ff, #64ffda); }
+        #risk-fill { background: linear-gradient(90deg, #22d3ee, #fbbf24, #fb7185); }
+        #fuel-fill { background: linear-gradient(90deg, #38bdf8, #2dd4bf); }
 
         #controls {
             bottom: 16px; left: 50%; transform: translateX(-50%);
             display: flex; gap: 10px; align-items: center; flex-wrap: wrap; justify-content: center;
-            background: var(--panel); border: 1px solid var(--line); border-radius: 999px;
-            padding: 10px 14px; backdrop-filter: blur(12px); max-width: calc(100% - 32px);
+            background: rgba(8, 12, 28, 0.55); border: none; border-radius: 999px;
+            padding: 10px 14px; max-width: calc(100% - 32px);
+            backdrop-filter: blur(26px) saturate(185%);
+            -webkit-backdrop-filter: blur(26px) saturate(185%);
+            box-shadow:
+                inset 0 1px 0 0 rgba(255, 255, 255, 0.24),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.09),
+                0 30px 70px -20px rgba(0, 0, 0, 0.72);
         }
         #sel-label { font-size: 13px; color: var(--muted); min-width: 130px; text-align: center; }
 
+        /* Neon halo out, neutral shadow in: this has to stay readable over live
+           gameplay, so the shadow is for contrast rather than glow. */
         #flash {
             top: 50%; left: 50%; transform: translate(-50%, -50%);
-            font-family: 'Orbitron', sans-serif; font-size: clamp(16px, 3vw, 26px); letter-spacing: 3px;
-            opacity: 0; transition: opacity 0.15s; text-shadow: 0 0 24px currentColor;
+            font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+            font-weight: 600; font-size: clamp(18px, 3.2vw, 30px); letter-spacing: -0.015em;
+            opacity: 0; transition: opacity 0.15s; text-shadow: 0 2px 18px rgba(0, 0, 0, 0.8);
         }
         #flash.show { opacity: 1; }
         #flash.collision { color: var(--warn); }
@@ -78,11 +116,22 @@
             backdrop-filter: blur(4px); position: fixed; z-index: 20;
         }
         #done { display: none; }
+        /* Modal glass, same recipe as .modal-content in the bridge. */
         .card {
-            width: min(620px, 100%); background: linear-gradient(160deg, rgba(18, 30, 55, 0.94), rgba(8, 13, 24, 0.94));
-            border: 1px solid var(--line); border-radius: 20px; padding: 26px; text-align: center;
+            width: min(620px, 100%); background: rgba(255, 255, 255, 0.075);
+            backdrop-filter: blur(40px) saturate(210%);
+            -webkit-backdrop-filter: blur(40px) saturate(210%);
+            border: none; border-radius: 22px; padding: 26px; text-align: center;
+            box-shadow:
+                inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.09),
+                0 30px 70px -20px rgba(0, 0, 0, 0.72);
         }
-        .card h1 { font-family: 'Orbitron', sans-serif; letter-spacing: 3px; margin: 0 0 10px; font-size: clamp(22px, 4vw, 34px); }
+        .card h1 {
+            font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+            font-weight: 600; letter-spacing: -0.025em; margin: 0 0 10px;
+            font-size: clamp(26px, 4.4vw, 42px);
+        }
         .card p { color: var(--muted); line-height: 1.6; font-size: 14.5px; }
         .card .keys { font-size: 13px; color: var(--muted); margin-top: 14px; }
         kbd {
@@ -93,6 +142,11 @@
         .note { color: #ffb46b; font-size: 13px; margin-top: 10px; }
         .actions { display: flex; gap: 10px; justify-content: center; margin-top: 18px; flex-wrap: wrap; }
     </style>
+    <!-- Last in <head> on purpose: the bridge re-points this page's tokens and
+         re-materials its HUD and controls as glass, and it wins on source
+         order, not on specificity. -->
+    <link rel="stylesheet" href="/public/css/liquid-glass-theme.css">
+    <script src="/public/js/liquid-glass.js" defer></script>
 </head>
 <body>
     <div id="scene"></div>

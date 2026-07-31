@@ -1,12 +1,29 @@
 /* Shared chrome for every /games page. The canvas is the game; everything in
-   here is the frame around it. */
+   here is the frame around it.
+
+   The frame is the same material as the rest of the site: liquid-glass-theme.css
+   is linked after this file on every game page, so the tokens below resolve to
+   the site palette and the controls resolve to glass. What stays local is
+   layout — where the HUD sits, how the overlay is composed — plus one
+   deliberate difference: `--accent` is written per game by shell.js as an
+   inline style on <html>, so each game keeps its own hue inside a shared
+   material. Hue varies; the glass does not.
+
+   Fallbacks are given on every var() so a game page still renders correctly
+   with the bridge absent. */
 
 * { box-sizing: border-box; }
 
 body.arcade {
+    /* Secondary ink. Not `--muted`: the bridge deliberately leaves that token
+       alone because it means a surface tint on some pages and a text colour on
+       others, so borrowing it here would be borrowing an ambiguity. This is the
+       site's --ink-3 by value. */
+    --a-ink-2: rgba(198, 210, 240, 0.62);
+
     margin: 0;
-    background: #03060f;
-    color: #e8eefc;
+    background: var(--space-dark, #04060f);
+    color: var(--text, #f2f6ff);
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     overflow: hidden;
     height: 100vh;
@@ -17,86 +34,241 @@ body.arcade {
 
 #game { position: fixed; inset: 0; display: block; }
 
+/* The game canvas is opaque and covers the viewport, so the aurora field the
+   runtime mounts would never be seen — it would just animate four blurred orbs
+   behind an opaque surface for the whole session. Hiding it stops that work:
+   Chrome does not run animations inside a `display: none` subtree. One rule
+   here covers all ten game pages. */
+body.arcade .lg-aurora,
+body.arcade .lg-grid { display: none; }
+
+/* Above the overlays (z-index 20), not below them. Underneath, the scrim's
+   blur made the bar illegible and `pointer-events` on the overlay swallowed
+   the clicks — so on the menu, pause and game-over screens the only way back
+   to the arcade was the Esc key. */
 .a-top {
-    position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+    position: fixed; top: 0; left: 0; right: 0; z-index: 30;
     display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+    /* A legibility scrim, not decoration: the HUD sits over live gameplay. */
     background: linear-gradient(180deg, rgba(3, 6, 15, 0.85), transparent);
     pointer-events: none;
 }
 .a-top > * { pointer-events: auto; }
 .a-grow { flex: 1; }
+
+/* Material comes from the bridge (.lg-sheen). Only the size is local. */
 .a-chip {
-    padding: 7px 13px; border-radius: 999px; font-size: 13px; text-decoration: none;
-    background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.16);
-    color: #e8eefc;
+    padding: 0 14px; min-height: 38px; border-radius: 999px; font-size: 13px;
+    text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+    color: var(--text, #f2f6ff); cursor: pointer;
 }
-.a-chip:hover { border-color: var(--accent); }
+
+/* Was Orbitron at 3px tracking — the neon-HUD signature the rest of the site
+   dropped in the glass redesign. Same typeface and tracking as the site
+   wordmark now, still lit with the game's accent. */
 .a-name {
-    font-family: 'Orbitron', sans-serif; font-size: 13px; letter-spacing: 3px;
-    color: var(--accent);
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-size: 13px; font-weight: 600; letter-spacing: -0.01em;
+    color: var(--accent, #22d3ee);
 }
-.a-best { font-size: 12px; letter-spacing: 1.5px; color: #9fb3cc; font-variant-numeric: tabular-nums; }
+.a-best {
+    font-size: 12px; color: var(--a-ink-2);
+    font-variant-numeric: tabular-nums;
+}
+
+/* The mute toggle is a real button but wears the chip material. */
+button.a-mute {
+    border: 0; background: rgba(255, 255, 255, 0.04);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+    font-size: 15px; line-height: 1; min-width: 38px; justify-content: center;
+    padding: 0 10px;
+}
+button.a-mute:hover { background: rgba(255, 255, 255, 0.09); }
 
 .a-hud {
     position: fixed; top: 52px; left: 16px; z-index: 9; pointer-events: none;
     display: flex; flex-direction: column; gap: 6px;
+    transition: opacity 0.2s ease;
 }
+/* Under the overlay the HUD reads as a blurred smudge rather than as
+   information, so it steps aside while a card is up. */
+body.arcade.a-overlay-open .a-hud { opacity: 0; }
+
+/* The score sat in a coloured neon halo. Glass does not glow, but this number
+   does have to stay readable over whatever the game is drawing underneath it,
+   so the halo becomes a neutral shadow: contrast, not decoration. */
 .a-score {
-    font-family: 'Orbitron', sans-serif; font-size: clamp(20px, 3.4vw, 30px);
-    letter-spacing: 2px; text-shadow: 0 0 18px rgba(100, 255, 218, 0.35);
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-size: clamp(20px, 3.4vw, 30px);
+    font-weight: 600; letter-spacing: -0.02em;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.72);
     font-variant-numeric: tabular-nums;
+    /* The shell writes an inline scale on a scoring event and eases it out
+       frame by frame, so the growth is instant and only the settle is smoothed
+       — a CSS transition on both ends would mute the hit. */
+    transform-origin: left center;
 }
-.a-extra { font-size: 13px; color: #9fb3cc; line-height: 1.7; font-variant-numeric: tabular-nums; }
-.a-extra b { color: #e8eefc; }
+.a-extra {
+    font-size: 13px; color: var(--a-ink-2); line-height: 1.7;
+    font-variant-numeric: tabular-nums;
+    text-shadow: 0 1px 8px rgba(0, 0, 0, 0.6);
+}
+.a-extra b { color: var(--text, #f2f6ff); }
 
 .a-flash {
     position: fixed; top: 42%; left: 50%; transform: translate(-50%, -50%);
-    font-family: 'Orbitron', sans-serif; font-size: clamp(20px, 4.5vw, 44px);
-    letter-spacing: 4px; opacity: 0; transition: opacity 0.12s; z-index: 8;
-    text-shadow: 0 0 30px currentColor; pointer-events: none; text-align: center;
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-size: clamp(20px, 4.5vw, 44px); font-weight: 600; letter-spacing: -0.02em;
+    opacity: 0; transition: opacity 0.12s; z-index: 8;
+    text-shadow: 0 2px 20px rgba(0, 0, 0, 0.8); pointer-events: none; text-align: center;
 }
 .a-flash.show { opacity: 1; }
 
+/* Starts below the top bar so the bar stays sharp and clickable. 58px is the
+   bar's own height: a 38px chip plus its 10px vertical padding. */
 .a-screen {
-    position: fixed; inset: 0; z-index: 20; display: flex;
+    position: fixed; inset: 58px 0 0 0; z-index: 20; display: flex;
     align-items: center; justify-content: center; padding: 20px;
-    background: radial-gradient(circle at 50% 45%, rgba(9, 20, 40, 0.78), rgba(3, 5, 12, 0.95));
-    backdrop-filter: blur(5px);
+    background: rgba(2, 4, 10, 0.62);
+    backdrop-filter: blur(10px) saturate(120%);
+    -webkit-backdrop-filter: blur(10px) saturate(120%);
+    opacity: 1; visibility: visible;
+    transition: opacity 0.28s ease, visibility 0.28s ease;
 }
-.a-hidden { display: none; }
+/* Hidden by fade, not display:none — the menu and game-over screens dissolve
+   over the live scene instead of blinking. visibility keeps them untabbable
+   and click-through while faded out. */
+.a-hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+.a-screen .a-card {
+    transform: none;
+    transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.a-hidden .a-card { transform: scale(0.94) translateY(10px); }
 
+/* Modal glass, same recipe as .modal-content in the bridge: no border, a
+   hairline drawn with an inset shadow, deeper blur than the page. The old
+   1px #7aa2ff outline and gradient fill were the pre-redesign language. */
 .a-card {
     width: min(520px, 100%); text-align: center; padding: 30px 26px;
-    background: linear-gradient(160deg, rgba(18, 30, 55, 0.95), rgba(8, 13, 24, 0.95));
-    border: 1px solid rgba(122, 162, 255, 0.24); border-radius: 22px;
+    background: rgba(255, 255, 255, 0.075);
+    backdrop-filter: blur(40px) saturate(210%);
+    -webkit-backdrop-filter: blur(40px) saturate(210%);
+    border: none; border-radius: 22px;
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.22),
+        inset 0 -1px 0 0 rgba(255, 255, 255, 0.05),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.09),
+        0 30px 70px -20px rgba(0, 0, 0, 0.72);
 }
 .a-card h1 {
-    font-family: 'Orbitron', sans-serif; letter-spacing: 4px; margin: 0 0 10px;
-    font-size: clamp(20px, 4vw, 32px); color: var(--accent);
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    letter-spacing: -0.02em; margin: 0 0 10px; font-weight: 600;
+    font-size: clamp(24px, 4.4vw, 38px); color: var(--accent, #22d3ee);
 }
-.a-tag { color: #9fb3cc; font-size: 14.5px; line-height: 1.6; margin: 0 0 16px; }
+.a-tag { color: var(--a-ink-2); font-size: 14.5px; line-height: 1.6; margin: 0 0 16px; }
 
 .a-controls { list-style: none; padding: 0; margin: 0 0 20px; display: grid; gap: 7px; }
-.a-controls li { display: flex; align-items: center; gap: 10px; justify-content: center; font-size: 13.5px; color: #9fb3cc; }
+.a-controls li {
+    display: flex; align-items: center; gap: 10px; justify-content: center;
+    font-size: 13.5px; color: var(--a-ink-2);
+}
 .a-controls kbd {
-    background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 6px; padding: 3px 9px; font-family: 'JetBrains Mono', ui-monospace, monospace;
-    font-size: 12px; color: #e8eefc; min-width: 62px; display: inline-block;
+    background: rgba(255, 255, 255, 0.07);
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+    border: none; border-radius: 8px; padding: 4px 9px;
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    font-size: 12px; color: var(--text, #f2f6ff); min-width: 62px; display: inline-block;
 }
 
+/* The primary action. Built exactly like the system's `.btn--primary` — white
+   gloss over a lit core, inset top light, coloured cast shadow — but lit with
+   this game's accent instead of the site's cyan-to-violet gradient. That is
+   the one place a game is allowed to differ.
+
+   The travelling sheen and the press/lift come from the bridge via .lg-sheen. */
 .a-btn {
-    font-family: 'Orbitron', sans-serif; letter-spacing: 2.5px; font-size: 14px;
-    padding: 13px 30px; border-radius: 999px; cursor: pointer; text-decoration: none;
-    background: var(--accent); color: #04121a; border: 0; font-weight: 700;
-    display: inline-flex; align-items: center; justify-content: center;
+    font-family: 'Inter', system-ui, sans-serif;
+    font-weight: 600; font-size: 0.92rem; letter-spacing: 0.01em;
+    min-height: 46px; padding: 0 1.6rem; border-radius: 999px;
+    cursor: pointer; text-decoration: none; border: 0;
+    display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+    color: #02121a;
+    background:
+        linear-gradient(120deg, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0.05) 42%, transparent 60%),
+        var(--accent, #22d3ee);
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.65),
+        inset 0 -2px 6px 0 rgba(0, 40, 60, 0.28),
+        0 10px 30px -8px rgba(0, 0, 0, 0.5),
+        0 14px 40px -14px rgba(0, 0, 0, 0.6);
+    transition:
+        transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+        box-shadow 0.34s cubic-bezier(0.22, 1, 0.36, 1),
+        filter 0.34s ease;
 }
-.a-btn:hover { filter: brightness(1.12); }
-.a-btn.a-ghost { background: transparent; color: #e8eefc; border: 1px solid rgba(255, 255, 255, 0.2); }
+
+/* Lift and press are declared here rather than picked up from the bridge's
+   button rules, because those set `background: … !important` on hover and would
+   flatten the accent core back to plain glass. Same distances and easing as
+   `.btn`, so it reads identically — only the colour underneath differs. */
+.a-btn:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.07);
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.8),
+        inset 0 -2px 6px 0 rgba(0, 40, 60, 0.3),
+        0 16px 44px -10px rgba(0, 0, 0, 0.55),
+        0 30px 70px -20px rgba(0, 0, 0, 0.72);
+}
+
+.a-btn:active {
+    transform: translateY(0) scale(0.978);
+    transition-duration: 0.08s;
+}
+
+.a-btn.a-ghost:hover {
+    filter: none;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.3),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.28),
+        0 14px 40px -14px rgba(0, 0, 0, 0.6);
+}
+
+/* Secondary action: rim only, no fill — the system's `.btn--ghost`. */
+.a-btn.a-ghost {
+    color: var(--text, #f2f6ff);
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(18px) saturate(180%);
+    -webkit-backdrop-filter: blur(18px) saturate(180%);
+    box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.16),
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.14);
+}
+
+/* Accessibility toggle on the pause card. */
+.a-toggle {
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    margin: 0 0 18px; font-size: 13px; color: var(--a-ink-2); cursor: pointer;
+}
+.a-toggle input { width: 16px; height: 16px; accent-color: var(--accent, #22d3ee); cursor: pointer; }
+
+/* The next-medal line. Quieter than the best-score line above it: it is a
+   target, not a result. */
+.a-medal {
+    margin: -8px 0 16px; font-size: 12.5px;
+    color: color-mix(in srgb, var(--accent, #22d3ee) 78%, white);
+    opacity: 0.85;
+}
+.a-medal:empty { display: none; }
+
 .a-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
 .a-final {
-    font-family: 'Orbitron', sans-serif; font-size: clamp(24px, 5vw, 38px);
-    margin: 12px 0 6px; letter-spacing: 2px;
+    font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+    font-size: clamp(24px, 5vw, 38px); font-weight: 600;
+    margin: 12px 0 6px; letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 640px) {

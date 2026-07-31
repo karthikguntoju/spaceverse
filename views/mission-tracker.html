@@ -26,7 +26,7 @@
 
         body {
             font-family: 'Inter', system-ui, sans-serif;
-            background: #000000;
+            background: transparent;
             color: var(--text-main);
             min-height: 100vh;
             overflow-x: hidden;
@@ -124,7 +124,7 @@
         .logo-planet {
             width: 30px;
             height: 30px;
-            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #005b99);
+            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #38bdf8);
             border-radius: 50%;
             box-shadow: 0 0 20px rgba(0, 243, 255, 0.8), inset -5px -5px 10px rgba(0, 0, 0, 0.4);
             animation: planetRotate 10s linear infinite;
@@ -267,7 +267,7 @@
 
         .header p {
             font-size: 1.2rem;
-            color: #a0aec0;
+            color: rgba(198, 210, 240, 0.62);
         }
 
         .filters {
@@ -280,7 +280,7 @@
 
         .filter-btn {
             padding: 0.7rem 1.8rem;
-            background: rgba(0, 243, 255, 0.03);
+            background: rgba(34, 211, 238, 0.03);
             border: 1px solid var(--glass-border);
             border-radius: 30px;
             color: var(--neon-blue);
@@ -427,7 +427,7 @@
         }
 
         .mission-detail-label {
-            color: #a0aec0;
+            color: rgba(198, 210, 240, 0.62);
             font-size: 0.9rem;
         }
 
@@ -482,7 +482,7 @@
             position: absolute;
             top: 25px;
             right: 30px;
-            color: #a0aec0;
+            color: rgba(198, 210, 240, 0.62);
             font-size: 32px;
             font-weight: 300;
             cursor: pointer;
@@ -1039,9 +1039,9 @@
             t = ts * 0.001;
             const W = canvas.width, H = canvas.height;
 
-            // Background fill
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, W, H);
+            // Clear to transparent — the liquid-glass bridge paints the
+            // void + aurora behind this canvas; only stars draw here.
+            ctx.clearRect(0, 0, W, H);
 
             // Nebula blobs
             nebulae.forEach(n => {
@@ -1129,5 +1129,7 @@
     })();
     </script>
     <script src="/public/js/chat-widget.js" defer></script>
+    <!-- Shared photographic night sky — takes over #space-bg -->
+    <script src="/public/js/star-sky.js" defer></script>
 </body>
 </html>

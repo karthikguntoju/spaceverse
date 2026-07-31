@@ -183,8 +183,7 @@ body.lg-lite > canvas#starfield {
 .lg-lite .mission-details,
 .lg-lite .visibility-map,
 .lg-lite .calendar-day,
-.lg-lite .side-planet,
-.lg-lite .top-actions,
+.lg-lite .game,
 .lg-lite .modal-content {
     /* No `position` here on purpose. Several of these surfaces are absolutely
        positioned overlays (the traffic-visualisation control panels, for one)
@@ -209,6 +208,7 @@ body.lg-lite > canvas#starfield {
 .lg-lite .scenario-card:hover,
 .lg-lite .mission-card:hover,
 .lg-lite .feature-card:hover,
+.lg-lite .game:hover,
 .lg-lite .calendar-day:hover {
     transform: translateY(-4px);
     background: rgba(255, 255, 255, 0.085) !important;
@@ -236,6 +236,18 @@ body.lg-lite > canvas#starfield {
 .lg-lite .btn-out,
 .lg-lite .submit-btn,
 .lg-lite button[type='submit'],
+/* The arcade's own controls. `.a-btn` is deliberately absent — it is the one
+   primary action on the site that is lit with a per-game accent rather than the
+   site gradient, so arcade.css owns its fill and this rule would flatten it. */
+.lg-lite .a-chip,
+.lg-lite .chip,
+.lg-lite .btn-gold,
+.lg-lite .link-btn,
+.lg-lite .google-btn,
+.lg-lite .like-btn,
+.lg-lite .comments-btn,
+.lg-lite .btn-back-small,
+.lg-lite .pb-item,
 /* Plain class selectors, not `button.btn-primary`: the accent rule further
    down targets `.btn-primary`, and a tag-qualified selector here would
    out-specify it and keep every primary action grey. */
@@ -276,9 +288,56 @@ body.lg-lite > canvas#starfield {
 .lg-lite .nav-back-btn:hover,
 .lg-lite .logout-btn:hover,
 .lg-lite .back-btn:hover,
-.lg-lite .btn-feature:hover {
+.lg-lite .btn-feature:hover,
+.lg-lite .a-chip:hover,
+.lg-lite .chip:hover,
+.lg-lite .btn-gold:hover,
+.lg-lite .link-btn:hover,
+.lg-lite .google-btn:hover,
+.lg-lite .like-btn:hover,
+.lg-lite .comments-btn:hover,
+.lg-lite .btn-back-small:hover,
+.lg-lite .pb-item:hover {
     transform: translateY(-2px);
     background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* ── Top action rail ────────────────────────────────────────────────
+   The two 3D pages hang their nav in a `.top-actions` row, and that row was
+   in the panel list above: a blurred slab behind blurred pills, two
+   materials stacked, the slab's 22px corners cutting diagonally across the
+   row of capsules. It is a segmented control, so exactly one surface —
+   the rail — and the buttons are segments cut into it. Same shape language
+   as the planet rail at the bottom of the same page. */
+.lg-lite .top-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 2px;
+    padding: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(26px) saturate(185%);
+    -webkit-backdrop-filter: blur(26px) saturate(185%);
+    box-shadow:
+        inset 0 1px 0 0 rgba(255, 255, 255, 0.2),
+        inset 0 0 0 1px rgba(255, 255, 255, 0.08),
+        0 22px 48px -22px rgba(0, 0, 0, 0.75);
+}
+
+.lg-lite .top-actions .top-btn {
+    background: transparent !important;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    box-shadow: none !important;
+    color: rgba(242, 246, 255, 0.72);
+}
+
+/* A segment lifting off the rail it is cut into reads as a broken widget,
+   so the hover here is a fill rather than the usual 2px rise. */
+.lg-lite .top-actions .top-btn:hover {
+    transform: none;
+    background: rgba(255, 255, 255, 0.11) !important;
+    color: #fff;
 }
 
 /* The nav "Back to Home" anchors were sized entirely by inline styles that

@@ -6,57 +6,138 @@
     <title>Arcade — SpaceVerse</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Inter:wght@300;400;500;600;700&display=swap"
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@600;800&family=Inter:wght@300;400;500;600;700&display=swap"
         rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
     <style>
+        /* These are the site's tokens, not a second palette. The values used to
+           be a near-miss set of their own — mint #64ffda where the site uses
+           cyan #22d3ee, #e8eefc ink where the site uses #f2f6ff — which is why
+           the arcade read as a different product. The bridge re-points --accent,
+           --text and --line anyway (it loads after this block); these are kept
+           in step so the page still looks right on its own. */
         :root {
-            --accent: #64ffda;
+            --accent: #22d3ee;
             --amber: #fbbf24;
-            --violet: #b48bff;
-            --rose: #ff8ba7;
-            --blue: #7aa2ff;
-            --line: rgba(122, 162, 255, 0.22);
-            --panel: rgba(10, 16, 30, 0.72);
-            --text: #e8eefc;
-            --muted: #9fb3cc;
+            --violet: #a78bfa;
+            --rose: #fb7185;
+            --blue: #38bdf8;
+            --line: rgba(255, 255, 255, 0.1);
+            --panel: rgba(255, 255, 255, 0.055);
+            --text: #f2f6ff;
+            --muted: rgba(198, 210, 240, 0.62);
         }
         * { box-sizing: border-box; }
         body {
             margin: 0; min-height: 100vh; color: var(--text);
             font-family: 'Inter', system-ui, sans-serif;
-            background: #03060f;
+            background: #04060f;
             overflow-x: hidden;
         }
-        #stars { position: fixed; inset: 0; z-index: 0; }
+        /* The hub's own sky. Painted transparent, never on an opaque fill: the
+           bridge screen-blends this canvas over the aurora, so a black fillRect
+           here would black out the whole page's coloured backdrop. */
+        #stars { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
 
         .wrap { position: relative; z-index: 1; max-width: 1180px; margin: 0 auto; padding: 28px 20px 80px; }
 
         header { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 8px; }
+        /* Size only. The material — glass fill, hairline rim, hover lift, the
+           travelling sheen — comes from the bridge, same as every other control
+           on the site. The 1px rim it used to draw was the pre-redesign
+           language; nothing else on the site has a hard border any more. */
         .chip {
-            padding: 9px 16px; border-radius: 999px; font-size: 13.5px; cursor: pointer;
-            background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.16);
-            color: var(--text); text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
+            padding: 0 16px; min-height: 40px; border-radius: 999px; font-size: 13.5px;
+            cursor: pointer; color: var(--text); text-decoration: none;
+            display: inline-flex; align-items: center; gap: 6px;
         }
-        .chip:hover { border-color: var(--accent); }
+        /* Was Orbitron at 4px tracking in ALL CAPS — the neon-HUD signature the
+           rest of the site dropped. Same typeface, weight and negative tracking
+           as every other page heading now; it keeps the gradient fill, retuned
+           from the old mint/blue/violet to the site's cyan-teal-violet. */
         h1 {
-            font-family: 'Orbitron', sans-serif; letter-spacing: 4px; margin: 22px 0 6px;
-            font-size: clamp(26px, 5vw, 44px);
-            background: linear-gradient(90deg, #64ffda, #7aa2ff, #b48bff);
+            font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+            font-weight: 600; letter-spacing: -0.025em; margin: 0 0 8px;
+            font-size: clamp(30px, 5.4vw, 52px);
+            background: linear-gradient(100deg, #22d3ee, #2dd4bf 34%, #a78bfa);
             -webkit-background-clip: text; background-clip: text; color: transparent;
         }
-        .sub { color: var(--muted); max-width: 640px; line-height: 1.6; margin: 0 0 30px; font-size: 15px; }
+        .sub { color: var(--muted); max-width: 620px; line-height: 1.6; margin: 0; font-size: 15px; }
 
+        /* ── Hero band ──────────────────────────────────────────────────────
+           The title and its 620px subtitle used to sit alone in a ~230px band,
+           leaving the right 55% of the fold empty. The aggregate figures fill
+           it: they are the one thing a returning player wants before the grid,
+           and a first-time visitor reads them as "here is what there is to
+           earn". Right-aligned so the ragged edge of the subtitle and the
+           ragged edge of the tiles do not fight over the same gutter. */
+        .hero {
+            display: flex; align-items: flex-end; justify-content: space-between;
+            gap: 20px 32px; flex-wrap: wrap; margin: 22px 0 22px;
+        }
+        .hero-copy { flex: 1 1 440px; min-width: 0; }
+        .stats { display: flex; gap: 9px; flex-wrap: wrap; justify-content: flex-end; }
+        /* Same material as the `← Deck` chip — the bridge styles both off
+           `.chip` — but read-only, so it never takes a pointer and the runtime
+           never tags it with a sheen (that guard is semantic: `<div>` is not
+           in the PRESSABLE list). */
+        .stat {
+            cursor: default; gap: 8px; padding: 0 15px; min-height: 40px;
+            font-variant-numeric: tabular-nums; font-size: 12.5px;
+        }
+        .stat b { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; }
+        .stat span {
+            color: var(--muted); font-size: 10.5px; letter-spacing: 0.1em;
+            text-transform: uppercase; white-space: nowrap;
+        }
+        .stat i { font-style: normal; color: var(--c, var(--accent)); }
+
+        /* ── Filter row ─────────────────────────────────────────────────────
+           The seven category tags were pure decoration for as long as they have
+           existed. They are the only taxonomy the arcade has, so they get to do
+           the one job a taxonomy is for. `.filter-btn` is the site's own filter
+           vocabulary: the bridge gives it the glass fill, the sheen and — on
+           `.active` — the aurora core, so this row is materially identical to
+           every other filter row on the site. */
+        .filters {
+            display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+            margin: 0 0 20px;
+        }
+        .filter-btn {
+            font-family: inherit; font-size: 11.5px; font-weight: 600;
+            letter-spacing: 0.09em; text-transform: uppercase;
+            padding: 0 14px; min-height: 34px; border-radius: 999px;
+            display: inline-flex; align-items: center; gap: 7px;
+            color: var(--muted); background: var(--panel);
+            border: none; cursor: pointer;
+        }
+        .filter-btn:hover { color: var(--text); }
+        .filter-btn i {
+            font-style: normal; opacity: 0.55; font-size: 10.5px;
+            font-variant-numeric: tabular-nums;
+        }
+        .filter-btn.active {
+            color: #02121a;
+            background: linear-gradient(100deg, #22d3ee 0%, #2dd4bf 34%, #a78bfa 100%);
+        }
+        .filter-btn.active i { opacity: 0.72; color: inherit; }
+
+        /* 272 rather than 255: at the 1140px content width that is exactly four
+           columns, and four columns with the featured card spanning two makes
+           twelve cells for eleven games — the orphan slot the 255px track left
+           at the end of the last row is now the focal point at the start of the
+           first. */
         .grid {
             display: grid; gap: 16px;
-            grid-template-columns: repeat(auto-fill, minmax(255px, 1fr));
+            grid-template-columns: repeat(auto-fill, minmax(272px, 1fr));
         }
         .game {
             position: relative; display: flex; flex-direction: column; gap: 8px;
             background: var(--panel); border: 1px solid var(--line); border-radius: 18px;
             padding: 20px 20px 18px; text-decoration: none; color: var(--text);
             backdrop-filter: blur(10px); overflow: hidden;
-            transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+            transition: transform 0.16s ease, border-color 0.16s ease,
+                box-shadow 0.16s ease, opacity 0.12s ease;
         }
         .game:hover { transform: translateY(-4px); border-color: var(--c, var(--accent)); box-shadow: 0 12px 40px -18px var(--c, var(--accent)); }
         .game::before {
@@ -64,19 +145,131 @@
             background: linear-gradient(90deg, transparent, var(--c, var(--accent)), transparent);
             opacity: 0.7;
         }
-        .icon { font-size: 34px; line-height: 1; filter: drop-shadow(0 0 14px var(--c, var(--accent))); }
-        .tag {
-            position: absolute; top: 16px; right: 16px; font-size: 11px; letter-spacing: 1.5px;
-            text-transform: uppercase; color: var(--c, var(--accent)); border: 1px solid var(--c, var(--accent));
-            border-radius: 999px; padding: 3px 10px; opacity: 0.85;
+
+        /* ── Card art ───────────────────────────────────────────────────────
+           Eleven static emoji advertised eleven games without showing one frame
+           of any of them. Each card now runs a loop of its own core verb — the
+           thing you actually do — and holds it at frame 0 until you point at
+           it. The emoji stays on as a small secondary mark, because it is what
+           people recognise the game by in the medal row and the game pages. */
+        .pvwrap {
+            position: relative; display: block; height: 96px; flex: 0 0 auto;
+            border-radius: 12px;
+            overflow: hidden; background: #050914;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.07);
         }
-        .game h2 { font-family: 'Orbitron', sans-serif; font-size: 17px; letter-spacing: 1.5px; margin: 4px 0 0; }
+        .pvwrap::after {
+            content: ''; position: absolute; inset: auto 0 0 0; height: 46%;
+            background: linear-gradient(180deg, rgba(4, 6, 15, 0), rgba(4, 6, 15, 0.78));
+            pointer-events: none;
+        }
+        .pv { display: block; width: 100%; height: 100%; }
+        .icon {
+            position: absolute; left: 10px; bottom: 7px; z-index: 2;
+            font-size: 16px; line-height: 1;
+            filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.85));
+        }
+        /* Category label. The rim is drawn with an inset shadow rather than a
+           border, so it sits inside the radius the same way every other glass
+           edge on the site does. Sits over the top-right of the art now — the
+           badge-on-artwork position every card grid uses. */
+        .tag {
+            position: absolute; top: 30px; right: 30px; z-index: 2;
+            font-size: 11px; letter-spacing: 0.06em;
+            text-transform: uppercase; color: var(--c, var(--accent));
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c, var(--accent)) 42%, transparent);
+            background: color-mix(in srgb, var(--c, var(--accent)) 16%, rgba(4, 6, 15, 0.62));
+            backdrop-filter: blur(6px);
+            border-radius: 999px; padding: 4px 11px; opacity: 0.95;
+        }
+        .game h2 {
+            font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+            font-weight: 600; font-size: 18px; letter-spacing: -0.015em; margin: 4px 0 0;
+        }
         .game p { color: var(--muted); font-size: 13.5px; line-height: 1.55; margin: 0; flex: 1; }
         .foot { display: flex; align-items: center; justify-content: space-between; margin-top: 8px; font-size: 12.5px; }
         .play { color: var(--c, var(--accent)); font-weight: 600; letter-spacing: 0.5px; }
         .best { color: var(--muted); font-variant-numeric: tabular-nums; }
         .best b { color: var(--text); }
+        /* An empty slot on a first visit left eleven lopsided footers and no
+           information. An unplayed game is a fact worth stating. */
+        .best.never {
+            display: inline-flex; align-items: center; gap: 6px;
+            font-size: 11px; letter-spacing: 0.08em;
+        }
+        .best.never::before {
+            content: ''; width: 5px; height: 5px; border-radius: 50%;
+            background: var(--c, var(--accent));
+            box-shadow: 0 0 8px var(--c, var(--accent));
+        }
+
+        /* ── Featured pick ──────────────────────────────────────────────── */
+        .game.featured { grid-column: span 2; }
+        .game.featured .pvwrap { height: 176px; }
+        .game.featured h2 { font-size: 22px; }
+        .game.featured p { font-size: 14px; max-width: 62ch; }
+        .feat {
+            position: absolute; top: 30px; left: 30px; z-index: 2;
+            font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
+            text-transform: uppercase; color: var(--c, var(--accent));
+            background: color-mix(in srgb, var(--c, var(--accent)) 16%, rgba(4, 6, 15, 0.62));
+            box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--c, var(--accent)) 46%, transparent);
+            backdrop-filter: blur(6px);
+            border-radius: 999px; padding: 4px 11px;
+        }
+        /* Below ~600px the grid is a single column and a two-column span would
+           conjure an implicit second track and blow the page out sideways. */
+        @media (max-width: 600px) {
+            .game.featured { grid-column: auto; }
+            .game.featured .pvwrap { height: 120px; }
+        }
+
+        /* Filter transitions: opacity first, then the card leaves layout. */
+        .game.f-out { opacity: 0; pointer-events: none; }
+        .game.f-gone { display: none; }
+
+        /* Medal pip. Sits on the art beside the game's own mark, so an unplayed
+           game reads as a gap in a row of earned marks rather than as missing
+           furniture. */
+        .medal {
+            position: absolute; right: 10px; bottom: 6px; z-index: 2;
+            font-size: 17px; line-height: 1;
+            opacity: 0.95; filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.75));
+        }
+        .medal[data-tier="none"] { opacity: 0.24; filter: grayscale(1); }
+
+        /* Arcade rank strip: one line of standing above the grid. */
+        .rank {
+            display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+            padding: 14px 18px; margin: 0 0 22px; border-radius: 16px;
+            background: var(--panel); backdrop-filter: blur(10px);
+            box-shadow: inset 0 0 0 1px var(--line);
+            font-size: 13px; color: var(--muted);
+        }
+        .rank b { color: var(--text); font-variant-numeric: tabular-nums; }
+        .rank .rank-title {
+            font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+            font-weight: 600; font-size: 15px; letter-spacing: -0.01em;
+            color: var(--accent);
+        }
+        .rank .bar {
+            flex: 1; min-width: 130px; height: 6px; border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08); overflow: hidden;
+        }
+        .rank .bar i {
+            display: block; height: 100%; border-radius: 999px;
+            background: linear-gradient(90deg, #22d3ee, #a78bfa);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .game, .game:hover { transition: none; transform: none; }
+        }
     </style>
+    <!-- Last in <head> on purpose: the bridge re-points this page's tokens and
+         re-materials its cards and controls as glass, and it wins on source
+         order, not on specificity. -->
+    <link rel="stylesheet" href="/public/css/liquid-glass-theme.css">
+    <script src="/public/js/liquid-glass.js" defer></script>
 </head>
 <body>
     <canvas id="stars"></canvas>
@@ -84,125 +277,1176 @@
         <header>
             <a href="/app" class="chip">← Deck</a>
         </header>
-        <h1>THE ARCADE</h1>
-        <p class="sub">Ten quick games set in the SpaceVerse. No briefings, no simulations — pick one,
-            play in five seconds, chase your best score.</p>
+
+        <div class="hero">
+            <div class="hero-copy">
+                <h1>THE ARCADE</h1>
+                <p class="sub">Eleven quick games set in the SpaceVerse. No briefings, no simulations — pick one,
+                    play in five seconds, chase your best score.</p>
+            </div>
+            <div class="stats" id="stats"></div>
+        </div>
+
+        <div class="filters" id="filters" role="group" aria-label="Filter games by category"></div>
+
+        <div class="rank" id="rank"></div>
 
         <div class="grid" id="grid">
             <a class="game" href="/games/gravity-runner" style="--c:#64ffda" data-slug="gravity-runner">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">☄️</span></span>
                 <span class="tag">Reflex</span>
-                <span class="icon">☄️</span>
                 <h2>GRAVITY RUNNER</h2>
                 <p>One button. Thrust or drift while planets drag you in. Skim close for speed — clip the surface and you're dust.</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/kessler-reversed" style="--c:#fbbf24" data-slug="kessler-reversed">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">💥</span></span>
                 <span class="tag">Chaos</span>
-                <span class="icon">💥</span>
                 <h2>KESSLER REVERSED</h2>
-                <p>You get ONE shot into a field of 200 satellites. Aim it, fire it, watch the chain reaction ripple. Score = destruction.</p>
+                <p>Three shots into a field of 200 satellites. Aim each one, fire, watch the chain reactions ripple. Score = destruction.</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/last-station" style="--c:#ff8ba7" data-slug="last-station">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🛡️</span></span>
                 <span class="tag">Defense</span>
-                <span class="icon">🛡️</span>
                 <h2>LAST STATION</h2>
                 <p>Debris spirals in from every side. Aim your laser and vaporize it — but big rocks split when shot. Protect the station.</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/junk-katamari" style="--c:#b48bff" data-slug="junk-katamari">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🧲</span></span>
                 <span class="tag">Chaos</span>
-                <span class="icon">🧲</span>
                 <h2>SPACE JUNK KATAMARI</h2>
                 <p>You're a runaway bolt. Eat smaller junk to grow — a screw, a wrench, a satellite, a station. Anything ringed red shears pieces back off you.</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/re-entry" style="--c:#ff8b5a" data-slug="re-entry">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🔥</span></span>
                 <span class="tag">Reflex</span>
-                <span class="icon">🔥</span>
                 <h2>RE-ENTRY</h2>
                 <p>Mach 25, falling. Too steep and you burn, too shallow and you skip off into space. Sixty seconds of pure tension.</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/asteroid-miner" style="--c:#7aa2ff" data-slug="asteroid-miner">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">⛏️</span></span>
                 <span class="tag">Risk</span>
-                <span class="icon">⛏️</span>
                 <h2>ASTEROID MINER</h2>
                 <p>Tractor ore out of a tumbling field and haul it home before your oxygen runs out. One more chunk... or enough air to get back?</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/slingshot-golf" style="--c:#8dffa0" data-slug="slingshot-golf">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">⛳</span></span>
                 <span class="tag">Puzzle</span>
-                <span class="icon">⛳</span>
                 <h2>SLINGSHOT GOLF</h2>
-                <p>Planet-to-planet golf. One flick sets the launch — gravity does the rest. Par 3. Hole 9 needs a double gravity assist.</p>
+                <p>Planet-to-planet golf. One flick sets the launch — gravity does the rest. Nine holes, and the late ones want a gravity assist.</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/solar-sailor" style="--c:#ffd35a" data-slug="solar-sailor">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">⛵</span></span>
                 <span class="tag">Race</span>
-                <span class="icon">⛵</span>
                 <h2>SOLAR SAILOR</h2>
                 <p>No engine. Tilt your light-sail and let the Sun push you through the gates. Momentum is the enemy and the ride.</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/planet-defense" style="--c:#5ad7ff" data-slug="planet-defense">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🗼</span></span>
                 <span class="tag">Defense</span>
-                <span class="icon">🗼</span>
                 <h2>PLANET DEFENSE</h2>
-                <p>Asteroid waves stream down the orbit lanes. Place lasers and gravity wells on the rings, upgrade between waves, hold Earth.</p>
+                <p>Asteroid waves stream down the orbit lanes. Place lasers and gravity wells on the rings, spend salvage wisely, hold Earth.</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/orbit-weaver" style="--c:#c9a0ff" data-slug="orbit-weaver">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🕸️</span></span>
                 <span class="tag">Puzzle</span>
-                <span class="icon">🕸️</span>
                 <h2>ORBIT WEAVER</h2>
                 <p>Cover every signal zone with the satellites you're given. Low orbits are narrow and strong, high orbits wide and weak, and two on one ring collide.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/eclipse" style="--c:#a78bfa" data-slug="eclipse">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🌑</span></span>
+                <span class="tag">Stealth</span>
+                <h2>ECLIPSE</h2>
+                <p>The Sun burns everything it can see. Hide in the moving shadows of orbiting planets, dash into the light for crystals, and watch for flares.</p>
                 <span class="foot"><span class="play">PLAY →</span><span class="best"></span></span>
             </a>
         </div>
     </div>
 
     <script>
-        // Best scores live in localStorage under one key per game.
-        document.querySelectorAll('.game').forEach((card) => {
-            const best = localStorage.getItem('spaceverse.arcade.' + card.dataset.slug + '.best');
-            if (best) card.querySelector('.best').innerHTML = 'BEST <b>' + Number(best).toLocaleString() + '</b>';
+    (function () {
+        'use strict';
+
+        var TAU = 6.2832;
+        var STILL = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+
+        function rnd(a, b) { return a + Math.random() * (b - a); }
+        function fract(v) { return v - Math.floor(v); }
+        function ease(k) { return k * k * (3 - 2 * k); }
+
+        function hexRGB(hex) {
+            var m = /#?([0-9a-f]{6})/i.exec(String(hex || '').trim());
+            if (!m) return [34, 211, 238];
+            var n = parseInt(m[1], 16);
+            return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+        }
+        function rgba(c, a) { return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')'; }
+
+        /* ═════════════════════════════════════════════════════════════════
+           1 · Best scores, medals, and the "never played" flag
+           ═════════════════════════════════════════════════════════════════
+           Best scores live in localStorage under one key per game. The medal
+           thresholds below are the arcade's only progression: a reason to
+           return to a game you have already "finished" once.
+
+           They are per-game because the scoring scales are not comparable —
+           Kessler pays in the tens of thousands, Re-entry in the hundreds — so
+           one shared number would make half the set unearnable and the other
+           half free. Each triple is roughly [a competent run, a good run, a run
+           you had to work for]. */
+        var TIERS = {
+            'gravity-runner': [1500, 5000, 12000],
+            'kessler-reversed': [6000, 18000, 40000],
+            'last-station': [2500, 8000, 18000],
+            'junk-katamari': [1200, 3500, 8000],
+            're-entry': [800, 2200, 4500],
+            'asteroid-miner': [900, 2600, 6000],
+            'slingshot-golf': [1500, 4000, 9000],
+            'solar-sailor': [3000, 9000, 20000],
+            'planet-defense': [2000, 6500, 15000],
+            'orbit-weaver': [2500, 7000, 15000],
+            'eclipse': [1200, 4000, 9000]
+        };
+        var MEDALS = ['none', '🥉', '🥈', '🥇'];
+
+        var grid = document.getElementById('grid');
+        var cards = Array.prototype.slice.call(document.querySelectorAll('.game'));
+        var total = cards.length;
+
+        var earned = 0, played = 0, scoreSum = 0;
+        var topCard = null, topRatio = -1;
+
+        cards.forEach(function (card) {
+            var slug = card.dataset.slug;
+            var best = Number(localStorage.getItem('spaceverse.arcade.' + slug + '.best') || 0);
+            if (!isFinite(best) || best < 0) best = 0;
+            var t = TIERS[slug] || [0, 0, 0];
+            var slot = card.querySelector('.best');
+
+            if (best) {
+                slot.className = 'best';
+                slot.innerHTML = 'BEST <b>' + best.toLocaleString() + '</b>';
+                played++;
+                scoreSum += best;
+                // Standing, not raw points: the scales are not comparable, so
+                // "your strongest game" is how far into its own medal ladder
+                // the run sits, never which game happens to pay the most.
+                var ratio = t[2] ? best / t[2] : 0;
+                if (ratio > topRatio) { topRatio = ratio; topCard = card; }
+            } else {
+                slot.className = 'best never';
+                slot.textContent = 'NEVER PLAYED';
+                slot.title = 'Score ' + t[0].toLocaleString() + ' for bronze';
+            }
+
+            var tier = best >= t[2] ? 3 : best >= t[1] ? 2 : best >= t[0] ? 1 : 0;
+            earned += tier;
+
+            var pip = document.createElement('span');
+            pip.className = 'medal';
+            if (tier === 0) {
+                pip.dataset.tier = 'none';
+                pip.textContent = '🥉';
+                pip.title = 'Score ' + t[0].toLocaleString() + ' for bronze';
+            } else {
+                pip.textContent = MEDALS[tier];
+                pip.title = tier < 3
+                    ? 'Next: ' + t[tier].toLocaleString()
+                    : 'Gold — the top tier';
+            }
+            (card.querySelector('.pvwrap') || card).appendChild(pip);
+
+            // Cached so the filter row does not re-read the DOM per keystroke.
+            var tagEl = card.querySelector('.tag');
+            card.dataset.tag = tagEl ? tagEl.textContent.trim().toLowerCase() : 'other';
         });
 
-        // Drifting starfield background.
-        const cv = document.getElementById('stars');
-        const cx = cv.getContext('2d');
-        let W, H, stars;
-        function reset() {
-            W = cv.width = innerWidth; H = cv.height = innerHeight;
-            stars = Array.from({ length: 160 }, () => ({
-                x: Math.random() * W, y: Math.random() * H,
-                r: Math.random() * 1.4 + 0.3, s: Math.random() * 8 + 2
-            }));
+        /* ═════════════════════════════════════════════════════════════════
+           2 · Rank strip
+           ═════════════════════════════════════════════════════════════════
+           Titles are spaced so the first is quick to reach and the last
+           genuinely is not. */
+        var max = total * 3;
+        var pct = max ? earned / max : 0;
+        var TITLES = [
+            [0, 'Groundcrew'], [0.1, 'Cadet'], [0.25, 'Pilot'],
+            [0.45, 'Flight Officer'], [0.65, 'Commander'], [0.85, 'Fleet Admiral']
+        ];
+        var title = TITLES[0][1];
+        TITLES.forEach(function (row) { if (pct >= row[0]) title = row[1]; });
+
+        document.getElementById('rank').innerHTML =
+            '<span class="rank-title">' + title + '</span>' +
+            '<span><b>' + earned + '</b> / ' + max + ' medals</span>' +
+            '<span class="bar"><i style="width:' + Math.round(pct * 100) + '%"></i></span>' +
+            '<span><b>' + played + '</b> / ' + total + ' games played</span>';
+
+        /* ═════════════════════════════════════════════════════════════════
+           3 · Aggregate stat strip
+           ═════════════════════════════════════════════════════════════════
+           Only `.best` is ever written to storage — shell.js keeps no run
+           counter — so the aggregate here is the sum of every personal best
+           rather than a count of sessions. That is the honest figure these
+           keys can produce, and it is the one that moves every time you beat
+           yourself at anything. */
+        function tile(value, label, tone) {
+            var v = tone ? '<i>' + value + '</i>' : value;
+            return '<div class="chip stat"><b>' + v + '</b><span>' + label + '</span></div>';
         }
-        reset();
-        addEventListener('resize', reset);
-        (function tick() {
+        var unplayed = total - played;
+        var topName = topCard ? topCard.querySelector('h2').textContent.trim() : '—';
+        if (topName.length > 17) topName = topName.replace(/^SPACE /, '');
+
+        document.getElementById('stats').innerHTML =
+            tile(scoreSum.toLocaleString(), 'total score') +
+            tile(topName, 'top game') +
+            tile(String(unplayed), 'never played', unplayed > 0);
+
+        /* ═════════════════════════════════════════════════════════════════
+           4 · Featured pick
+           ═════════════════════════════════════════════════════════════════
+           `minmax(272px, 1fr)` gives four columns at the 1140px content width,
+           and four into eleven left one dead cell at the end of the last row.
+           One card spanning two tracks makes twelve cells — the hole closes,
+           and the page gains the focal point it never had. Which card is
+           seeded by day-of-year, so the shop window changes daily without any
+           state to store. It is moved to the front because a two-track item
+           cannot start in the final column: left in place it would wrap and
+           re-open the very hole it exists to fill. */
+        var now = new Date();
+        var doy = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 86400000);
+        var feat = cards[((doy % total) + total) % total];
+        feat.classList.add('featured');
+        var badge = document.createElement('span');
+        badge.className = 'feat';
+        badge.textContent = 'Featured today';
+        feat.insertBefore(badge, feat.firstChild);
+        grid.insertBefore(feat, grid.firstChild);
+
+        /* ═════════════════════════════════════════════════════════════════
+           5 · Card previews
+           ═════════════════════════════════════════════════════════════════
+           One loop per game, showing that game's core verb and nothing else.
+           They are deliberately cheap — a handful of paths on a ~230x96 canvas
+           — and only one ever runs at a time: a preview animates when the card
+           is pointed at or keyboard-focused AND an IntersectionObserver says it
+           is on screen. Everything else sits on frame 0, which is composed to
+           be a readable still in its own right. Under reduced motion nothing
+           animates at all. */
+        function halo(c, x, y, r, col) {
+            if (!(r > 0)) return;
+            var g = c.createRadialGradient(x, y, 0, x, y, r);
+            g.addColorStop(0, col);
+            g.addColorStop(1, 'rgba(0,0,0,0)');
+            var prev = c.globalCompositeOperation;
+            c.globalCompositeOperation = 'lighter';
+            c.fillStyle = g;
+            c.beginPath(); c.arc(x, y, r, 0, TAU); c.fill();
+            c.globalCompositeOperation = prev;
+        }
+
+        function rock(c, x, y, r, seed) {
+            c.save();
+            c.translate(x, y);
+            c.beginPath();
+            for (var i = 0; i < 8; i++) {
+                var a = (i / 8) * TAU;
+                var rr = r * (0.72 + 0.4 * fract(Math.sin(seed * 127.1 + i * 311.7) * 43758.5453));
+                var px = Math.cos(a) * rr, py = Math.sin(a) * rr;
+                if (i) c.lineTo(px, py); else c.moveTo(px, py);
+            }
+            c.closePath();
+            c.fillStyle = '#39456a'; c.fill();
+            c.strokeStyle = 'rgba(190,206,244,0.5)'; c.lineWidth = 1; c.stroke();
+            c.restore();
+        }
+
+        var PV = {
+            /* Thrust past a gravity well: the whole game is the choice to hug
+               the limb for speed instead of flying wide and safe. */
+            'gravity-runner': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96;
+                var px = w * 0.5, py = h * 1.3, pr = h * 0.8, R = pr + 12 * u;
+                halo(c, px, py, pr * 1.5, 'rgba(90,140,255,0.16)');
+                var g = c.createRadialGradient(px - pr * 0.3, py - pr * 0.55, pr * 0.08, px, py, pr);
+                g.addColorStop(0, '#2c4080'); g.addColorStop(1, '#080e2a');
+                c.fillStyle = g; c.beginPath(); c.arc(px, py, pr, 0, TAU); c.fill();
+                c.strokeStyle = rgba(A, 0.45); c.lineWidth = 1.2 * u;
+                c.beginPath(); c.arc(px, py, pr, 0, TAU); c.stroke();
+
+                var q = (t / 3.4) % 1;
+                function at(k) {
+                    var x = px - R * 0.94 + k * R * 1.88;
+                    var cs = Math.max(-1, Math.min(1, (x - px) / R));
+                    return [x, py - Math.sin(Math.acos(cs)) * R];
+                }
+                c.globalAlpha = 0.4; c.strokeStyle = rgba(A, 1);
+                c.lineWidth = 2.2 * u; c.lineCap = 'round';
+                c.beginPath();
+                var open = false;
+                for (var i = 10; i >= 0; i--) {
+                    var k = q - i * 0.02;
+                    if (k < 0) continue;
+                    var b = at(k);
+                    if (open) c.lineTo(b[0], b[1]); else { c.moveTo(b[0], b[1]); open = true; }
+                }
+                if (open) c.stroke();
+                c.globalAlpha = 1;
+                var s = at(q);
+                halo(c, s[0], s[1], 14 * u, rgba(A, 0.5));
+                c.fillStyle = '#eaf3ff';
+                c.beginPath(); c.arc(s[0], s[1], 2.7 * u, 0, TAU); c.fill();
+            },
+
+            /* One shot, then the cascade does the scoring for you. */
+            'kessler-reversed': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96;
+                if (!p.pts) {
+                    p.pts = [];
+                    for (var n = 0; n < 30; n++) p.pts.push({ x: Math.random(), y: Math.random(), r: rnd(1, 2.2) });
+                }
+                var q = (t / 3) % 1, tx = w * 0.56, ty = h * 0.46;
+                var out = q < 0.34 ? 0 : ((q - 0.34) / 0.66);
+                var R = out * Math.hypot(w, h) * 0.62, fade = 1 - out;
+                for (var i = 0; i < p.pts.length; i++) {
+                    var s = p.pts[i], x = s.x * w, y = s.y * h;
+                    var d = Math.hypot(x - tx, y - ty);
+                    if (R > d) {
+                        var k = Math.min(1, (R - d) / (30 * u));
+                        c.globalAlpha = (1 - k) * 0.9 * fade + 0.06;
+                        c.strokeStyle = 'rgba(251,191,36,1)'; c.lineWidth = 1.2 * u;
+                        c.beginPath(); c.arc(x, y, s.r * u + k * 9 * u, 0, TAU); c.stroke();
+                    } else {
+                        c.globalAlpha = 0.72; c.fillStyle = '#9fb7ff';
+                        c.beginPath(); c.arc(x, y, s.r * u * 0.8, 0, TAU); c.fill();
+                    }
+                }
+                c.globalAlpha = 1;
+                if (q < 0.34) {
+                    var kk = q / 0.34;
+                    var sx = -8 + kk * (tx + 8), sy = h * 0.96 + kk * (ty - h * 0.96);
+                    c.strokeStyle = rgba(A, 0.5); c.lineWidth = 1.6 * u;
+                    c.beginPath(); c.moveTo(-8, h * 0.96); c.lineTo(sx, sy); c.stroke();
+                    halo(c, sx, sy, 12 * u, rgba(A, 0.6));
+                    c.fillStyle = '#fff';
+                    c.beginPath(); c.arc(sx, sy, 2.2 * u, 0, TAU); c.fill();
+                } else {
+                    c.globalAlpha = fade * 0.45;
+                    c.strokeStyle = 'rgba(251,191,36,1)'; c.lineWidth = 1.6 * u;
+                    c.beginPath(); c.arc(tx, ty, R, 0, TAU); c.stroke();
+                    c.globalAlpha = 1;
+                    halo(c, tx, ty, 26 * u * fade, 'rgba(251,191,36,' + (0.5 * fade) + ')');
+                }
+            },
+
+            /* Beam out, rock splits, two smaller problems come back — with the
+               rest of the field still closing in behind it, because "debris
+               from every side" is the pressure the game is actually about. */
+            'last-station': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 2.8) % 1;
+                var sx = w * 0.5, sy = h * 0.8, hit = 0.5;
+                var rx = w * 0.72, ry = h * 0.28;
+
+                // Background field, spiralling slowly inward on its own clock.
+                for (var d = 0; d < 6; d++) {
+                    var da = d * 1.05 + t * 0.16;
+                    var dr = (h * 1.15) - ((t * 5 + d * 26) % (h * 0.95));
+                    c.globalAlpha = 0.42;
+                    rock(c, sx + Math.cos(da) * dr * 1.55, sy + Math.sin(da) * dr, 3.4 * u, 11 + d);
+                }
+                c.globalAlpha = 1;
+                c.strokeStyle = rgba(A, 0.13);
+                c.lineWidth = 1 * u;
+                c.beginPath(); c.arc(sx, sy, h * 0.5, 0, TAU); c.stroke();
+                c.beginPath(); c.arc(sx, sy, h * 0.78, 0, TAU); c.stroke();
+                if (q < hit) {
+                    var k = q / hit;
+                    var ax = w * 1.05 + (rx - w * 1.05) * k, ay = -h * 0.2 + (ry + h * 0.2) * k;
+                    rock(c, ax, ay, 7.5 * u, 3.1);
+                    if (q > hit - 0.13) {
+                        c.globalAlpha = (q - (hit - 0.13)) / 0.13;
+                        c.strokeStyle = rgba(A, 0.95); c.lineWidth = 2.2 * u; c.lineCap = 'round';
+                        c.beginPath(); c.moveTo(sx, sy); c.lineTo(ax, ay); c.stroke();
+                        c.globalAlpha = 1;
+                        halo(c, ax, ay, 12 * u, rgba(A, 0.5));
+                    }
+                } else {
+                    var f = (q - hit) / (1 - hit);
+                    c.globalAlpha = 1 - f;
+                    for (var i = 0; i < 2; i++) {
+                        var a = -0.45 + i * 1.6;
+                        rock(c, rx + Math.cos(a) * f * w * 0.4, ry + Math.sin(a) * f * h * 0.5, 4.2 * u, 2 + i);
+                    }
+                    c.globalAlpha = 1;
+                    halo(c, rx, ry, 26 * u * (1 - f), 'rgba(255,180,120,' + (0.55 * (1 - f)) + ')');
+                }
+                halo(c, sx, sy, 22 * u, rgba(A, 0.4));
+                c.strokeStyle = rgba(A, 0.45); c.lineWidth = 1 * u;
+                c.beginPath(); c.arc(sx, sy, 10.5 * u, 0, TAU); c.stroke();
+                c.fillStyle = '#dfe8ff';
+                c.beginPath(); c.arc(sx, sy, 5 * u, 0, TAU); c.fill();
+            },
+
+            /* Eat something smaller, get bigger, repeat until you are a station. */
+            'junk-katamari': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 2.6) % 1;
+                var bx = w * 0.46, by = h * 0.56;
+                var grow = q < 0.6 ? 0 : Math.min(1, (q - 0.6) / 0.2);
+                var R = (15 + 4.5 * grow) * u;
+
+                // Ambient junk, so the field always reads as a field.
+                c.globalAlpha = 0.45; c.fillStyle = '#8ea4d8';
+                for (var d = 0; d < 4; d++) {
+                    var dx = ((d * 61 + t * 7) % (w + 30)) - 15;
+                    var dy = h * (0.18 + 0.21 * d) + Math.sin(t * 0.7 + d) * 3 * u;
+                    c.save(); c.translate(dx, dy); c.rotate(t * (0.6 + d * 0.2));
+                    c.fillRect(-2.6 * u, -0.9 * u, 5.2 * u, 1.8 * u);
+                    c.restore();
+                }
+                c.globalAlpha = 1;
+                if (q < 0.63) {
+                    var k = ease(Math.min(1, q / 0.6));
+                    var ex = w * 1.02 + (bx - w * 1.02) * k, ey = h * 0.14 + (by - h * 0.14) * k;
+                    c.save(); c.translate(ex, ey); c.rotate(t * 3);
+                    c.fillStyle = '#a8bcf0';
+                    c.fillRect(-3.6 * u, -1.2 * u, 7.2 * u, 2.4 * u);
+                    c.fillRect(-1.2 * u, -3.6 * u, 2.4 * u, 7.2 * u);
+                    c.restore();
+                }
+                halo(c, bx, by, R * 2.2, rgba(A, 0.3));
+                c.beginPath();
+                for (var i = 0; i < 18; i++) {
+                    var a = (i / 18) * TAU;
+                    var rr = R * (0.86 + 0.15 * Math.sin(a * 3 + t * 1.6));
+                    var x = bx + Math.cos(a) * rr, y = by + Math.sin(a) * rr;
+                    if (i) c.lineTo(x, y); else c.moveTo(x, y);
+                }
+                c.closePath();
+                c.fillStyle = rgba(A, 0.2); c.fill();
+                c.strokeStyle = rgba(A, 0.85); c.lineWidth = 1.6 * u; c.stroke();
+                c.globalAlpha = 0.75; c.fillStyle = '#cfe1ff';
+                for (var j = 0; j < 7; j++) {
+                    var b = j * 1.9 + t * 0.5, rj = R * 0.52;
+                    c.fillRect(bx + Math.cos(b) * rj - 1.3 * u, by + Math.sin(b) * rj - 1.3 * u, 2.6 * u, 2.6 * u);
+                }
+                c.globalAlpha = 1;
+            },
+
+            /* Hold the corridor: too steep burns, too shallow skips off. */
+            're-entry': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 3.2) % 1;
+                var g = c.createLinearGradient(0, h * 0.4, 0, h);
+                g.addColorStop(0, 'rgba(90,150,255,0)');
+                g.addColorStop(1, 'rgba(90,150,255,0.3)');
+                c.fillStyle = g;
+                c.beginPath(); c.arc(w * 0.5, h * 2.4, h * 2.05, 0, TAU); c.fill();
+                c.strokeStyle = 'rgba(150,200,255,0.5)'; c.lineWidth = 1.2 * u;
+                c.beginPath(); c.arc(w * 0.5, h * 2.4, h * 2.05, 0, TAU); c.stroke();
+
+                c.strokeStyle = rgba(A, 0.3); c.lineWidth = 1 * u;
+                c.setLineDash([4 * u, 4 * u]);
+                c.beginPath(); c.moveTo(w * 0.04, h * 0.14); c.lineTo(w * 0.94, h * 0.66); c.stroke();
+                c.beginPath(); c.moveTo(w * 0.04, h * 0.40); c.lineTo(w * 0.94, h * 0.92); c.stroke();
+                c.setLineDash([]);
+
+                var cxp = w * 0.04 + q * w * 0.9;
+                var cyp = h * 0.27 + q * h * 0.52 + Math.sin(t * 2.4) * 3 * u;
+                var ang = Math.atan2(h * 0.52, w * 0.9);
+                c.save(); c.translate(cxp, cyp); c.rotate(ang);
+                var pl = c.createLinearGradient(0, 0, -32 * u, 0);
+                pl.addColorStop(0, 'rgba(255,196,96,0.9)');
+                pl.addColorStop(1, 'rgba(255,80,40,0)');
+                c.fillStyle = pl;
+                c.beginPath(); c.moveTo(0, -4.6 * u); c.lineTo(-32 * u, 0); c.lineTo(0, 4.6 * u); c.closePath(); c.fill();
+                c.fillStyle = '#e8eeff';
+                c.beginPath(); c.moveTo(5.2 * u, 0); c.lineTo(-3 * u, -3.4 * u); c.lineTo(-3 * u, 3.4 * u); c.closePath(); c.fill();
+                c.restore();
+                halo(c, cxp, cyp, 16 * u, 'rgba(255,150,60,0.5)');
+            },
+
+            /* Tractor the ore home. Every chunk is oxygen you are not keeping. */
+            'asteroid-miner': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 2.4) % 1;
+                var shx = w * 0.76, shy = h * 0.28;
+                var rx = w * 0.26, ry = h * 0.68 + Math.sin(t * 0.9) * 2 * u;
+                rock(c, rx, ry, 13 * u, 7);
+                c.globalCompositeOperation = 'lighter';
+                var gg = c.createLinearGradient(shx, shy, rx, ry);
+                gg.addColorStop(0, rgba(A, 0.3));
+                gg.addColorStop(1, rgba(A, 0.02));
+                c.fillStyle = gg;
+                c.beginPath();
+                c.moveTo(shx, shy);
+                c.lineTo(rx - 12 * u, ry - 9 * u);
+                c.lineTo(rx + 9 * u, ry + 12 * u);
+                c.closePath(); c.fill();
+                c.globalCompositeOperation = 'source-over';
+                for (var i = 0; i < 3; i++) {
+                    var k = (q + i / 3) % 1;
+                    c.globalAlpha = Math.sin(k * Math.PI);
+                    c.fillStyle = 'rgba(251,191,36,1)';
+                    c.beginPath();
+                    c.arc(rx + (shx - rx) * k, ry + (shy - ry) * k, 2.5 * u, 0, TAU);
+                    c.fill();
+                }
+                c.globalAlpha = 1;
+                halo(c, shx, shy, 17 * u, rgba(A, 0.4));
+                c.save(); c.translate(shx, shy); c.rotate(2.35);
+                c.fillStyle = '#e6eeff';
+                c.beginPath();
+                c.moveTo(7.5 * u, 0); c.lineTo(-5 * u, -4.6 * u);
+                c.lineTo(-2 * u, 0); c.lineTo(-5 * u, 4.6 * u);
+                c.closePath(); c.fill();
+                c.restore();
+            },
+
+            /* One flick, then gravity writes the rest of the shot. */
+            'slingshot-golf': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 3) % 1;
+                var px = w * 0.5, py = h * 0.62, pr = h * 0.23;
+                function at(k) {
+                    return [w * 0.08 + k * w * 0.8,
+                            h * 0.82 - Math.sin(k * Math.PI) * h * 0.64 + k * h * 0.05];
+                }
+                halo(c, px, py, pr * 2.3, 'rgba(130,120,255,0.2)');
+                c.fillStyle = '#1a2450';
+                c.beginPath(); c.arc(px, py, pr, 0, TAU); c.fill();
+                c.strokeStyle = 'rgba(160,190,255,0.4)'; c.lineWidth = 1 * u;
+                c.beginPath(); c.arc(px, py, pr, 0, TAU); c.stroke();
+
+                c.fillStyle = rgba(A, 0.5);
+                for (var i = 0; i <= 26; i++) {
+                    var k = i / 26;
+                    if (k > q) break;
+                    var d = at(k);
+                    c.beginPath(); c.arc(d[0], d[1], 1.5 * u, 0, TAU); c.fill();
+                }
+                var f = at(1);
+                c.strokeStyle = rgba(A, 0.8); c.lineWidth = 1.4 * u;
+                c.beginPath(); c.moveTo(f[0], f[1]); c.lineTo(f[0], f[1] - 14 * u); c.stroke();
+                c.fillStyle = rgba(A, 0.9);
+                c.beginPath();
+                c.moveTo(f[0], f[1] - 14 * u);
+                c.lineTo(f[0] + 9 * u, f[1] - 11 * u);
+                c.lineTo(f[0], f[1] - 8 * u);
+                c.closePath(); c.fill();
+                var b = at(q);
+                halo(c, b[0], b[1], 11 * u, 'rgba(255,255,255,0.45)');
+                c.fillStyle = '#fff';
+                c.beginPath(); c.arc(b[0], b[1], 2.8 * u, 0, TAU); c.fill();
+            },
+
+            /* No engine — just a sail angled into the light and a lot of patience. */
+            'solar-sailor': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 3.6) % 1;
+                var sx = w * 0.08, sy = h * 0.3;
+                halo(c, sx, sy, h * 0.9, 'rgba(255,200,90,0.4)');
+                c.fillStyle = '#ffd98a';
+                c.beginPath(); c.arc(sx, sy, h * 0.15, 0, TAU); c.fill();
+                c.globalCompositeOperation = 'lighter';
+                c.strokeStyle = 'rgba(255,210,120,0.085)'; c.lineWidth = 1 * u;
+                for (var i = 0; i < 5; i++) {
+                    var a = -0.45 + i * 0.3 + Math.sin(t * 0.6 + i) * 0.03;
+                    c.beginPath(); c.moveTo(sx, sy);
+                    c.lineTo(sx + Math.cos(a) * w * 1.4, sy + Math.sin(a) * w * 1.4);
+                    c.stroke();
+                }
+                c.globalCompositeOperation = 'source-over';
+                var bx = w * 0.3 + q * w * 0.62;
+                var by = h * 0.88 - Math.sin(q * 2.3) * h * 0.44;
+                c.save(); c.translate(bx, by); c.rotate(-0.5 + Math.sin(t * 0.9) * 0.42);
+                var sg = c.createLinearGradient(0, -17 * u, 0, 17 * u);
+                sg.addColorStop(0, rgba(A, 0.08));
+                sg.addColorStop(0.5, rgba(A, 0.5));
+                sg.addColorStop(1, rgba(A, 0.08));
+                c.fillStyle = sg;
+                c.beginPath();
+                c.moveTo(0, -17 * u);
+                c.quadraticCurveTo(10 * u, 0, 0, 17 * u);
+                c.quadraticCurveTo(3 * u, 0, 0, -17 * u);
+                c.closePath(); c.fill();
+                c.strokeStyle = rgba(A, 0.9); c.lineWidth = 1.3 * u;
+                c.beginPath(); c.moveTo(0, -17 * u); c.quadraticCurveTo(10 * u, 0, 0, 17 * u); c.stroke();
+                c.strokeStyle = 'rgba(220,232,255,0.55)'; c.lineWidth = 0.9 * u;
+                c.beginPath();
+                c.moveTo(-6 * u, 0); c.lineTo(0, -15 * u);
+                c.moveTo(-6 * u, 0); c.lineTo(0, 15 * u);
+                c.stroke();
+                c.fillStyle = '#e6eeff';
+                c.beginPath(); c.arc(-6 * u, 0, 2.4 * u, 0, TAU); c.fill();
+                c.restore();
+            },
+
+            /* Something is coming down the lane; something you placed shoots it. */
+            'planet-defense': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 2.6) % 1;
+                var px = w * 0.5, py = h * 0.58, pr = h * 0.16;
+                halo(c, px, py, pr * 2.8, 'rgba(80,150,255,0.26)');
+                c.fillStyle = '#1d3a72';
+                c.beginPath(); c.arc(px, py, pr, 0, TAU); c.fill();
+                c.strokeStyle = 'rgba(140,200,255,0.55)'; c.lineWidth = 1 * u;
+                c.beginPath(); c.arc(px, py, pr, 0, TAU); c.stroke();
+                c.strokeStyle = rgba(A, 0.22); c.lineWidth = 1 * u;
+                c.beginPath(); c.arc(px, py, pr * 2.05, 0, TAU); c.stroke();
+                c.beginPath(); c.arc(px, py, pr * 3, 0, TAU); c.stroke();
+
+                // The rest of the wave, still out in the lanes.
+                for (var d = 0; d < 3; d++) {
+                    var la = -2.4 + d * 0.9 + t * 0.25;
+                    var lr = pr * 4.4 - ((t * 9 + d * 22) % (pr * 2.6));
+                    c.globalAlpha = 0.5;
+                    rock(c, px + Math.cos(la) * lr, py + Math.sin(la) * lr, 3.6 * u, 20 + d);
+                }
+                c.globalAlpha = 1;
+
+                var ta = -0.95, tx = px + Math.cos(ta) * pr * 2.05, ty = py + Math.sin(ta) * pr * 2.05;
+                var k = Math.min(1, q / 0.72);
+                var aa = ta - 0.6, ar = pr * 4.8 + (pr * 2.05 - pr * 4.8) * k;
+                var ax = px + Math.cos(aa) * ar, ay = py + Math.sin(aa) * ar;
+                if (q < 0.72) rock(c, ax, ay, 6 * u, 4);
+                else {
+                    var f = 1 - (q - 0.72) / 0.28;
+                    halo(c, ax, ay, 22 * u * f, 'rgba(255,165,120,' + (0.6 * f) + ')');
+                }
+                if (q > 0.55 && q < 0.78) {
+                    c.globalAlpha = Math.max(0, 1 - Math.abs(q - 0.665) / 0.115);
+                    c.strokeStyle = rgba(A, 1); c.lineWidth = 1.8 * u; c.lineCap = 'round';
+                    c.beginPath(); c.moveTo(tx, ty); c.lineTo(ax, ay); c.stroke();
+                    c.globalAlpha = 1;
+                }
+                halo(c, tx, ty, 11 * u, rgba(A, 0.55));
+                c.fillStyle = rgba(A, 1);
+                c.beginPath(); c.arc(tx, ty, 3.2 * u, 0, TAU); c.fill();
+            },
+
+            /* Swing the wedge round until it lands on the zone and the zone lights. */
+            'orbit-weaver': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 3.2) % 1;
+                var px = w * 0.5, py = h * 0.55;
+                var r0 = h * 0.13, r1 = h * 0.3, r2 = h * 0.44;
+                var za = -1.15, sweep = -2.7 + q * 3.2;
+                var cover = Math.abs(sweep - za) < 0.32;
+
+                c.strokeStyle = rgba(A, 0.2); c.lineWidth = 1 * u;
+                c.beginPath(); c.arc(px, py, r1, 0, TAU); c.stroke();
+                c.beginPath(); c.arc(px, py, r2, 0, TAU); c.stroke();
+
+                var sxp = px + Math.cos(sweep) * r2, syp = py + Math.sin(sweep) * r2;
+                var toward = Math.atan2(py - syp, px - sxp);
+                c.globalCompositeOperation = 'lighter';
+                var wg = c.createRadialGradient(sxp, syp, 0, sxp, syp, r2);
+                wg.addColorStop(0, rgba(A, 0.55));
+                wg.addColorStop(0.7, rgba(A, 0.16));
+                wg.addColorStop(1, rgba(A, 0));
+                c.fillStyle = wg;
+                c.beginPath();
+                c.moveTo(sxp, syp);
+                c.arc(sxp, syp, r2 * 0.98, toward - 0.32, toward + 0.32);
+                c.closePath(); c.fill();
+                c.globalCompositeOperation = 'source-over';
+
+                c.fillStyle = '#14204a';
+                c.beginPath(); c.arc(px, py, r0, 0, TAU); c.fill();
+                c.strokeStyle = 'rgba(150,190,255,0.4)'; c.lineWidth = 1 * u;
+                c.beginPath(); c.arc(px, py, r0, 0, TAU); c.stroke();
+
+                // The other signal zones, still uncovered — the puzzle is that
+                // there are always more of them than satellites.
+                c.strokeStyle = 'rgba(200,215,255,0.22)'; c.lineWidth = 2.4 * u;
+                [0.35, 1.6, 2.75].forEach(function (a) {
+                    c.beginPath(); c.arc(px, py, r0 + 2.5 * u, a - 0.26, a + 0.26); c.stroke();
+                });
+
+                c.strokeStyle = cover ? rgba(A, 1) : 'rgba(200,215,255,0.3)';
+                c.lineWidth = (cover ? 3.6 : 2.4) * u;
+                c.beginPath(); c.arc(px, py, r0 + 2.5 * u, za - 0.3, za + 0.3); c.stroke();
+                if (cover) halo(c, px + Math.cos(za) * r0, py + Math.sin(za) * r0, 20 * u, rgba(A, 0.5));
+
+                c.fillStyle = rgba(A, 1);
+                c.fillRect(sxp - 2.7 * u, syp - 2.7 * u, 5.4 * u, 5.4 * u);
+            },
+
+            /* Sit in the moving shadow; the light out there is what kills you. */
+            'eclipse': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 3.4) % 1;
+                var sx = -w * 0.02, sy = h * 0.5;
+                var flare = (q > 0.6 && q < 0.8) ? Math.sin((q - 0.6) * Math.PI / 0.2) : 0;
+
+                c.globalCompositeOperation = 'lighter';
+                var lg = c.createLinearGradient(sx, sy, w, sy);
+                lg.addColorStop(0, 'rgba(255,205,115,' + (0.2 + flare * 0.32) + ')');
+                lg.addColorStop(1, 'rgba(255,170,80,0.02)');
+                c.fillStyle = lg; c.fillRect(0, 0, w, h);
+                c.globalCompositeOperation = 'source-over';
+
+                var oa = -0.6 + q * 2.2;
+                var px = w * 0.4 + Math.cos(oa) * w * 0.05;
+                var py = h * 0.5 + Math.sin(oa) * h * 0.22;
+                var pr = h * 0.16, ang = Math.atan2(py - sy, px - sx);
+                var n1 = ang + 1.5708, n2 = ang - 1.5708, L = w * 1.6;
+                c.fillStyle = '#050914';
+                c.beginPath();
+                c.moveTo(px + Math.cos(n1) * pr, py + Math.sin(n1) * pr);
+                c.lineTo(px + Math.cos(n2) * pr, py + Math.sin(n2) * pr);
+                c.lineTo(px + Math.cos(n2) * pr + Math.cos(ang) * L, py + Math.sin(n2) * pr + Math.sin(ang) * L);
+                c.lineTo(px + Math.cos(n1) * pr + Math.cos(ang) * L, py + Math.sin(n1) * pr + Math.sin(ang) * L);
+                c.closePath(); c.fill();
+
+                halo(c, sx, sy, h * 0.75, 'rgba(255,205,110,' + (0.4 + flare * 0.4) + ')');
+                c.fillStyle = '#ffe6ae';
+                c.beginPath(); c.arc(sx, sy, h * 0.13, 0, TAU); c.fill();
+
+                c.fillStyle = '#0b1230';
+                c.beginPath(); c.arc(px, py, pr, 0, TAU); c.fill();
+                c.strokeStyle = rgba(A, 0.45); c.lineWidth = 1 * u;
+                c.beginPath(); c.arc(px, py, pr, 0, TAU); c.stroke();
+
+                var hx = px + Math.cos(ang) * (pr + 24 * u);
+                var hy = py + Math.sin(ang) * (pr + 24 * u) + Math.sin(t * 2.4) * 2.5 * u;
+                halo(c, hx, hy, 14 * u, rgba(A, 0.75));
+                c.strokeStyle = rgba(A, 0.85); c.lineWidth = 1 * u;
+                c.beginPath(); c.arc(hx, hy, 6 * u, 0, TAU); c.stroke();
+                c.fillStyle = '#eaf1ff';
+                c.beginPath(); c.arc(hx, hy, 3 * u, 0, TAU); c.fill();
+
+                c.save(); c.translate(w * 0.87, h * 0.28); c.rotate(t * 1.2);
+                c.fillStyle = 'rgba(167,139,250,0.95)';
+                c.beginPath();
+                c.moveTo(0, -4.4 * u); c.lineTo(3.2 * u, 0);
+                c.lineTo(0, 4.4 * u); c.lineTo(-3.2 * u, 0);
+                c.closePath(); c.fill();
+                c.restore();
+            }
+        };
+
+        /* Where in its own loop each scene rests. A loop literally parked at
+           zero is a scene that has not started — the golf ball still on the
+           tee, the sail off the left edge — so the eleven stills would have
+           been eleven set-ups and no pay-off. These are the poster frame of
+           each loop: the moment the verb is happening. Nothing animates until
+           the card is pointed at; this only decides what it holds. */
+        var POSTER = {
+            'gravity-runner': 1.7, 'kessler-reversed': 1.5, 'last-station': 1.32,
+            'junk-katamari': 1.3, 're-entry': 1.6, 'asteroid-miner': 0.84,
+            'slingshot-golf': 1.86, 'solar-sailor': 1.8, 'planet-defense': 1.72,
+            'orbit-weaver': 1.55, 'eclipse': 1.53
+        };
+
+        var previews = [];
+        var live = [];
+        var pvRaf = null, pvLast = 0;
+
+        function measure(p) {
+            var r = p.cv.getBoundingClientRect();
+            if (!r.width || !r.height) return false;
+            p.dpr = Math.min(window.devicePixelRatio || 1, 2);
+            var cw = Math.round(r.width * p.dpr), ch = Math.round(r.height * p.dpr);
+            if (p.cv.width !== cw) p.cv.width = cw;
+            if (p.cv.height !== ch) p.cv.height = ch;
+            p.w = r.width; p.h = r.height;
+            return true;
+        }
+
+        /* Every scene is composed once, in a fixed 232x96 design box, and the
+           box is then scaled to cover whatever the card gives it. Without this
+           the same scene has to work at 233x96 and at 547x176: shapes scale
+           with height while positions scale with width, so the featured card
+           got the identical props spread across two and a half times the
+           room and read as an empty rectangle with a dot in it. Cover rather
+           than fit, because letterboxing a hero preview reintroduces exactly
+           the emptiness it is meant to cure; the clamp keeps the vertical crop
+           to roughly a tenth at each edge, which every scene is composed for. */
+        var DW = 232, DH = 96;
+
+        function render(p) {
+            if (!p.w) return;
+            var c = p.ctx, w = p.w, h = p.h;
+            c.setTransform(p.dpr, 0, 0, p.dpr, 0, 0);
+            c.globalCompositeOperation = 'source-over';
+            c.globalAlpha = 1;
+            c.fillStyle = '#050914';
+            c.fillRect(0, 0, w, h);
+            // Stars stay in canvas space so they fill the frame edge to edge
+            // whatever the scene inside is doing.
+            for (var i = 0; i < p.stars.length; i++) {
+                var s = p.stars[i];
+                c.globalAlpha = s.a;
+                c.fillStyle = s.col;
+                c.fillRect(s.x * w, s.y * h, s.r, s.r);
+            }
+            c.globalAlpha = 1;
+            var sc = Math.min(Math.max(w / DW, h / DH), (h / DH) * 1.35);
+            c.save();
+            c.translate(w / 2, h / 2);
+            c.scale(sc, sc);
+            c.translate(-DW / 2, -DH / 2);
+            p.fn(c, DW, DH, p.t, p);
+            c.restore();
+            c.globalAlpha = 1;
+            c.globalCompositeOperation = 'source-over';
+            c.setLineDash([]);
+        }
+
+        function wake(p) {
+            if (STILL || !p.vis || !p.hot) return;
+            if (live.indexOf(p) < 0) live.push(p);
+            if (pvRaf === null) {
+                pvLast = performance.now();
+                pvRaf = requestAnimationFrame(pvTick);
+            }
+        }
+
+        function stop(p, rewind) {
+            var i = live.indexOf(p);
+            if (i >= 0) live.splice(i, 1);
+            if (rewind) { p.t = p.t0; render(p); }
+            if (!live.length && pvRaf !== null) {
+                cancelAnimationFrame(pvRaf);
+                pvRaf = null;
+            }
+        }
+
+        function pvTick(now) {
+            var dt = Math.min(0.034, (now - pvLast) / 1000);
+            pvLast = now;
+            for (var i = 0; i < live.length; i++) {
+                live[i].t += dt;
+                render(live[i]);
+            }
+            pvRaf = live.length ? requestAnimationFrame(pvTick) : null;
+        }
+
+        var TINTS = ['#ffffff', '#ffffff', '#cfe1ff', '#b8ccff', '#ffe9c9', '#9fb7ff'];
+
+        cards.forEach(function (card) {
+            var cv = card.querySelector('.pv');
+            var fn = PV[card.dataset.slug];
+            if (!cv || !fn || !cv.getContext) return;
+            var t0 = POSTER[card.dataset.slug] || 0;
+            var p = {
+                card: card, cv: cv, ctx: cv.getContext('2d'), fn: fn,
+                rgb: hexRGB(getComputedStyle(card).getPropertyValue('--c')),
+                stars: [], t0: t0, t: t0, w: 0, h: 0, dpr: 1, vis: false, hot: false
+            };
+            for (var i = 0; i < 16; i++) {
+                p.stars.push({
+                    x: Math.random(), y: Math.random(),
+                    a: rnd(0.16, 0.5), r: Math.random() < 0.22 ? 1.5 : 1,
+                    col: TINTS[(Math.random() * TINTS.length) | 0]
+                });
+            }
+            previews.push(p);
+            card.__pv = p;
+
+            card.addEventListener('pointerenter', function () { p.hot = true; wake(p); });
+            card.addEventListener('pointerleave', function () { p.hot = false; stop(p, true); });
+            // Pointer hover and keyboard focus are the same intent; :focus-visible
+            // keeps a plain mouse click on the card from also starting the loop
+            // it is about to navigate away from.
+            card.addEventListener('focus', function () {
+                var ok = true;
+                try { ok = card.matches(':focus-visible'); } catch (err) { ok = true; }
+                if (ok) { p.hot = true; wake(p); }
+            });
+            card.addEventListener('blur', function () { p.hot = false; stop(p, true); });
+        });
+
+        // Only paint what is on screen — eleven canvases painting on load for
+        // cards three rows down is work nobody asked for.
+        function syncPreviews() {
+            for (var i = 0; i < previews.length; i++) {
+                var p = previews[i];
+                if (measure(p)) render(p);
+            }
+        }
+
+        if (window.IntersectionObserver) {
+            var io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) {
+                    var p = e.target.__pv;
+                    if (!p) return;
+                    p.vis = e.isIntersecting;
+                    if (p.vis) {
+                        if (measure(p)) render(p);
+                        if (p.hot) wake(p);
+                    } else {
+                        stop(p, false);
+                    }
+                });
+            }, { rootMargin: '140px 0px' });
+            previews.forEach(function (p) { io.observe(p.card); });
+        } else {
+            previews.forEach(function (p) { p.vis = true; });
+            requestAnimationFrame(syncPreviews);
+        }
+
+        var pvResizeT = null;
+        window.addEventListener('resize', function () {
+            clearTimeout(pvResizeT);
+            pvResizeT = setTimeout(syncPreviews, 140);
+        });
+
+        /* ═════════════════════════════════════════════════════════════════
+           6 · Category filter
+           ═════════════════════════════════════════════════════════════════
+           Built from the tags the cards already carry, so the row can never
+           drift out of step with the grid. The choice survives a reload —
+           somebody who only wants the puzzle games should not have to say so
+           twice. */
+        var FILTER_KEY = 'spaceverse.arcade.filter';
+        var filtersEl = document.getElementById('filters');
+        var order = [], counts = {};
+        cards.forEach(function (card) {
+            var tag = card.dataset.tag;
+            if (!counts[tag]) { counts[tag] = 0; order.push(tag); }
+            counts[tag]++;
+        });
+        order.sort();
+
+        var html = '<button type="button" class="filter-btn" data-tag="all">All <i>'
+            + total + '</i></button>';
+        order.forEach(function (tag) {
+            html += '<button type="button" class="filter-btn" data-tag="' + tag + '">'
+                + tag + ' <i>' + counts[tag] + '</i></button>';
+        });
+        filtersEl.innerHTML = html;
+        var buttons = Array.prototype.slice.call(filtersEl.querySelectorAll('.filter-btn'));
+
+        var hideTimers = [];
+        function applyFilter(tag, animate) {
+            hideTimers.forEach(clearTimeout);
+            hideTimers.length = 0;
+
+            cards.forEach(function (card) {
+                var show = tag === 'all' || card.dataset.tag === tag;
+                if (show) {
+                    card.classList.remove('f-gone');
+                    // Two frames: one for the browser to lay the card back out,
+                    // one for the opacity transition to have a start value.
+                    requestAnimationFrame(function () {
+                        requestAnimationFrame(function () { card.classList.remove('f-out'); });
+                    });
+                } else if (animate) {
+                    card.classList.add('f-out');
+                    hideTimers.push(setTimeout(function () {
+                        if (card.classList.contains('f-out')) card.classList.add('f-gone');
+                    }, 130));
+                } else {
+                    card.classList.add('f-out', 'f-gone');
+                }
+            });
+
+            grid.dataset.filter = tag;
+            buttons.forEach(function (b) {
+                var on = b.dataset.tag === tag;
+                b.classList.toggle('active', on);
+                b.setAttribute('aria-pressed', on ? 'true' : 'false');
+            });
+            // Cards that were display:none have no box to measure; give the
+            // grid a beat to reflow, then paint the previews that just arrived.
+            hideTimers.push(setTimeout(syncPreviews, 170));
+        }
+
+        filtersEl.addEventListener('click', function (e) {
+            var btn = e.target.closest ? e.target.closest('.filter-btn') : null;
+            if (!btn) return;
+            var tag = btn.dataset.tag;
+            try { localStorage.setItem(FILTER_KEY, tag); } catch (err) { /* private mode */ }
+            applyFilter(tag, true);
+        });
+
+        var saved = 'all';
+        try { saved = localStorage.getItem(FILTER_KEY) || 'all'; } catch (err) { /* private mode */ }
+        if (saved !== 'all' && !counts[saved]) saved = 'all';
+        applyFilter(saved, false);
+
+        /* ═════════════════════════════════════════════════════════════════
+           7 · The hub's own sky
+           ═════════════════════════════════════════════════════════════════
+           This used to be 160 identical white dots in one flat layer falling
+           straight down — no parallax, no twinkle, no nebula, no meteors — so
+           the storefront was visibly cheaper than the eleven games it sells,
+           every one of which opens on shell.js's three-layer field. Same
+           construction as that field now, tuned to the site palette rather
+           than a per-game accent.
+
+           It also advanced by a hardcoded 0.016 per frame, which is not a
+           sixtieth of a second on a 120Hz panel — it is a thirtieth, and the
+           sky scrolled at double speed. Everything below is driven by a real
+           measured delta. */
+        var STAR_TINTS = ['#ffffff', '#ffffff', '#cfe1ff', '#b8ccff', '#ffe9c9', '#9fb7ff'];
+        var cv = document.getElementById('stars');
+        var cx = cv.getContext('2d');
+        var W = 0, H = 0, DPR = 1, skyT = 0;
+        var layers = [], nebulae = [], meteor = null, nextMeteor = 3.5;
+
+        function buildSky() {
+            DPR = Math.min(window.devicePixelRatio || 1, 2);
+            W = window.innerWidth;
+            H = window.innerHeight;
+            cv.width = Math.round(W * DPR);
+            cv.height = Math.round(H * DPR);
+            cv.style.width = W + 'px';
+            cv.style.height = H + 'px';
+
+            var per = Math.min(230, Math.max(70, Math.round((W * H) / 9000)));
+            var zs = [0.35, 0.6, 1];
+            layers = [];
+            for (var l = 0; l < 3; l++) {
+                var n = Math.round(per * (l === 2 ? 0.55 : 1));
+                var stars = [];
+                for (var i = 0; i < n; i++) {
+                    stars.push({
+                        x: Math.random() * W, y: Math.random() * H,
+                        r: zs[l] < 1 ? rnd(0.5, 1.1) : rnd(0.9, 1.9),
+                        a: rnd(0.25, zs[l] < 1 ? 0.55 : 0.9),
+                        tw: rnd(0.6, 2.4), ph: rnd(0, TAU),
+                        col: STAR_TINTS[(Math.random() * STAR_TINTS.length) | 0]
+                    });
+                }
+                layers.push({ z: zs[l], stars: stars });
+            }
+            // Cyan 187° and violet 258° are the site's two hues; the third is
+            // the teal that sits between them in the heading gradient. Placed
+            // off the aurora orbs behind them on purpose — the bridge screen-
+            // blends this canvas, so a wash sitting on top of an orb of the
+            // same hue just doubles it into a flat colour cast instead of
+            // adding depth.
+            nebulae = [
+                { fx: 0.62, fy: 0.13, fr: 0.50, hue: 187, sp: 0.030, ph: 0.0, a: 0.062 },
+                { fx: 0.22, fy: 0.62, fr: 0.44, hue: 258, sp: 0.023, ph: 2.1, a: 0.058 },
+                { fx: 0.88, fy: 0.86, fr: 0.40, hue: 205, sp: 0.017, ph: 4.3, a: 0.046 }
+            ];
+        }
+
+        function drawSky(dt) {
+            skyT += dt;
+            var t = skyT;
+            cx.setTransform(DPR, 0, 0, DPR, 0, 0);
+            // Cleared, never filled: the bridge screen-blends this canvas over
+            // the aurora field, and an opaque base would erase it.
             cx.clearRect(0, 0, W, H);
-            for (const st of stars) {
-                st.y += st.s * 0.016;
-                if (st.y > H) { st.y = -2; st.x = Math.random() * W; }
-                cx.globalAlpha = 0.25 + st.r * 0.4;
-                cx.fillStyle = '#cfe0ff';
-                cx.fillRect(st.x, st.y, st.r, st.r);
+            cx.save();
+
+            cx.globalCompositeOperation = 'lighter';
+            for (var k = 0; k < nebulae.length; k++) {
+                var nb = nebulae[k];
+                var nx = nb.fx * W + Math.sin(t * nb.sp + nb.ph) * W * 0.06;
+                var ny = nb.fy * H + Math.cos(t * nb.sp * 0.8 + nb.ph) * H * 0.05;
+                var nr = nb.fr * Math.max(W, H);
+                var grd = cx.createRadialGradient(nx, ny, 0, nx, ny, nr);
+                grd.addColorStop(0, 'hsla(' + nb.hue + ',70%,55%,' + nb.a + ')');
+                grd.addColorStop(0.55, 'hsla(' + nb.hue + ',75%,45%,' + (nb.a * 0.4) + ')');
+                grd.addColorStop(1, 'rgba(0,0,0,0)');
+                cx.fillStyle = grd;
+                cx.fillRect(0, 0, W, H);
+            }
+            cx.globalCompositeOperation = 'source-over';
+
+            // Downward drift, as before, but each layer moves at its own rate:
+            // that difference is the whole reason the field reads as depth.
+            var dx = -4, dy = 8;
+            for (var l = 0; l < layers.length; l++) {
+                var layer = layers[l], z = layer.z;
+                var ox = dx * t * z, oy = dy * t * z;
+                for (var i = 0; i < layer.stars.length; i++) {
+                    var s = layer.stars[i];
+                    var x = s.x + ox; x -= Math.floor(x / W) * W;
+                    var y = s.y + oy; y -= Math.floor(y / H) * H;
+                    cx.globalAlpha = s.a * (0.72 + 0.28 * Math.sin(t * s.tw + s.ph));
+                    cx.fillStyle = s.col;
+                    if (s.r < 1.2) cx.fillRect(x, y, s.r + 0.4, s.r + 0.4);
+                    else { cx.beginPath(); cx.arc(x, y, s.r, 0, TAU); cx.fill(); }
+                }
             }
             cx.globalAlpha = 1;
-            requestAnimationFrame(tick);
-        })();
+
+            // Ambient meteor: rare, cheap, and it makes the sky feel live.
+            if (dt > 0) {
+                nextMeteor -= dt;
+                if (!meteor && nextMeteor <= 0) {
+                    var ma = rnd(0.5, 1.1);
+                    meteor = {
+                        x: rnd(W * 0.1, W * 0.9), y: -30,
+                        vx: Math.cos(ma) * rnd(380, 560),
+                        vy: Math.sin(ma) * rnd(380, 560),
+                        life: 0.9, age: 0
+                    };
+                    nextMeteor = rnd(7, 16);
+                }
+                if (meteor) {
+                    meteor.age += dt;
+                    meteor.x += meteor.vx * dt;
+                    meteor.y += meteor.vy * dt;
+                    var fade = Math.max(0, 1 - meteor.age / meteor.life);
+                    if (fade <= 0 || meteor.y > H + 40) meteor = null;
+                    else {
+                        cx.globalCompositeOperation = 'lighter';
+                        var tail = cx.createLinearGradient(
+                            meteor.x, meteor.y,
+                            meteor.x - meteor.vx * 0.13, meteor.y - meteor.vy * 0.13);
+                        tail.addColorStop(0, 'rgba(255,255,255,' + (0.85 * fade) + ')');
+                        tail.addColorStop(1, 'rgba(255,255,255,0)');
+                        cx.strokeStyle = tail;
+                        cx.lineWidth = 1.6;
+                        cx.beginPath();
+                        cx.moveTo(meteor.x, meteor.y);
+                        cx.lineTo(meteor.x - meteor.vx * 0.13, meteor.y - meteor.vy * 0.13);
+                        cx.stroke();
+                        cx.globalCompositeOperation = 'source-over';
+                    }
+                }
+            }
+            cx.restore();
+        }
+
+        var last = 0;
+        function frame(now) {
+            var dt = Math.min(0.034, (now - last) / 1000);
+            last = now;
+            drawSky(dt);
+            requestAnimationFrame(frame);
+        }
+
+        buildSky();
+        if (STILL) {
+            // One static frame. Advance the clock a little first so the still
+            // is a composed sky rather than every star at the same phase.
+            skyT = 6;
+            drawSky(0);
+        } else {
+            last = performance.now();
+            requestAnimationFrame(frame);
+        }
+
+        var skyResizeT = null;
+        window.addEventListener('resize', function () {
+            clearTimeout(skyResizeT);
+            skyResizeT = setTimeout(function () {
+                buildSky();
+                if (STILL) drawSky(0);
+            }, 140);
+        });
+    })();
     </script>
 </body>
 </html>

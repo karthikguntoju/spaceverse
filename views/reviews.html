@@ -6,17 +6,17 @@
     <title>Community Reviews - SpaceVerse</title>
     <style>
         :root {
-            --bg: #0D1117;
-            --text: #E6F1FF;
-            --accent: #64FFDA;
-            --accent2: #9457EB;
-            --panel-bg: rgba(13,17,23,0.6);
+            --bg: #04060f;
+            --text: #f2f6ff;
+            --accent: #22d3ee;
+            --accent2: #a78bfa;
+            --panel-bg: rgba(255,255,255,0.055);
             --muted: rgba(230,241,255,0.06);
-            --muted-strong: rgba(100,255,218,0.12);
-            --danger: #ff4d4d;
-            --warning: #ffcc00;
-            --success: #4caf50;
-            --card-bg: rgba(30, 30, 46, 0.7);
+            --muted-strong: rgba(34,211,238,0.12);
+            --danger: #fb7185;
+            --warning: #fbbf24;
+            --success: #34d399;
+            --card-bg: rgba(255, 255, 255, 0.055);
         }
 
         body { 
@@ -43,7 +43,7 @@
         .logo {
             font-size: 1.8rem;
             font-weight: bold;
-            color: #ffb703;
+            color: #fbbf24;
         }
         
         .nav-links {
@@ -59,16 +59,16 @@
         }
         
         .nav-links a:hover {
-            color: #ffb703;
+            color: #fbbf24;
         }
         
         .back-btn {
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(100, 255, 218, 0.06);
-            border: 2px solid #64FFDA;
-            color: #E6F1FF;
+            background: rgba(34, 211, 238, 0.06);
+            border: 2px solid #22d3ee;
+            color: #f2f6ff;
             padding: 10px 20px;
             border-radius: 25px;
             text-decoration: none;
@@ -77,9 +77,9 @@
         }
         
         .back-btn:hover {
-            background: rgba(100, 255, 218, 0.14);
+            background: rgba(34, 211, 238, 0.14);
             transform: translateY(-2px);
-            color: #0D1117;
+            color: #04060f;
         }
         
         .container {
@@ -93,13 +93,17 @@
             margin-bottom: 40px;
         }
         
+        /* Was an amber/gold gradient — the only page heading on the site still
+           lit that way. Gold now means one of two things here: a rating star or
+           a warning. A page title is neither, so this takes the site's
+           cyan→teal→violet heading gradient, same recipe as the arcade h1. */
         .header h1 {
             font-size: 2.5rem;
             margin-bottom: 10px;
-            background: linear-gradient(45deg, #ffb703, #fb8500);
+            background: linear-gradient(100deg, #22d3ee, #2dd4bf 34%, #a78bfa);
             -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
             background-clip: text;
+            color: transparent;
         }
         
         .header p {
@@ -113,17 +117,17 @@
             background: var(--card-bg);
             border-radius: 15px;
             padding: 25px;
-            box-shadow: 0 8px 32px 0 rgba(100,255,218,0.04);
+            box-shadow: 0 8px 32px 0 rgba(34,211,238,0.04);
             -webkit-backdrop-filter: blur(12px);
             backdrop-filter: blur(12px);
-            border: 1px solid rgba(148,87,235,0.15);
+            border: 1px solid rgba(167,139,250,0.15);
             margin-bottom: 30px;
         }
         
         .panel-title {
             font-size: 1.5rem;
             margin-top: 0;
-            color: #64FFDA;
+            color: #22d3ee;
             margin-bottom: 20px;
             text-align: center;
         }
@@ -135,7 +139,7 @@
         .form-group label {
             display: block;
             margin-bottom: 8px;
-            color: #64FFDA;
+            color: #22d3ee;
             font-weight: 600;
         }
         
@@ -144,7 +148,7 @@
             padding: 12px;
             border-radius: 8px;
             background: rgba(255, 255, 255, 0.08);
-            border: 1px solid rgba(100, 255, 218, 0.3);
+            border: 1px solid rgba(34, 211, 238, 0.3);
             color: white;
             font-size: 1rem;
             transition: all 0.3s ease;
@@ -152,8 +156,8 @@
         
         .form-control:focus {
             outline: none;
-            border-color: #64FFDA;
-            box-shadow: 0 0 0 3px rgba(100, 255, 218, 0.3);
+            border-color: #22d3ee;
+            box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.3);
             background: rgba(255, 255, 255, 0.12);
         }
         
@@ -176,11 +180,11 @@
         }
         
         .star.selected {
-            color: #ffcc00;
+            color: #fbbf24;
         }
         
         .star:hover {
-            color: #ffcc00;
+            color: #fbbf24;
         }
         
         .btn {
@@ -213,18 +217,18 @@
         }
         
         .btn-primary {
-            background: linear-gradient(45deg, #ffb703, #fb8500);
+            background: linear-gradient(45deg, #fbbf24, #f59e0b);
             color: #000;
             width: 100%;
             font-size: 1.1rem;
             padding: 15px;
             border: none;
-            box-shadow: 0 4px 15px rgba(255, 183, 3, 0.3);
+            box-shadow: 0 4px 15px rgba(251, 191, 36, 0.3);
         }
         
         .btn-primary:hover {
             transform: translateY(-3px);
-            box-shadow: 0 7px 20px rgba(255, 183, 3, 0.4);
+            box-shadow: 0 7px 20px rgba(251, 191, 36, 0.4);
         }
         
         .reviews-grid {
@@ -235,16 +239,16 @@
         }
         
         .review-card {
-            background: rgba(148, 87, 235, 0.05);
+            background: rgba(167, 139, 250, 0.05);
             border-radius: 12px;
             padding: 20px;
             transition: transform 0.3s, box-shadow 0.3s;
-            border: 1px solid rgba(100, 255, 218, 0.1);
+            border: 1px solid rgba(34, 211, 238, 0.1);
         }
         
         .review-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 10px 25px rgba(100, 255, 218, 0.1);
+            box-shadow: 0 10px 25px rgba(34, 211, 238, 0.1);
         }
         
         .review-header {
@@ -256,7 +260,7 @@
         
         .review-author {
             font-weight: bold;
-            color: #64FFDA;
+            color: #22d3ee;
         }
         
         .review-date {
@@ -265,7 +269,7 @@
         }
         
         .review-rating {
-            color: #ffcc00;
+            color: #fbbf24;
             font-size: 1.2rem;
             margin: 10px 0;
         }
@@ -284,7 +288,7 @@
         .spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
-            border-top: 4px solid #64FFDA;
+            border-top: 4px solid #22d3ee;
             width: 40px;
             height: 40px;
             animation: spin 1s linear infinite;
@@ -297,7 +301,7 @@
         }
         
         .error-message {
-            background: rgba(255, 77, 77, 0.1);
+            background: rgba(251, 113, 133, 0.1);
             border-left: 4px solid var(--danger);
             padding: 15px;
             border-radius: 0 8px 8px 0;
@@ -306,7 +310,7 @@
         }
         
         .success-message {
-            background: rgba(76, 175, 80, 0.1);
+            background: rgba(52, 211, 153, 0.1);
             border-left: 4px solid var(--success);
             padding: 15px;
             border-radius: 0 8px 8px 0;
@@ -405,7 +409,7 @@
                 const rating = parseInt(star.getAttribute('data-rating'));
                 ratingStars.forEach((s, index) => {
                     if (index < rating) {
-                        s.style.color = '#ffcc00';
+                        s.style.color = '#fbbf24';
                     }
                 });
             });
@@ -413,7 +417,7 @@
             star.addEventListener('mouseout', () => {
                 ratingStars.forEach(s => {
                     if (s.classList.contains('selected')) {
-                        s.style.color = '#ffcc00';
+                        s.style.color = '#fbbf24';
                     } else {
                         s.style.color = '#ddd';
                     }

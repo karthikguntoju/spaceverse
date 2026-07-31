@@ -84,17 +84,30 @@
             text-shadow: 0 0 60px rgba(120, 170, 255, .25);
             white-space: nowrap;
         }
+        /* The blur lives on the whole title, not on each letter. Per-char it
+           was seven separately-rasterised blur layers animating at once and
+           it showed up as the widest frame-time spread in the switch; one
+           layer reads the same and costs a seventh. The stagger is still
+           per-char, on opacity and transform only — both compositor-only. */
+        #hero-name {
+            filter: blur(15px);
+            transition: filter .9s cubic-bezier(.2,.65,.25,1);
+        }
+        #hero.in #hero-name { filter: blur(0); }
+        #hero.exit #hero-name {
+            filter: blur(13px);
+            transition: filter .5s cubic-bezier(.55,0,.7,.4);
+        }
         #hero-name .char {
             display: inline-block;
             opacity: 0;
-            filter: blur(16px);
             transform: translateY(38px) scale(1.06);
-            transition: opacity .9s cubic-bezier(.2,.65,.25,1), filter .9s cubic-bezier(.2,.65,.25,1), transform .9s cubic-bezier(.2,.65,.25,1);
+            transition: opacity .9s cubic-bezier(.2,.65,.25,1), transform .9s cubic-bezier(.2,.65,.25,1);
         }
-        #hero.in #hero-name .char { opacity: 1; filter: blur(0); transform: none; }
+        #hero.in #hero-name .char { opacity: 1; transform: none; }
         #hero.exit #hero-name .char {
-            opacity: 0; filter: blur(14px); transform: translateY(-26px);
-            transition: all .5s cubic-bezier(.55,0,.7,.4);
+            opacity: 0; transform: translateY(-26px);
+            transition: opacity .5s cubic-bezier(.55,0,.7,.4), transform .5s cubic-bezier(.55,0,.7,.4);
         }
         #hero-divider {
             width: 64px; height: 3px; margin: 2rem auto 1.6rem;
@@ -187,44 +200,96 @@
         }
         .top-btn:hover { background: rgba(0, 243, 255, 0.1); border-color: var(--neon-blue); color: #fff; box-shadow: 0 0 15px rgba(0, 243, 255, 0.3); }
 
-        /* ── SIDE PLANETS (neighbors, Dribbble style) ── */
+        /* ── SIDE PLANETS (neighbours) ──────────────────────────────
+           A neighbour is a body further down the same system, not a menu
+           item, so it gets no card and no plate — just the lit globe, an
+           atmosphere ring and its name. It also sits back: dimmer than the
+           planet in frame until you reach for it. */
         .side-planet {
             position: absolute; top: 58%;
-            display: flex; flex-direction: column; align-items: center; gap: 14px;
+            display: flex; flex-direction: column; align-items: center; gap: 15px;
+            padding: 12px 18px;
             background: none; border: none; cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
             transition: transform .5s cubic-bezier(.2,.65,.25,1), opacity .6s ease;
             opacity: 0;
         }
-        .side-planet.show { opacity: 1; }
+        .side-planet.show { opacity: .84; }
+        .side-planet.show:hover, .side-planet.show:focus-visible { opacity: 1; }
         #side-prev { left: 3.5vw; }
         #side-next { right: 3.5vw; }
         .sp-globe {
-            width: clamp(64px, 8vw, 108px); height: clamp(64px, 8vw, 108px);
+            position: relative;
+            width: clamp(64px, 8vw, 104px); height: clamp(64px, 8vw, 104px);
             border-radius: 50%;
             background-size: 205% 100%;
             background-position: 30% 50%;
-            box-shadow: inset -18px -10px 28px rgba(0,0,0,.85), inset 6px 4px 14px rgba(255,255,255,.12), 0 0 34px rgba(0,0,0,.6);
-            transition: transform .5s cubic-bezier(.2,.65,.25,1), box-shadow .4s ease;
+            /* terminator on the same side as the scene's key light, so the
+               neighbours are lit by the same sun as the planet in frame */
+            box-shadow:
+                inset -18px -10px 30px rgba(0,0,0,.9),
+                inset 7px 5px 16px rgba(255,255,255,.10),
+                0 20px 44px -14px rgba(0,0,0,.85);
+            transition: transform .5s cubic-bezier(.2,.65,.25,1), box-shadow .45s ease;
             animation: sp-drift 7s ease-in-out infinite alternate;
+        }
+        /* Atmosphere: brightest right at the limb and falling away outward.
+           The band has to peak past the globe's own radius (77% of this box)
+           or it paints a hard ring across the planet instead of a halo
+           around it. */
+        .sp-globe::after {
+            content: ''; position: absolute; inset: -15%;
+            border-radius: 50%;
+            background: radial-gradient(circle,
+                rgba(150,195,255,0) 72%,
+                rgba(165,205,255,.24) 79%,
+                rgba(140,185,255,.09) 86%,
+                rgba(140,185,255,0) 100%);
+            opacity: .75; pointer-events: none;
+            transition: opacity .45s ease;
         }
         #side-next .sp-globe { animation-delay: -3.5s; }
         @keyframes sp-drift {
             from { transform: translateY(-7px); }
             to   { transform: translateY(7px); }
         }
-        .side-planet:hover .sp-globe {
-            box-shadow: inset -18px -10px 28px rgba(0,0,0,.8), inset 6px 4px 14px rgba(255,255,255,.15), 0 0 44px rgba(120,180,255,.35);
+        .side-planet:hover .sp-globe,
+        .side-planet:focus-visible .sp-globe {
+            box-shadow:
+                inset -18px -10px 30px rgba(0,0,0,.85),
+                inset 7px 5px 16px rgba(255,255,255,.15),
+                0 0 48px rgba(120,180,255,.42),
+                0 20px 44px -14px rgba(0,0,0,.85);
         }
-        .side-planet:hover { transform: scale(1.08); }
+        .side-planet:hover .sp-globe::after,
+        .side-planet:focus-visible .sp-globe::after { opacity: 1; }
+        .side-planet:hover { transform: scale(1.07); }
+        .side-planet:active { transform: scale(1.01); transition-duration: .12s; }
         .sp-label {
             font-family: 'Playfair Display', serif;
             font-size: clamp(.72rem, 1vw, .95rem);
             letter-spacing: .45em; text-indent: .45em;
-            color: rgba(226, 232, 240, .75);
+            color: rgba(226, 232, 240, .72);
             text-transform: uppercase;
             transition: color .3s;
         }
-        .side-planet:hover .sp-label { color: #fff; }
+        .side-planet:hover .sp-label,
+        .side-planet:focus-visible .sp-label { color: #fff; }
+        /* Which way it takes you — kept out of the resting frame. */
+        .side-planet::after {
+            position: absolute;
+            top: calc(12px + clamp(64px, 8vw, 104px) / 2);
+            transform: translateY(-50%);
+            font-size: 1.5rem; line-height: 1;
+            color: rgba(226, 232, 240, .8);
+            opacity: 0; transition: opacity .35s ease;
+            pointer-events: none;
+        }
+        #side-prev::after { content: '‹'; left: -4px; }
+        #side-next::after { content: '›'; right: -4px; }
+        .side-planet:hover::after,
+        .side-planet:focus-visible::after { opacity: 1; }
+        .side-planet:focus-visible { outline: 2px solid rgba(150,195,255,.85); outline-offset: 4px; border-radius: 18px; }
 
         /* ── INFO CARDS (toggle panel) ── */
         .card {
@@ -434,13 +499,38 @@
         };
     }
 
+    /* The neighbour globes are ~104px across and were filling themselves with
+       the 4K planet texture — a full-size JPEG decode on the CSS path, kicked
+       off by populate() at the exact frame the two planets swap. Downscaled
+       once, in idle time, from the image three has already decoded. */
+    const thumbs = {};
+    function makeThumb(k) {
+        if (thumbs[k]) return;
+        idle(() => {
+            const img = texCache[k] && texCache[k].image;
+            if (thumbs[k] || !img || !img.width) return;
+            const c = document.createElement('canvas');
+            c.width = 256; c.height = 128;
+            c.getContext('2d').drawImage(img, 0, 0, 256, 128);
+            thumbs[k] = c.toDataURL('image/jpeg', 0.86);
+            /* whichever neighbour is showing it right now gets the cheap one */
+            ['side-prev', 'side-next'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el && el.dataset.key === k) {
+                    el.querySelector('.sp-globe').style.backgroundImage = `url('${thumbs[k]}')`;
+                }
+            });
+        });
+    }
+
     function setSidePlanet(el, k) {
         const globe = el.querySelector('.sp-globe');
         const label = el.querySelector('.sp-label');
         const pd = PD[k];
         label.textContent = k;
-        if (TEXTURES[k]) {
-            globe.style.backgroundImage = `url('${TEXTURES[k]}')`;
+        const src = thumbs[k] || TEXTURES[k];
+        if (src) {
+            globe.style.backgroundImage = `url('${src}')`;
             globe.style.backgroundColor = pd.color;
         } else {
             globe.style.backgroundImage = `radial-gradient(circle at 35% 35%, ${pd.color}, #663300 90%)`;
@@ -546,91 +636,125 @@
             vView = normalize(-mv.xyz);
             gl_Position = projectionMatrix * mv;
         }`;
-    function fresnelMat(color, power, intensity, side) {
-        return new THREE.ShaderMaterial({
-            uniforms: { glowColor: { value: new THREE.Color(color) } },
-            vertexShader: ATMO_VERT,
-            fragmentShader: `
-                uniform vec3 glowColor; varying vec3 vNormal; varying vec3 vView;
-                void main(){
-                    float f = pow(1.0 - abs(dot(vNormal, vView)), ${power.toFixed(1)});
-                    gl_FragColor = vec4(glowColor, f * ${intensity.toFixed(2)});
-                }`,
-            blending: THREE.AdditiveBlending,
-            side: side, transparent: true, depthWrite: false
-        });
+    /* ─── SHARED GPU RESOURCES ───────────────────────────────────────
+       Every planet is the same sphere at the same radius wearing a different
+       texture, and the two atmosphere shells differ only by colour and
+       strength. Building them per planet meant a 33k-vertex buffer upload
+       and two shader compiles in the middle of the carousel move — the one
+       moment a dropped frame is impossible to miss. Built once, shared, and
+       flagged so disposeGroup leaves them alone. */
+    const GEO = {};
+    function sphereGeo(r, seg) {
+        const k = r.toFixed(4) + '/' + seg;
+        if (!GEO[k]) {
+            GEO[k] = new THREE.SphereGeometry(r, seg, seg);
+            GEO[k].userData.shared = true;
+        }
+        return GEO[k];
     }
+
     /* Halo glow: brightest right at the planet limb, dissolving smoothly to
        nothing at the halo's outer edge. A plain BackSide fresnel peaks at the
        OUTER silhouette instead, which draws a hard shell ring around the
        planet — this inverted falloff is what removes that ring. */
-    function haloMat(color, intensity) {
-        return new THREE.ShaderMaterial({
-            uniforms: { glowColor: { value: new THREE.Color(color) } },
-            vertexShader: ATMO_VERT,
-            fragmentShader: `
-                uniform vec3 glowColor; varying vec3 vNormal; varying vec3 vView;
-                void main(){
-                    float d = abs(dot(vNormal, vView));
-                    float f = smoothstep(0.0, 0.34, d);
-                    gl_FragColor = vec4(glowColor, f * f * ${intensity.toFixed(2)});
-                }`,
-            blending: THREE.AdditiveBlending,
-            side: THREE.BackSide, transparent: true, depthWrite: false
-        });
-    }
+    const ATMO_HALO = new THREE.ShaderMaterial({
+        uniforms: { glowColor: { value: new THREE.Color('#4488ff') }, uIntensity: { value: 0.5 } },
+        vertexShader: ATMO_VERT,
+        fragmentShader: `
+            uniform vec3 glowColor; uniform float uIntensity;
+            varying vec3 vNormal; varying vec3 vView;
+            void main(){
+                float d = abs(dot(vNormal, vView));
+                float f = smoothstep(0.0, 0.34, d);
+                gl_FragColor = vec4(glowColor, f * f * uIntensity);
+            }`,
+        blending: THREE.AdditiveBlending,
+        side: THREE.BackSide, transparent: true, depthWrite: false
+    });
+    /* inner rim — atmosphere hugging the surface edge */
+    const ATMO_RIM = new THREE.ShaderMaterial({
+        uniforms: { glowColor: { value: new THREE.Color('#4488ff') }, uIntensity: { value: 0.5 } },
+        vertexShader: ATMO_VERT,
+        fragmentShader: `
+            uniform vec3 glowColor; uniform float uIntensity;
+            varying vec3 vNormal; varying vec3 vView;
+            void main(){
+                float f = pow(1.0 - abs(dot(vNormal, vView)), 4.5);
+                gl_FragColor = vec4(glowColor, f * uIntensity);
+            }`,
+        blending: THREE.AdditiveBlending,
+        side: THREE.FrontSide, transparent: true, depthWrite: false
+    });
+    ATMO_HALO.userData.shared = ATMO_RIM.userData.shared = true;
+
     /* Atmosphere strength per planet — airless bodies barely glow,
        gas giants get a whisper (their surface IS atmosphere already) */
     const ATMO_INT = { mercury: 0.2, mars: 0.42, venus: 0.6, earth: 0.72,
                        jupiter: 0.38, saturn: 0.38, uranus: 0.52, neptune: 0.55 };
+    /* Called when the incoming planet reaches the frame, never while the
+       outgoing one is still on screen — one set of shells, one colour at a
+       time. */
+    function setAtmosphere(k) {
+        const col = (PD[k] && PD[k].ac) || '#4488ff';
+        const glow = ATMO_INT[k] !== undefined ? ATMO_INT[k] : 0.5;
+        ATMO_HALO.uniforms.glowColor.value.set(col);
+        ATMO_HALO.uniforms.uIntensity.value = glow;
+        ATMO_RIM.uniforms.glowColor.value.set(col);
+        ATMO_RIM.uniforms.uIntensity.value = 0.5;
+    }
     function addAtmosphere(wrap, k) {
         if (k === 'sun') return;
         const body = PLANET_DIAM / 2;
-        const col = PD[k].ac || '#4488ff';
-        const glow = ATMO_INT[k] !== undefined ? ATMO_INT[k] : 0.5;
-        const outer = new THREE.Mesh(
-            new THREE.SphereGeometry(body * 1.045, 96, 96),
-            haloMat(col, glow)
-        );
-        wrap.add(outer);
-        /* inner rim — atmosphere hugging the surface edge */
-        const inner = new THREE.Mesh(
-            new THREE.SphereGeometry(body * 1.004, 96, 96),
-            fresnelMat(col, 4.5, 0.5, THREE.FrontSide)
-        );
-        wrap.add(inner);
+        wrap.add(new THREE.Mesh(sphereGeo(body * 1.045, 96), ATMO_HALO));
+        wrap.add(new THREE.Mesh(sphereGeo(body * 1.004, 96), ATMO_RIM));
     }
     function addClouds(tiltG, wrap, k) {
         if (k !== 'earth') return;
-        new THREE.TextureLoader().load('/public/textures/earth-clouds.png', t => {
-            const body = PLANET_DIAM / 2;
+        const attach = t => {
             const clouds = new THREE.Mesh(
-                new THREE.SphereGeometry(body * 1.014, 96, 96),
+                sphereGeo(PLANET_DIAM / 2 * 1.014, 96),
                 new THREE.MeshLambertMaterial({ map: t, transparent: true, opacity: 0.38, depthWrite: false })
             );
             wrap.userData.clouds = clouds;
             tiltG.add(clouds);
+        };
+        /* parked in texCache so a second visit to Earth is instant and the
+           dispose pass knows not to free it */
+        if (texCache['earth:clouds']) { attach(texCache['earth:clouds']); return; }
+        new THREE.TextureLoader().load('/public/textures/earth-clouds.png', t => {
+            texCache['earth:clouds'] = t;
+            attach(t);
         });
     }
 
+    let ringGeo = null, ringMat = null;
     function addSaturnRings(tiltG, R) {
+        const build = t => {
+            if (!ringGeo) {
+                const outer = R * 2.3;
+                ringGeo = new THREE.RingGeometry(R * 1.18, outer, 256, 1);
+                /* planar UV — the ring texture is a full square annulus image */
+                const pos = ringGeo.attributes.position, uv = ringGeo.attributes.uv;
+                for (let i = 0; i < pos.count; i++) {
+                    uv.setXY(i, (pos.getX(i) / outer + 1) / 2, (pos.getY(i) / outer + 1) / 2);
+                }
+                ringGeo.userData.shared = true;
+                ringMat = new THREE.MeshStandardMaterial({
+                    map: t, transparent: true, side: THREE.DoubleSide,
+                    roughness: 0.95, metalness: 0, depthWrite: false, opacity: 0.96
+                });
+                ringMat.userData.shared = true;
+            }
+            const ring = new THREE.Mesh(ringGeo, ringMat);
+            ring.rotation.x = -Math.PI / 2;
+            tiltG.add(ring);
+        };
+        if (texCache['saturn:ring']) { build(texCache['saturn:ring']); return; }
         new THREE.TextureLoader().load('/public/textures/saturn-ring.png', t => {
             t.encoding = THREE.sRGBEncoding;
             t.anisotropy = renderer.capabilities.getMaxAnisotropy();
-            const outer = R * 2.3;
-            const geo = new THREE.RingGeometry(R * 1.18, outer, 256, 1);
-            /* planar UV — the ring texture is a full square annulus image */
-            const pos = geo.attributes.position, uv = geo.attributes.uv;
-            for (let i = 0; i < pos.count; i++) {
-                uv.setXY(i, (pos.getX(i) / outer + 1) / 2, (pos.getY(i) / outer + 1) / 2);
-            }
-            const mat = new THREE.MeshStandardMaterial({
-                map: t, transparent: true, side: THREE.DoubleSide,
-                roughness: 0.95, metalness: 0, depthWrite: false, opacity: 0.96
-            });
-            const ring = new THREE.Mesh(geo, mat);
-            ring.rotation.x = -Math.PI / 2;
-            tiltG.add(ring);
+            texCache['saturn:ring'] = t;
+            build(t);
         });
     }
 
@@ -677,7 +801,7 @@
                 roughness: k === 'earth' ? 0.5 : 0.68,
                 metalness: 0.02
             });
-            const mesh = new THREE.Mesh(new THREE.SphereGeometry(R, 128, 128), mat);
+            const mesh = new THREE.Mesh(sphereGeo(R, 128), mat);
             const tiltG = new THREE.Group();
             tiltG.add(mesh);
             tiltG.rotation.z = -(TILT[k] || 0) * Math.PI / 180;
@@ -698,19 +822,73 @@
     /* Texture cache + neighbor preload — carousel switches render instantly
        instead of waiting on a 4K download mid-transition */
     const texCache = {};
+    /* ─── TEXTURE WARM-UP ────────────────────────────────────────────
+       A 4K texture costs 120ms+ to hand to the GPU — upload plus mipmap
+       generation — and left alone it happens on the first frame the new
+       planet is drawn, which is the worst possible frame. Warming it at
+       preload time only moved the stall onto the end of the move, so the
+       upload is queued instead: one texture per idle slot, never while a
+       switch is in flight. By the time the arrow is pressed the work is
+       already done. */
+    const idle = window.requestIdleCallback
+        ? cb => requestIdleCallback(cb, { timeout: 2000 })
+        : cb => setTimeout(cb, 300);
+    const warmQueue = [];
+    let warming = false, lastMove = 0;
+    const CALM_MS = 250;    /* just past the landing, while the planet only idles */
+    const warmed = new WeakSet();   /* THREE.Texture has no userData in r128 */
+    function warmNow(t) {
+        if (!t || warmed.has(t) || !renderer.initTexture) return;
+        renderer.initTexture(t);
+        warmed.add(t);
+    }
+    function warmLater(t) {
+        if (!renderer.initTexture) return;
+        warmQueue.push(t);
+        if (warming) return;
+        warming = true;
+        (function pump() {
+            if (!warmQueue.length) { warming = false; return; }
+            const calm = performance.now() - lastMove;
+            if (switching || calm < CALM_MS) { setTimeout(pump, Math.max(120, CALM_MS - calm)); return; }
+            warmNow(warmQueue.shift());
+            idle(pump);
+        })();
+    }
+
     function getTexture(k, cb) {
         if (texCache[k]) { cb(texCache[k]); return; }
         new THREE.TextureLoader().load(TEXTURES[k], t => {
             t.encoding = THREE.sRGBEncoding;
             enhanceTex(t);
             texCache[k] = t;
+            warmLater(t);
+            makeThumb(k);
             cb(t);
         }, undefined, () => cb(null));
+    }
+    /* Earth's cloud shell and Saturn's rings are separate downloads that the
+       old code only started once you had already arrived, so they uploaded
+       mid-entrance. They travel with their planet now. */
+    function preloadExtras(k) {
+        if (k === 'earth' && !texCache['earth:clouds']) {
+            new THREE.TextureLoader().load('/public/textures/earth-clouds.png', t => {
+                texCache['earth:clouds'] = t; warmLater(t);
+            });
+        }
+        if (k === 'saturn' && !texCache['saturn:ring']) {
+            new THREE.TextureLoader().load('/public/textures/saturn-ring.png', t => {
+                t.encoding = THREE.sRGBEncoding;
+                t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+                texCache['saturn:ring'] = t; warmLater(t);
+            });
+        }
     }
     function preloadNeighbors(k) {
         const nb = neighborKeys(k);
         [nb.prev, nb.next].forEach(n => {
             if (n !== 'sun' && !texCache[n]) getTexture(n, () => {});
+            preloadExtras(n);
         });
     }
 
@@ -733,81 +911,140 @@
 
     loadPlanetModel(key, wrap => {
         planetMesh = wrap;
+        setAtmosphere(key);
         pivot.add(wrap);
         renderer.toneMappingExposure = exposureFor(key);
         intro();
     });
 
-    /* ─── CAROUSEL SWITCH (Dribbble-style glide + blur crossfade) ─── */
+    /* ─── CAROUSEL SWITCH ────────────────────────────────────────────
+       One continuous move: the outgoing planet accelerates out of frame
+       while the incoming one is being built off-screen, and the entrance
+       starts the instant both are ready. The old version loaded the
+       replacement only after the exit had finished, so a cold texture left
+       an empty frame sitting there mid-transition.
+
+       Everything that used to snap at the swap — spin rate, exposure, the
+       four light intensities — is tweened across the move instead. */
+    const EXIT_MS = 620, ENTER_MS = 900, OFF_X = 12, DIP = 0.55, SHRINK = 0.84;
+    const spin = { v: 0 };          /* extra spin during the move, ramped */
+    let queuedDir = 0;              /* the click that arrived mid-transition */
+
+    function sideShow(on) {
+        document.getElementById('side-prev').classList.toggle('show', on);
+        document.getElementById('side-next').classList.toggle('show', on);
+    }
+
+    function navigate(dir) {
+        const nb = neighborKeys(key);
+        goPlanet(dir > 0 ? nb.next : nb.prev, dir);
+    }
+
     function goPlanet(newKey, dir) {
         /* dir: +1 = next (new planet slides in from right), -1 = prev */
-        if (switching || newKey === key) return;
+        if (!PD[newKey] || newKey === key) return;
+        /* Spamming the arrow used to do nothing at all. Remember the last
+           direction and resolve it against whatever planet we land on, so a
+           double-press moves two planets instead of one. */
+        if (switching) { queuedDir = dir; return; }
         switching = true;
+        /* If the queue has not got to this one yet — you pressed faster than
+           the idle slots came — pay the upload here, before a single pixel
+           has moved. The press absorbs it; the slide would not. */
+        warmNow(texCache[newKey]);
+        if (newKey === 'earth')  warmNow(texCache['earth:clouds']);
+        if (newKey === 'saturn') warmNow(texCache['saturn:ring']);
         hero.classList.add('exit');
         hero.classList.remove('in');
-        document.getElementById('side-prev').classList.remove('show');
-        document.getElementById('side-next').classList.remove('show');
+        sideShow(false);
 
-        /* old planet glides off + accelerated spin */
         const oldWrap = planetMesh;
-        spinBoost = dir * 0.05;
-        tw(pivot.position, 'x', -dir * 11, 750, easeInCubic, () => {
+        let incoming = null, exited = false;
+
+        /* built in parallel with the exit, not after it */
+        loadPlanetModel(newKey, wrap => { incoming = wrap; if (exited) enter(); });
+
+        /* old planet glides off, sinking and shrinking as it goes, with the
+           spin winding up rather than jumping to speed */
+        tw(spin, 'v', dir * 0.055, EXIT_MS, easeOutCubic);
+        tw(pivot.position, 'x', -dir * OFF_X, EXIT_MS, easeInCubic);
+        tw(pivot.position, 'y', PIVOT_Y - DIP, EXIT_MS, easeOutCubic);
+        tw(pivot.scale, 'x', SHRINK, EXIT_MS, easeOutCubic);
+        tw(pivot.scale, 'y', SHRINK, EXIT_MS, easeOutCubic);
+        tw(pivot.scale, 'z', SHRINK, EXIT_MS, easeOutCubic, () => {
             if (oldWrap) { pivot.remove(oldWrap); disposeGroup(oldWrap); }
             planetMesh = null;
 
             key = newKey;
             history.replaceState(null, '', '/planet?id=' + newKey);
             populate(newKey);
+
+            /* The type comes back on its own schedule rather than waiting for
+               the mesh. They are almost always ready together, but on a cold
+               cache the old code left the whole screen empty until the
+               texture landed. */
             hero.classList.remove('exit');
-
-            ambient.intensity = newKey === 'sun' ? 2.5 : 0.11;
-            dl.intensity = newKey === 'sun' ? 3.0 : 2.7;
-            rim.intensity = newKey === 'sun' ? 0.0 : 0.8;
-            hemi.intensity = newKey === 'sun' ? 0.0 : 0.14;
-            renderer.toneMappingExposure = exposureFor(newKey);
-
-            loadPlanetModel(newKey, wrap => {
-                planetMesh = wrap;
-                pivot.add(wrap);
-                pivot.position.x = dir * 11;
-                tw(pivot.position, 'x', 0, 1000, easeOutCubic, () => {
-                    spinBoost = 0;
-                    switching = false;
-                    preloadNeighbors(newKey);
-                });
-                requestAnimationFrame(() => {
-                    hero.classList.add('in');
-                    setTimeout(() => {
-                        document.getElementById('side-prev').classList.add('show');
-                        document.getElementById('side-next').classList.add('show');
-                    }, 700);
-                });
+            requestAnimationFrame(() => {
+                hero.classList.add('in');
+                setTimeout(() => sideShow(true), 620);
             });
+
+            exited = true;
+            if (incoming) enter();
         });
+
+        function enter() {
+            planetMesh = incoming;
+            setAtmosphere(key);          /* shells are shared — recolour once the old body is gone */
+            pivot.add(incoming);
+            pivot.position.x = dir * OFF_X;
+
+            /* the scene relights across the entrance instead of at the cut */
+            tw(ambient, 'intensity', key === 'sun' ? 2.5 : 0.11, ENTER_MS, easeOutCubic);
+            tw(dl, 'intensity', key === 'sun' ? 3.0 : 2.7, ENTER_MS, easeOutCubic);
+            tw(rim, 'intensity', key === 'sun' ? 0.0 : 0.8, ENTER_MS, easeOutCubic);
+            tw(hemi, 'intensity', key === 'sun' ? 0.0 : 0.14, ENTER_MS, easeOutCubic);
+            tw(renderer, 'toneMappingExposure', exposureFor(key), ENTER_MS, easeOutCubic);
+
+            tw(pivot.position, 'y', PIVOT_Y, ENTER_MS, easeOutCubic);
+            tw(pivot.scale, 'x', 1, ENTER_MS, easeOutCubic);
+            tw(pivot.scale, 'y', 1, ENTER_MS, easeOutCubic);
+            tw(pivot.scale, 'z', 1, ENTER_MS, easeOutCubic);
+            tw(spin, 'v', 0, ENTER_MS + 260, easeOutCubic);
+            tw(pivot.position, 'x', 0, ENTER_MS, easeOutCubic, () => {
+                spin.v = 0;
+                switching = false;
+                lastMove = performance.now();
+                preloadNeighbors(key);
+                if (queuedDir) { const d = queuedDir; queuedDir = 0; navigate(d); }
+            });
+        }
     }
 
     function disposeGroup(g) {
         g.traverse(c => {
-            if (c.isMesh) {
-                c.geometry && c.geometry.dispose();
-                if (c.material) {
-                    (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => {
-                        ['map','normalMap','roughnessMap','metalnessMap','emissiveMap','aoMap'].forEach(s => {
-                            /* cached planet textures survive for instant re-use */
-                            if (m[s] && Object.values(texCache).indexOf(m[s]) === -1) m[s].dispose();
-                        });
-                        m.dispose();
-                    });
-                }
-            }
+            if (!c.isMesh) return;
+            /* the shared sphere buffers and atmosphere shells outlive every
+               individual planet — freeing them here would rebuild and
+               recompile them on the very next switch */
+            if (c.geometry && !c.geometry.userData.shared) c.geometry.dispose();
+            if (!c.material) return;
+            (Array.isArray(c.material) ? c.material : [c.material]).forEach(m => {
+                if (m.userData && m.userData.shared) return;
+                ['map','normalMap','roughnessMap','metalnessMap','emissiveMap','aoMap'].forEach(s => {
+                    /* cached planet textures survive for instant re-use */
+                    if (m[s] && Object.values(texCache).indexOf(m[s]) === -1) m[s].dispose();
+                });
+                m.dispose();
+            });
         });
     }
 
-    document.getElementById('side-prev').onclick = function(){ goPlanet(this.dataset.key, -1); };
-    document.getElementById('side-next').onclick = function(){ goPlanet(this.dataset.key, +1); };
+    document.getElementById('side-prev').onclick = () => navigate(-1);
+    document.getElementById('side-next').onclick = () => navigate(+1);
     window.addEventListener('keydown', e => {
-        if (e.key === 'ArrowLeft')  goPlanet(document.getElementById('side-prev').dataset.key, -1);
-        if (e.key === 'ArrowRight') goPlanet(document.getElementById('side-next').dataset.key, +1);
+        if (e.key === 'ArrowLeft')  navigate(-1);
+        if (e.key === 'ArrowRight') navigate(+1);
     });
 
     /* ─── FACTS TOGGLE ─── */
@@ -821,7 +1058,6 @@
     /* ─── DRAG ROTATION ─── */
     let dragging=false, prev={x:0,y:0};
     let rotVel={x:0, y:0.0035};
-    let spinBoost = 0;
     renderer.domElement.addEventListener('mousedown', e=>{dragging=true;prev={x:e.clientX,y:e.clientY};});
     window.addEventListener('mouseup', ()=>{dragging=false;});
     window.addEventListener('mousemove', e=>{
@@ -859,9 +1095,9 @@
             lastT = now || performance.now();
             if(planetMesh){
                 const sp = planetMesh.userData.spinner || planetMesh;
-                sp.rotation.y += (rotVel.y + spinBoost) * dt;
+                sp.rotation.y += (rotVel.y + spin.v) * dt;
                 planetMesh.rotation.x += rotVel.x * dt;
-                if(planetMesh.userData.clouds) planetMesh.userData.clouds.rotation.y += (rotVel.y + spinBoost + 0.0007) * dt;
+                if(planetMesh.userData.clouds) planetMesh.userData.clouds.rotation.y += (rotVel.y + spin.v + 0.0007) * dt;
                 if(!dragging){
                     rotVel.y += (0.0035 - rotVel.y) * Math.min(1, 0.04 * dt);
                     rotVel.x *= Math.pow(0.93, dt);
@@ -957,6 +1193,12 @@
         let t = 0, lastShooter = 0;
 
         function drawBg(ts) {
+            /* star-sky.js swaps #space-bg for its own canvas, which leaves this
+               loop painting a node that is no longer in the document: ~520
+               radial gradients a frame, every frame, into nothing. Returning
+               without re-queueing ends it — and hands those frames back to the
+               planet, which is where the transition needs them. */
+            if (window.__starSky) return;
             t = ts * 0.001;
             const W = bgCanvas.width, H = bgCanvas.height;
             ctx.fillStyle = '#01030c';
@@ -1006,5 +1248,7 @@
         requestAnimationFrame(drawBg);
     })();
     </script>
+    <!-- Shared photographic night sky — takes over #space-bg -->
+    <script src="/public/js/star-sky.js" defer></script>
 </body>
 </html>

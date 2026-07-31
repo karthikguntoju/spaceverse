@@ -32,7 +32,7 @@
 
         body {
             font-family: 'Inter', system-ui, sans-serif;
-            background: #000000;
+            background: transparent;
             color: var(--text-main);
             min-height: 100vh;
             overflow-x: hidden;
@@ -130,7 +130,7 @@
         .logo-planet {
             width: 30px;
             height: 30px;
-            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #005b99);
+            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #38bdf8);
             border-radius: 50%;
             box-shadow: 0 0 20px rgba(0, 243, 255, 0.8), inset -5px -5px 10px rgba(0, 0, 0, 0.4);
             animation: planetRotate 10s linear infinite;
@@ -209,7 +209,7 @@
         }
 
         .nav-links a:hover {
-            color: #fff;
+            color: #f2f6ff;
             text-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
         }
 
@@ -309,13 +309,13 @@
         }
 
         .tab-btn:hover {
-            color: #fff;
+            color: #f2f6ff;
             background: rgba(255, 255, 255, 0.05);
         }
 
         .tab-btn.active {
             background: rgba(255, 255, 255, 0.1);
-            color: #fff;
+            color: #f2f6ff;
             border-color: rgba(255, 255, 255, 0.2);
             box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
         }
@@ -395,7 +395,7 @@
         .play-button:hover {
             transform: scale(1.15);
             background: rgba(255, 255, 255, 0.2);
-            border-color: #fff;
+            border-color: #f2f6ff;
             box-shadow: 0 0 30px rgba(255, 255, 255, 0.3);
         }
 
@@ -465,7 +465,7 @@
         }
 
         .detail-value {
-            color: #fff;
+            color: #f2f6ff;
             font-weight: 600;
             text-align: right;
         }
@@ -901,9 +901,9 @@
                 t = ts * 0.001;
                 const W = canvas.width, H = canvas.height;
 
-                // Background fill
-                ctx.fillStyle = '#000000';
-                ctx.fillRect(0, 0, W, H);
+                // Clear to transparent — the liquid-glass bridge paints the
+                // void + aurora behind this canvas; only stars draw here.
+                ctx.clearRect(0, 0, W, H);
 
                 // Nebula blobs
                 nebulae.forEach(n => {
@@ -995,6 +995,8 @@
             displayLaunches(launchesData);
         };
     </script>
+    <!-- Shared photographic night sky — takes over #space-bg -->
+    <script src="/public/js/star-sky.js" defer></script>
 </body>
 
 </html>

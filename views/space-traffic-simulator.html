@@ -32,7 +32,7 @@
 
         body {
             font-family: 'Inter', system-ui, sans-serif;
-            background: #000000;
+            background: transparent;
             color: var(--text-main);
             min-height: 100vh;
             overflow-x: hidden;
@@ -132,7 +132,7 @@
         .logo-planet {
             width: 30px;
             height: 30px;
-            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #005b99);
+            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #38bdf8);
             border-radius: 50%;
             box-shadow: 0 0 20px rgba(0, 243, 255, 0.8), inset -5px -5px 10px rgba(0, 0, 0, 0.4);
             animation: planetRotate 10s linear infinite;
@@ -289,7 +289,7 @@
 
         .header p {
             font-size: 1.2rem;
-            color: #a0aec0;
+            color: rgba(198, 210, 240, 0.62);
             max-width: 800px;
             margin: 0 auto;
         }
@@ -376,7 +376,7 @@
         .form-group label {
             display: block;
             margin-bottom: 0.5rem;
-            color: #a0aec0;
+            color: rgba(198, 210, 240, 0.62);
             font-size: 0.9rem;
             text-transform: uppercase;
             letter-spacing: 1px;
@@ -542,7 +542,7 @@
         .earth {
             width: 150px;
             height: 150px;
-            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #005b99);
+            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #38bdf8);
             border-radius: 50%;
             position: relative;
             box-shadow: 0 0 20px rgba(0, 243, 255, 0.5), inset -10px -10px 20px rgba(0, 0, 0, 0.6);
@@ -668,7 +668,7 @@
 
         .metric-label {
             font-size: 0.9rem;
-            color: #a0aec0;
+            color: rgba(198, 210, 240, 0.62);
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
@@ -747,7 +747,7 @@
         }
 
         .score-card div:first-child {
-            color: #a0aec0;
+            color: rgba(198, 210, 240, 0.62);
             font-size: 0.8rem;
             text-transform: uppercase;
         }
@@ -1842,9 +1842,9 @@
                 t = ts * 0.001;
                 const W = canvas.width, H = canvas.height;
 
-                // Background fill
-                ctx.fillStyle = '#000000';
-                ctx.fillRect(0, 0, W, H);
+                // Clear to transparent — the liquid-glass bridge paints the
+                // void + aurora behind this canvas; only stars draw here.
+                ctx.clearRect(0, 0, W, H);
 
                 // Nebula blobs
                 nebulae.forEach(n => {
@@ -1933,6 +1933,8 @@
     </script>
     <!-- Chat widget: global popup available on main pages -->
     <script src="/public/js/chat-widget.js" defer></script>
+    <!-- Shared photographic night sky — takes over #space-bg -->
+    <script src="/public/js/star-sky.js" defer></script>
 </body>
 
 </html>

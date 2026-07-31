@@ -7,15 +7,15 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Orbitron:wght@500;700;900&display=swap" rel="stylesheet">
     <style>
         :root {
-            --neon-blue: #00f3ff;
-            --neon-purple: #bc13fe;
+            --neon-blue: #22d3ee;
+            --neon-purple: #a78bfa;
             --glass-bg: rgba(255, 255, 255, 0.07);
             --glass-border: rgba(255, 255, 255, 0.12);
             --glass-shadow: 0 15px 35px rgba(0, 0, 0, 0.4);
             --accent: var(--neon-blue);
-            --success: #28a745;
-            --error: #dc3545;
-            --text-glow: 0 0 15px rgba(0, 243, 255, 0.4);
+            --success: #34d399;
+            --error: #fb7185;
+            --text-glow: 0 0 15px rgba(34, 211, 238,0.4);
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -37,7 +37,7 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            box-shadow: inset 0 0 20px rgba(0, 243, 255, 0.15), inset 0 0 60px rgba(0, 0, 0, 0.9);
+            box-shadow: inset 0 0 20px rgba(34, 211, 238,0.15), inset 0 0 60px rgba(0, 0, 0, 0.9);
             border: none;
         }
 
@@ -54,21 +54,21 @@
             left: 0;
             border-left: 2px solid var(--neon-blue);
             clip-path: polygon(0 25px, 25px 0, 100% 0, 100% 100%, 25px 100%, 0 calc(100% - 25px));
-            box-shadow: inset 10px 0 20px -5px rgba(0, 243, 255, 0.4);
+            box-shadow: inset 10px 0 20px -5px rgba(34, 211, 238,0.4);
         }
 
         .nav-bracket.right {
             right: 0;
             border-right: 2px solid var(--neon-blue);
             clip-path: polygon(0 0, calc(100% - 25px) 0, 100% 25px, 100% calc(100% - 25px), calc(100% - 25px) 100%, 0 100%);
-            box-shadow: inset -10px 0 20px -5px rgba(0, 243, 255, 0.4);
+            box-shadow: inset -10px 0 20px -5px rgba(34, 211, 238,0.4);
         }
 
         .logo {
             font-size: 1.5rem;
             font-weight: 800;
             color: var(--neon-blue);
-            text-shadow: 0 0 15px rgba(0, 243, 255, 0.6);
+            text-shadow: 0 0 15px rgba(34, 211, 238,0.6);
             display: flex;
             align-items: center;
             gap: 1rem;
@@ -89,9 +89,9 @@
         .logo-planet {
             width: 25px;
             height: 25px;
-            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #005b99);
+            background: radial-gradient(circle at 30% 30%, var(--neon-blue), #38bdf8);
             border-radius: 50%;
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.8), inset -5px -5px 10px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0 20px rgba(34, 211, 238,0.8), inset -5px -5px 10px rgba(0, 0, 0, 0.4);
         }
 
         .nav-content {
@@ -111,13 +111,13 @@
             margin: 0;
         }
         .nav-links a {
-            color: #e2e8f0;
+            color: #f2f6ff;
             text-decoration: none;
             font-weight: 500;
             font-size: 0.9rem;
             transition: color 0.3s;
         }
-        .nav-links a:hover { color: #fff; text-shadow: 0 0 10px rgba(0, 243, 255, 0.8); }
+        .nav-links a:hover { color: #fff; text-shadow: 0 0 10px rgba(34, 211, 238,0.8); }
 
         /* ── BUTTON FEATURE CSS (V5 Pure Glassmorphism) ── */
         .btn-feature {
@@ -174,9 +174,9 @@
             border-color: rgba(255, 255, 255, 0.3);
             background: rgba(255, 255, 255, 0.08);
             /* Massive blue bloom on hover for V5 aesthetic */
-            box-shadow: 0 0 30px #00f3ff, inset 0 0 15px rgba(0, 243, 255, 0.2);
-            border: 1px solid #00f3ff;
-            border-top: 1px solid #00f3ff;
+            box-shadow: 0 0 30px #22d3ee, inset 0 0 15px rgba(34, 211, 238,0.2);
+            border: 1px solid #22d3ee;
+            border-top: 1px solid #22d3ee;
         }
 
         .btn-feature.selected::after,
@@ -187,17 +187,17 @@
         .btn-feature.selected .btn-icon,
         .btn-feature:hover .btn-icon {
             transform: scale(1.1);
-            filter: drop-shadow(0 0 20px #00f3ff);
+            filter: drop-shadow(0 0 20px #22d3ee);
         }
 
         .btn-feature.selected .btn-text,
         .btn-feature:hover .btn-text {
-            text-shadow: 0 0 12px #00f3ff;
+            text-shadow: 0 0 12px #22d3ee;
         }
         
         body { 
             font-family: 'Inter', sans-serif; 
-            background: #000;
+            background: transparent; /* bridge void + aurora show through; #space-bg blends on top */
             color: #fff; 
             min-height: 100vh;
             padding: 120px 2rem 2rem;
@@ -242,7 +242,7 @@
             -webkit-background-clip: text;
             background-clip: text;
             -webkit-text-fill-color: transparent;
-            text-shadow: 0 0 30px rgba(0, 243, 255, 0.3);
+            text-shadow: 0 0 30px rgba(34, 211, 238,0.3);
             margin-bottom: 1rem;
             letter-spacing: 2px;
             text-transform: uppercase;
@@ -263,7 +263,7 @@
             background: rgba(255, 255, 255, 0.05);
             backdrop-filter: blur(10px);
             border: 1px solid var(--glass-border);
-            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+            box-shadow: 0 0 30px rgba(34, 211, 238,0.2);
             border-radius: 50%;
             display: flex;
             align-items: center;
@@ -273,8 +273,8 @@
         }
         
         @keyframes botPulse {
-            0%, 100% { transform: translateY(0) scale(1); box-shadow: 0 0 20px rgba(0, 243, 255, 0.2); }
-            50% { transform: translateY(-10px) scale(1.05); box-shadow: 0 0 40px rgba(0, 243, 255, 0.4); }
+            0%, 100% { transform: translateY(0) scale(1); box-shadow: 0 0 20px rgba(34, 211, 238,0.2); }
+            50% { transform: translateY(-10px) scale(1.05); box-shadow: 0 0 40px rgba(34, 211, 238,0.4); }
         }
         
         .bot-message {
@@ -352,7 +352,7 @@
             margin-bottom: 1.5rem;
             text-transform: uppercase;
             letter-spacing: 3px;
-            text-shadow: 0 0 15px rgba(188, 19, 254, 0.3);
+            text-shadow: 0 0 15px rgba(167, 139, 250, 0.3);
         }
         
         .question-text {
@@ -388,25 +388,25 @@
             background: rgba(255, 255, 255, 0.08);
             border-color: var(--neon-blue);
             transform: translateX(10px);
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.1);
+            box-shadow: 0 0 20px rgba(34, 211, 238,0.1);
         }
         
         .option.selected {
             border-color: var(--neon-blue);
-            background: rgba(0, 243, 255, 0.1);
-            box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+            background: rgba(34, 211, 238,0.1);
+            box-shadow: 0 0 30px rgba(34, 211, 238,0.2);
         }
         
         .option.correct {
             border-color: var(--success) !important;
-            background: rgba(40, 167, 69, 0.1) !important;
-            box-shadow: 0 0 30px rgba(40, 167, 69, 0.3) !important;
+            background: rgba(52, 211, 153,0.1) !important;
+            box-shadow: 0 0 30px rgba(52, 211, 153,0.3) !important;
         }
         
         .option.incorrect {
             border-color: var(--error) !important;
-            background: rgba(220, 53, 69, 0.1) !important;
-            box-shadow: 0 0 30px rgba(220, 53, 69, 0.3) !important;
+            background: rgba(251, 113, 133,0.1) !important;
+            box-shadow: 0 0 30px rgba(251, 113, 133,0.3) !important;
         }
         
         .quiz-controls {
@@ -434,10 +434,10 @@
         }
 
         .btn-primary {
-            background: rgba(0, 243, 255, 0.1);
+            background: rgba(34, 211, 238,0.1);
             border-color: var(--neon-blue);
             color: var(--neon-blue);
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.2);
+            box-shadow: 0 0 20px rgba(34, 211, 238,0.2);
         }
         
         .btn-secondary {
@@ -450,7 +450,7 @@
             transform: translateY(-5px);
             background: var(--neon-blue);
             color: #000;
-            box-shadow: 0 0 30px rgba(0, 243, 255, 0.5);
+            box-shadow: 0 0 30px rgba(34, 211, 238,0.5);
             border-color: transparent;
         }
         
@@ -474,7 +474,7 @@
         .progress {
             height: 100%;
             background: linear-gradient(90deg, var(--neon-purple) 0%, var(--neon-blue) 100%);
-            box-shadow: 0 0 20px rgba(0, 243, 255, 0.5);
+            box-shadow: 0 0 20px rgba(34, 211, 238,0.5);
             transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
         }
         
@@ -506,7 +506,7 @@
             font-family: 'Orbitron', sans-serif;
             font-size: 2.2rem;
             color: var(--accent);
-            text-shadow: 0 0 15px rgba(0, 243, 255, 0.5);
+            text-shadow: 0 0 15px rgba(34, 211, 238,0.5);
         }
 
         .final-score {
@@ -527,8 +527,8 @@
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(0, 243, 255, 0.05);
-            border: 1px solid rgba(0, 243, 255, 0.3);
+            background: rgba(34, 211, 238,0.05);
+            border: 1px solid rgba(34, 211, 238,0.3);
             color: var(--text);
             padding: 10px 20px;
             border-radius: 25px;
@@ -561,8 +561,8 @@
         
         .back-btn:hover {
             color: #000;
-            border-color: rgba(0, 243, 255, 0.8);
-            box-shadow: 0 5px 15px rgba(0, 243, 255, 0.3);
+            border-color: rgba(34, 211, 238,0.8);
+            box-shadow: 0 5px 15px rgba(34, 211, 238,0.3);
             transform: translateY(-2px);
         }
 
@@ -1040,11 +1040,11 @@
             questions.forEach((q, i) => { if (userAnswers[i] !== q.correctAnswer) wrongIndices.push(i); });
 
             if (wrongIndices.length === 0) {
-                wrongContainer.innerHTML = '<div style="color:#28a745; font-weight:600; margin-top:10px;">All answers correct — well done!</div>';
+                wrongContainer.innerHTML = '<div style="color:#34d399; font-weight:600; margin-top:10px;">All answers correct — well done!</div>';
             } else {
                 const heading = document.createElement('div');
                 heading.style.fontWeight = '700';
-                heading.style.color = '#ffb703';
+                heading.style.color = '#fbbf24';
                 heading.style.marginBottom = '10px';
                 heading.textContent = `Questions answered incorrectly (${wrongIndices.length}):`;
                 wrongContainer.appendChild(heading);
@@ -1055,7 +1055,7 @@
 
                     const card = document.createElement('div');
                     card.style.background = 'rgba(255,255,255,0.04)';
-                    card.style.border = '1px solid rgba(255,183,3,0.12)';
+                    card.style.border = '1px solid rgba(251,191,36,0.12)';
                     card.style.padding = '10px';
                     card.style.borderRadius = '8px';
                     card.style.marginBottom = '8px';
@@ -1073,8 +1073,8 @@
                         optDiv.style.borderRadius = '6px';
                         optDiv.style.marginBottom = '4px';
                         if (oi === q.correctAnswer) {
-                            optDiv.style.background = 'rgba(40,167,69,0.12)';
-                            optDiv.style.borderLeft = '4px solid #28a745';
+                            optDiv.style.background = 'rgba(52,211,153,0.12)';
+                            optDiv.style.borderLeft = '4px solid #34d399';
                             optDiv.style.fontWeight = '700';
                         } else if (oi === userAns) {
                             optDiv.style.background = 'rgba(220,53,69,0.08)';
@@ -1174,5 +1174,7 @@
         })();
     </script>
     <script src="/public/js/chat-widget.js" defer></script>
+    <!-- Shared photographic night sky — takes over #space-bg -->
+    <script src="/public/js/star-sky.js" defer></script>
 </body>
 </html>

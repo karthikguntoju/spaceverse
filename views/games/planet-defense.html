@@ -6,9 +6,15 @@
     <title>Planet Defense — SpaceVerse Arcade</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Orbitron:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
     <link rel="stylesheet" href="/public/css/arcade.css">
+    <!-- Last in <head> on purpose: the bridge re-points this page's tokens and
+         re-materials its controls as glass, and it wins on source order, not on
+         specificity. The per-game accent survives it — shell.js writes --accent
+         as an inline style on <html>, which outranks any stylesheet. -->
+    <link rel="stylesheet" href="/public/css/liquid-glass-theme.css">
+    <script src="/public/js/liquid-glass.js" defer></script>
 </head>
 <body class="arcade">
     <!-- The shell builds the canvas, HUD and overlays; the game file below

@@ -7,8 +7,9 @@
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background: #0D1117;
-            color: #E6F1FF;
+            /* The bridge paints the void + aurora; no opaque legacy fill here. */
+            background: #04060f;
+            color: #f2f6ff;
             margin: 0;
             padding: 20px;
         }
@@ -20,7 +21,7 @@
         
         h1 {
             text-align: center;
-            color: #64FFDA;
+            color: #22d3ee;
         }
         
         .test-section {
@@ -37,23 +38,23 @@
         }
         
         .success {
-            background: rgba(100, 255, 218, 0.1);
-            border-left: 4px solid #64FFDA;
+            background: rgba(52, 211, 153, 0.1);
+            border-left: 4px solid #34d399;
         }
-        
+
         .error {
-            background: rgba(255, 107, 107, 0.1);
-            border-left: 4px solid #FF6B6B;
+            background: rgba(251, 113, 133, 0.1);
+            border-left: 4px solid #fb7185;
         }
-        
+
         .warning {
-            background: rgba(255, 215, 0, 0.1);
-            border-left: 4px solid #FFD700;
+            background: rgba(251, 191, 36, 0.1);
+            border-left: 4px solid #fbbf24;
         }
-        
+
         button {
-            background: #64FFDA;
-            color: #0D1117;
+            background: #22d3ee;
+            color: #04060f;
             border: none;
             padding: 10px 20px;
             border-radius: 5px;
@@ -76,10 +77,20 @@
         .back-link {
             display: inline-block;
             margin-bottom: 20px;
-            color: #64FFDA;
+            color: #22d3ee;
             text-decoration: none;
         }
     </style>
+    <!-- Liquid glass bridge + runtime. Loaded last on purpose: the bridge
+         re-materials this page's components as glass and wins on source order. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/public/css/liquid-glass-theme.css">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+    <script src="/public/js/liquid-glass.js" defer></script>
 </head>
 <body>
     <div class="container">

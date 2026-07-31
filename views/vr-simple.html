@@ -9,8 +9,10 @@
             margin: 0;
             padding: 0;
             font-family: 'Inter', sans-serif;
-            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
-            color: #E6F1FF;
+            /* The bridge paints the void + aurora; the old purple gradient
+               covered them with an opaque sheet. */
+            background: #04060f;
+            color: #f2f6ff;
             min-height: 100vh;
             overflow: hidden;
         }
@@ -25,11 +27,10 @@
         h1 {
             font-size: 3rem;
             margin-bottom: 1rem;
-            background: linear-gradient(90deg, #64FFDA, #00FFFF);
+            background: linear-gradient(90deg, #22d3ee, #a78bfa);
             -webkit-background-clip: text;
             background-clip: text;
             color: transparent;
-            text-shadow: 0 0 20px rgba(100, 255, 218, 0.3);
         }
         
         .subtitle {
@@ -45,7 +46,7 @@
             padding: 2rem;
             margin: 2rem auto;
             max-width: 800px;
-            border: 1px solid rgba(100, 255, 218, 0.2);
+            border: 1px solid rgba(34, 211, 238, 0.2);
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
         }
         
@@ -75,24 +76,24 @@
         }
         
         .success {
-            color: #64FFDA;
+            color: #34d399;
         }
-        
+
         .warning {
-            color: #FFD700;
+            color: #fbbf24;
         }
-        
+
         .error {
-            color: #FF6B6B;
+            color: #fb7185;
         }
         
         .btn {
             display: inline-block;
             padding: 12px 30px;
             margin: 10px;
-            background: rgba(100, 255, 218, 0.1);
-            color: #64FFDA;
-            border: 2px solid #64FFDA;
+            background: rgba(34, 211, 238, 0.1);
+            color: #22d3ee;
+            border: 2px solid #22d3ee;
             border-radius: 30px;
             font-size: 1rem;
             font-weight: bold;
@@ -100,27 +101,27 @@
             cursor: pointer;
             transition: all 0.3s ease;
         }
-        
+
         .btn:hover {
-            background: rgba(100, 255, 218, 0.3);
+            background: rgba(34, 211, 238, 0.3);
             transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(100, 255, 218, 0.2);
+            box-shadow: 0 5px 15px rgba(34, 211, 238, 0.2);
         }
-        
+
         .btn-primary {
-            background: linear-gradient(90deg, #64FFDA, #00FFFF);
-            color: #0D1117;
+            background: linear-gradient(90deg, #22d3ee, #38bdf8);
+            color: #04060f;
             border: none;
         }
-        
+
         .btn-primary:hover {
-            background: linear-gradient(90deg, #5ae6c8, #00e5e5);
-            box-shadow: 0 5px 15px rgba(100, 255, 218, 0.4);
+            background: linear-gradient(90deg, #06b6d4, #0ea5e9);
+            box-shadow: 0 5px 15px rgba(34, 211, 238, 0.4);
         }
         
         .info-box {
             background: rgba(255, 255, 255, 0.08);
-            border-left: 4px solid #64FFDA;
+            border-left: 4px solid #22d3ee;
             padding: 1.5rem;
             margin: 2rem 0;
             text-align: left;
@@ -172,33 +173,33 @@
             top: 20px;
             left: 20px;
             padding: 10px 20px;
-            background: rgba(100, 255, 218, 0.06);
-            color: #E6F1FF;
-            border: 2px solid #64FFDA;
+            background: rgba(34, 211, 238, 0.06);
+            color: #f2f6ff;
+            border: 2px solid #22d3ee;
             border-radius: 25px;
             text-decoration: none;
             z-index: 1000;
         }
-        
+
         .loading {
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(13, 17, 23, 0.9);
+            background: rgba(4, 6, 15, 0.9);
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
             z-index: 10000;
         }
-        
+
         .spinner {
             width: 50px;
             height: 50px;
-            border: 5px solid rgba(100, 255, 218, 0.3);
-            border-top: 5px solid #64FFDA;
+            border: 5px solid rgba(34, 211, 238, 0.3);
+            border-top: 5px solid #22d3ee;
             border-radius: 50%;
             animation: spin 1s linear infinite;
             margin-bottom: 20px;
@@ -213,6 +214,16 @@
             display: none;
         }
     </style>
+    <!-- Liquid glass bridge + runtime. Loaded last on purpose: the bridge
+         re-materials this page's components as glass and wins on source order. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/public/css/liquid-glass-theme.css">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+    <script src="/public/js/liquid-glass.js" defer></script>
 </head>
 <body>
     <a href="/" class="back-link">← Back to Home</a>

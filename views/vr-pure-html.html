@@ -13,8 +13,9 @@
         
         body {
             font-family: 'Arial', sans-serif;
-            background: #000;
-            color: #fff;
+            /* The bridge paints the void + aurora; no opaque black sheet here. */
+            background: #04060f;
+            color: #f2f6ff;
             overflow: hidden;
             height: 100vh;
             perspective: 1000px;
@@ -31,7 +32,8 @@
             position: absolute;
             width: 100%;
             height: 100%;
-            background: #000;
+            /* Transparent so the bridge's aurora reads through the starfield. */
+            background: transparent;
             overflow: hidden;
         }
         
@@ -85,49 +87,71 @@
             bottom: 20px;
             left: 20px;
             z-index: 100;
-            background: rgba(0, 0, 0, 0.7);
+            /* Glass HUD panel: dark tint + hairline inset, no neon rim. Fill is
+               0.62 rather than 0.55 — this sits directly on the void, so a
+               thinner tint leaves the labels floating on near-black. */
+            background: rgba(8, 12, 28, 0.62);
             padding: 15px;
-            border-radius: 10px;
-            border: 1px solid #64FFDA;
+            border-radius: 20px;
+            border: none;
+            backdrop-filter: blur(26px) saturate(185%);
+            -webkit-backdrop-filter: blur(26px) saturate(185%);
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
         }
-        
+
+        /* Ghost glass buttons, same feel as .a-btn a-ghost. They read against the
+           panel tint above, so the fill stays light and the label carries the
+           contrast at full-strength ink. */
         #controls button {
-            background: #64FFDA;
-            color: #000;
+            background: rgba(255, 255, 255, 0.08);
+            color: #f2f6ff;
             border: none;
             padding: 10px 15px;
             margin: 5px;
-            border-radius: 5px;
+            border-radius: 999px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
         }
-        
+
         #controls button:hover {
-            background: #5ae6c8;
+            background: rgba(255, 255, 255, 0.14);
         }
-        
+
         #info-panel {
             position: absolute;
             top: 20px;
             right: 20px;
-            background: rgba(0, 0, 0, 0.7);
+            background: rgba(8, 12, 28, 0.62);
             padding: 15px;
-            border-radius: 10px;
-            border: 1px solid #64FFDA;
+            border-radius: 20px;
+            border: none;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
             max-width: 300px;
             z-index: 100;
         }
-        
+
+        /* The theme bridge re-materials `#info-panel` at rgba(255,255,255,0.055)
+           !important — 5.5% white, which over this page's near-black void is no
+           fill at all, so the heading and copy sit on bare space. `.lg-lite
+           #info-panel` outranks a bare `#info-panel`, so the page has to answer
+           at matching specificity to keep its own tint. */
+        body.lg-lite #info-panel {
+            background: rgba(8, 12, 28, 0.62) !important;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16) !important;
+        }
+
         #back-home {
             position: absolute;
             top: 20px;
             left: 20px;
-            background: rgba(100, 255, 218, 0.1);
-            color: #64FFDA;
+            background: rgba(255, 255, 255, 0.08);
+            color: #f2f6ff;
             padding: 10px 20px;
             text-decoration: none;
-            border: 2px solid #64FFDA;
-            border-radius: 25px;
+            border: none;
+            border-radius: 999px;
+            box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.16);
             z-index: 100;
         }
         
@@ -137,7 +161,8 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: #000;
+            /* Near-opaque void tint instead of flat black. */
+            background: rgba(4, 6, 15, 0.92);
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -150,22 +175,63 @@
             font-size: 1.2em;
         }
         
+        /* `!important` is load-bearing, not decoration. `#loading` sets
+           `display: flex`, and an ID beats a class — so `.hidden` never won and
+           the 92%-opaque loading veil stayed over the page forever, dimming
+           every HUD control beneath it to roughly a tenth of its brightness.
+           That, not the glass tint, was why the labels were unreadable. */
         .hidden {
-            display: none;
+            display: none !important;
         }
-        
+
         #error-message {
             position: fixed;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background: rgba(255, 0, 0, 0.8);
+            /* Was a solid red sheet; now a glass card with a red hairline. */
+            background: rgba(8, 12, 28, 0.85);
             padding: 20px;
-            border-radius: 10px;
+            border-radius: 20px;
+            box-shadow: inset 0 0 0 1px rgba(251, 113, 133, 0.4);
             text-align: center;
             z-index: 1000;
         }
+
+        #error-message h3 {
+            color: #fb7185;
+        }
+
+        /* The one action in the modal, so it is lit as one. A ghost fill here
+           read as dark-grey-on-dark and looked disabled next to the warning
+           heading — the only way out of the dialog should be the brightest
+           thing in it. */
+        #error-message button {
+            background: #22d3ee;
+            color: #04060f;
+            border: none;
+            padding: 10px 22px;
+            margin: 14px 5px 0;
+            border-radius: 999px;
+            cursor: pointer;
+            font-weight: 600;
+            box-shadow: none;
+        }
+
+        #error-message button:hover {
+            background: #67e8f9;
+        }
     </style>
+    <!-- Liquid glass bridge + runtime. Loaded last on purpose: the bridge
+         re-materials this page's components as glass and wins on source order. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="/public/css/liquid-glass-theme.css">
+    <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
+    <script src="/public/js/liquid-glass.js" defer></script>
 </head>
 <body>
     <div id="loading">
