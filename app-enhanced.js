@@ -67,6 +67,14 @@ async function findAvailablePort(startPort) {
     return port;
 }
 
+// Every managed host (Render, Railway, Fly, Heroku) terminates TLS at a proxy
+// and forwards over plain HTTP. Without this Express reads the proxy's own
+// address as the client IP — which silently breaks per-IP rate limiting — and
+// treats the request as insecure, so it refuses to set a `secure` cookie and
+// nobody can log in. One hop is what all of the above put in front of us.
+const BEHIND_PROXY = process.env.NODE_ENV === 'production' || process.env.TRUST_PROXY === 'true';
+if (BEHIND_PROXY) app.set('trust proxy', 1);
+
 // Middleware
 app.use(cors({ credentials: true, origin: true }));
 app.use(express.json());
@@ -91,11 +99,25 @@ const MONGO_CONNECT_OPTIONS = {
 // Use a persistent MongoDB-backed store when a URI is available so sessions
 // survive server restarts (otherwise the default in-memory store logs everyone
 // out on every restart, causing protected pages to redirect back to home).
+// A signing secret checked into the source signs nothing: anyone with the repo
+// can mint a session cookie. Fine on a laptop, refused in production — better a
+// server that will not boot than one quietly running on a public secret.
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+    console.error('SESSION_SECRET is required in production. Set it in the host environment.');
+    process.exit(1);
+}
 const sessionOptions = {
     secret: process.env.SESSION_SECRET || 'spaceverse-secret-key-2024',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000, sameSite: 'lax' } // 24 hours
+    cookie: {
+        // Over HTTPS the cookie must be `secure`, or it travels in the clear and
+        // any network between the visitor and us can replay their session.
+        secure: BEHIND_PROXY,
+        httpOnly: true,
+        maxAge: 24 * 60 * 60 * 1000,
+        sameSite: 'lax'
+    } // 24 hours
 };
 if (process.env.MONGODB_URI) {
     try {
@@ -214,12 +236,13 @@ app.get('/mission/kessler', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'mission-kessler.html'));
 });
 
-// The Arcade. Ten small self-contained canvas games, each a single HTML page
+// The Arcade. Eleven small self-contained canvas games, each a single HTML page
 // with two plain scripts. The slug is checked against a fixed list rather than
 // passed to sendFile, so no request can walk out of views/games.
 const ARCADE_GAMES = [
     'gravity-runner', 'kessler-reversed', 'last-station', 'junk-katamari', 're-entry',
-    'asteroid-miner', 'slingshot-golf', 'solar-sailor', 'planet-defense', 'orbit-weaver'
+    'asteroid-miner', 'slingshot-golf', 'solar-sailor', 'planet-defense', 'orbit-weaver',
+    'eclipse'
 ];
 
 app.get('/games', ensureAuthenticated, (req, res) => {
@@ -735,6 +758,22 @@ app.get('/api/user', (req, res) => {
     } else {
         res.json({ loggedIn: false });
     }
+});
+
+// What the host polls to decide whether this instance is alive, so it stays
+// cheap and touches nothing. It reports the database rather than depending on
+// it: the site is deliberately usable with Mongo down (demo sessions, static
+// planet data), and failing the health check there would put the host into a
+// restart loop over a degradation the app already handles.
+app.get('/api/health', (req, res) => {
+    const states = ['disconnected', 'connected', 'connecting', 'disconnecting'];
+    res.json({
+        status: 'ok',
+        uptime: Math.round(process.uptime()),
+        db: states[mongoose.connection.readyState] || 'unknown',
+        demoAuth: DEMO_AUTH,
+        env: process.env.NODE_ENV || 'development'
+    });
 });
 
 // Quiz Routes

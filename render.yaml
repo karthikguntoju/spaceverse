@@ -1,0 +1,33 @@
+# Render blueprint — https://render.com/docs/blueprint-spec
+#
+# Render is used rather than the serverless config also in this repo because the
+# app serves ~123 MB of static assets (models/ and public/) straight from
+# express.static and holds a pooled Mongo connection. Both want one long-lived
+# process, not a function that is rebuilt per request.
+#
+# `sync: false` means Render prompts for the value on first deploy and stores it
+# encrypted, so no secret is ever written into this file.
+services:
+  - type: web
+    name: spaceverse
+    runtime: node
+    plan: free # free instances sleep after 15 min idle; first hit then takes ~30s
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production # also switches on trust-proxy and secure cookies
+      - key: NODE_VERSION
+        value: "22" # pinned: the manifest allows >=20, the host should not drift
+      - key: MONGODB_URI
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true # Render mints a random one and keeps it across deploys
+      - key: DEMO_AUTH
+        value: "true" # any callsign/access code accepted; nothing written to the DB
+      - key: NASA_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
