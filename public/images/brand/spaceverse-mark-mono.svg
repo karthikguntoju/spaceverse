@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Spaceverse">
+  <title>Spaceverse</title>
+  <!--
+    LATTICE, one colour — for anywhere the palette gets stripped: print,
+    embroidery, a partner's logo wall, a monochrome favicon fallback.
+
+    Everything is currentColor, so inlining this into a page picks up the
+    surrounding text colour. Referenced as an <img> src it falls back to
+    #F2F6FF, which is correct on the app's dark grounds; on a light ground
+    inline it and set color: #0A0D16.
+
+    Row opacity does the shading the accent colour normally does. Keep it.
+  -->
+  <defs>
+    <clipPath id="sv-lattice-mono-clip">
+      <circle cx="50" cy="50" r="38"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#sv-lattice-mono-clip)" stroke="currentColor" color="#F2F6FF"
+     stroke-linecap="round" stroke-width="5.4" stroke-dasharray="0.1 11">
+    <line x1="8"    y1="19" x2="96" y2="19" stroke-opacity=".62"/>
+    <line x1="13.5" y1="30" x2="96" y2="30" stroke-opacity=".8"/>
+    <line x1="8"    y1="41" x2="96" y2="41"/>
+    <line x1="13.5" y1="52" x2="96" y2="52"/>
+    <line x1="8"    y1="63" x2="96" y2="63" stroke-opacity=".9"/>
+    <line x1="13.5" y1="74" x2="96" y2="74" stroke-opacity=".75"/>
+    <line x1="8"    y1="85" x2="96" y2="85" stroke-opacity=".62"/>
+  </g>
+
+  <ellipse cx="50" cy="50" rx="45" ry="12.5" fill="none" stroke="currentColor" color="#F2F6FF"
+           stroke-width="3.2" stroke-opacity=".8" transform="rotate(-24 50 50)"/>
+</svg>

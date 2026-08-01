@@ -917,37 +917,16 @@ select.input {
     flex: none;
 }
 
+/* The Lattice mark. Drawn transparent rather than on its own tile — the dock
+   is already a glass surface, and a second hard ground inside it reads as a
+   sticker. At 32px this is the small cut; the seven-row master would silt up
+   at this size. */
 .dock-mark {
-    position: relative;
-    display: grid;
-    place-items: center;
+    display: block;
     width: 32px;
     height: 32px;
     flex: none;
-    border-radius: 11px;
-    background: linear-gradient(135deg, var(--aur-cyan), var(--aur-violet));
-    box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.7),
-        0 6px 18px -6px rgba(34, 211, 238, 0.8);
-}
-
-.dock-mark::before {
-    content: '';
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    background: #05080f;
-    box-shadow: inset -2px -2px 3px rgba(255, 255, 255, 0.35);
-}
-
-.dock-mark::after {
-    content: '';
-    position: absolute;
-    width: 25px;
-    height: 8px;
-    border: 1.5px solid rgba(255, 255, 255, 0.85);
-    border-radius: 50%;
-    transform: rotate(-22deg);
+    background: url('/public/images/brand/spaceverse-mark-small.svg') center / contain no-repeat;
 }
 
 .dock-nav {

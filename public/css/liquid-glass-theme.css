@@ -826,3 +826,30 @@ body.lg-lite > canvas#starfield {
         filter: blur(64px);
     }
 }
+
+/* ── Brand mark on the legacy headers ──────────────────────────────
+   Seven pages (quiz, reviews-era headers, the Artemis pair, mission
+   tracker, launches, the traffic simulator) each carry their own copy of
+   a `.logo-icon > .logo-planet + .logo-ring` header mark: a glowing ball
+   with a pulsing purple ellipse around it, redefined inline per file.
+
+   Rather than edit seven inline <style> blocks, the mark is repainted
+   once here. This file is linked after every one of those blocks, and
+   `.logo-icon .logo-planet` outranks the bare `.logo-planet` they use, so
+   the override lands without !important. The old parts are hidden rather
+   than deleted so nothing in those files breaks if they are edited later.
+
+   35px sits inside the small cut's band — do not swap in the seven-row
+   master here, its dot pitch collapses below 40px. */
+.logo-icon {
+    position: relative;
+    width: 35px;
+    height: 35px;
+    flex: none;
+    background: url('/public/images/brand/spaceverse-mark-small.svg') center / contain no-repeat;
+}
+
+.logo-icon .logo-planet,
+.logo-icon .logo-ring {
+    display: none;
+}

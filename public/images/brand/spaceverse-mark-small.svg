@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Spaceverse">
+  <title>Spaceverse</title>
+  <!--
+    LATTICE, small cut — for 16px to 64px.
+
+    A redraw, not a scale. The master's seven rows at 5.4 become three rows at
+    15: ten dots against roughly forty.
+
+    Two things were learned making this file and both are baked in here.
+
+    One: the ring cannot lead. In the first cut it was the only element still
+    standing at 16px and the mark collapsed into a violet smear. The dots are
+    the idea, so they are the heaviest thing here and the ring is trimmed to
+    suit — the reverse of the master's balance.
+
+    Two: at three rows the clip path is decorative. The master gets its round
+    silhouette from clipping a dense field; with ten dots there is nothing for
+    a clip to carve, so the dots are positioned into the circle by hand — 3/4/3
+    across rows at y 28/50/72, held to a 0.86 width-to-height ratio. Each row's
+    x2 stops on its last dot rather than running to the edge, which is what
+    sets the count.
+  -->
+  <g stroke-linecap="round" stroke-width="15" stroke-dasharray="0.1 18">
+    <line x1="32" y1="28" x2="68" y2="28" stroke="#F2F6FF" stroke-opacity=".85"/>
+    <line x1="23" y1="50" x2="77" y2="50" stroke="#22D3EE"/>
+    <line x1="32" y1="72" x2="68" y2="72" stroke="#F2F6FF" stroke-opacity=".7"/>
+  </g>
+
+  <ellipse cx="50" cy="50" rx="40" ry="10.5" fill="none" stroke="#A78BFA" stroke-width="6.5"
+           transform="rotate(-24 50 50)"/>
+</svg>

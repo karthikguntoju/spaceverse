@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" role="img" aria-label="Spaceverse">
+  <title>Spaceverse</title>
+  <!--
+    LATTICE — the primary Spaceverse mark.
+
+    The sphere is never drawn. Seven rows of dots on an 11-unit pitch, every
+    other row offset by half a pitch so the packing runs hexagonal, are clipped
+    to a 38-unit circle: the clip resolves the geometry into a planet, which is
+    what the renderer does too. The three equatorial rows carry the accent.
+
+    Use at 64px and above. Below that use spaceverse-mark-small.svg — the dot
+    pitch does not survive the reduction.
+
+    Row opacity shades the sphere, but the top and bottom rows carry the
+    circular silhouette and were originally set faint enough (.55/.5) that the
+    outline read as a diamond. They are floored at .68 for that reason: the
+    shading is worth less than the shape.
+  -->
+  <defs>
+    <clipPath id="sv-lattice-clip">
+      <circle cx="50" cy="50" r="38"/>
+    </clipPath>
+  </defs>
+
+  <g clip-path="url(#sv-lattice-clip)" stroke-linecap="round" stroke-width="5.4" stroke-dasharray="0.1 11">
+    <line x1="8"    y1="19" x2="96" y2="19" stroke="#F2F6FF" stroke-opacity=".68"/>
+    <line x1="13.5" y1="30" x2="96" y2="30" stroke="#F2F6FF" stroke-opacity=".85"/>
+    <line x1="8"    y1="41" x2="96" y2="41" stroke="#22D3EE"/>
+    <line x1="13.5" y1="52" x2="96" y2="52" stroke="#22D3EE"/>
+    <line x1="8"    y1="63" x2="96" y2="63" stroke="#22D3EE" stroke-opacity=".85"/>
+    <line x1="13.5" y1="74" x2="96" y2="74" stroke="#F2F6FF" stroke-opacity=".82"/>
+    <line x1="8"    y1="85" x2="96" y2="85" stroke="#F2F6FF" stroke-opacity=".68"/>
+  </g>
+
+  <ellipse cx="50" cy="50" rx="45" ry="12.5" fill="none" stroke="#A78BFA" stroke-width="3.2"
+           transform="rotate(-24 50 50)"/>
+</svg>
