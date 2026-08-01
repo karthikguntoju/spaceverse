@@ -45,6 +45,14 @@ process.on('exit', (code) => {
 
 const PORT = process.env.PORT || 5000;
 
+// A managed host (Render, Railway, Fly, Heroku) assigns the port and routes
+// traffic to exactly that number. Scanning for the next free one there is
+// actively harmful: if the probe ever comes back false the app binds PORT + 1,
+// nothing is listening where the platform is routing, and the health check
+// fails with no error that points at the cause. Probing is a local-dev
+// convenience for when 5000 is already taken — so it stays, but only off-prod.
+const MUST_BIND_ASSIGNED_PORT = process.env.NODE_ENV === 'production' && Boolean(process.env.PORT);
+
 // Function to find an available port
 async function findAvailablePort(startPort) {
     const net = require('net');
@@ -1522,13 +1530,21 @@ if (IS_TEST) {
     initializeDatabase().then(() => {
         // ... (remaining logic same as before, but wrapped)
         // Note: For brevity, I'm just showing the structural change
-        findAvailablePort(PORT).then(availablePort => {
+        const resolvePort = MUST_BIND_ASSIGNED_PORT
+            ? Promise.resolve(PORT)
+            : findAvailablePort(PORT);
+
+        resolvePort.then(availablePort => {
             const server = app.listen(availablePort, () => {
                 console.log(`🚀 Enhanced Spaceverse Server is running on http://localhost:${availablePort}`);
             });
 
+            // On a managed host a bind failure must kill the process so the
+            // platform reports a failed deploy, rather than leaving a live
+            // container that answers nothing.
             server.on('error', (err) => {
                 console.error('Server error:', err);
+                if (MUST_BIND_ASSIGNED_PORT) process.exit(1);
             });
 
             process.on('SIGTERM', () => {
