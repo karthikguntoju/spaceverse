@@ -20,6 +20,8 @@ let mongod = null;
 
 async function startTestDb() {
     process.env.NODE_ENV = 'test';
+    // Tests log in with arbitrary callsigns; they were written for demo auth.
+    process.env.DEMO_AUTH = 'true';
     mongod = await MongoMemoryServer.create();
     const uri = mongod.getUri();
     process.env.MONGODB_URI = uri;

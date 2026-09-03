@@ -1535,8 +1535,51 @@ if (IS_TEST) {
             : findAvailablePort(PORT);
 
         resolvePort.then(availablePort => {
-            const server = app.listen(availablePort, () => {
-                console.log(`🚀 Enhanced Spaceverse Server is running on http://localhost:${availablePort}`);
+            // HTTPS=true serves the same app over TLS with a self-signed cert.
+            // Needed for phone VR: browsers only hand out gyroscope /
+            // DeviceOrientation data on a secure origin, and a phone on the LAN
+            // reaches this machine by IP, which is never "localhost".
+            const useHttps = String(process.env.HTTPS || '').toLowerCase() === 'true' || process.argv.includes('--https');
+            let server;
+            if (useHttps) {
+                const https = require('https');
+                const fs = require('fs');
+                const certDir = path.join(__dirname, 'certs');
+                const keyPath = path.join(certDir, 'dev-key.pem');
+                const certPath = path.join(certDir, 'dev-cert.pem');
+                if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+                    const selfsigned = require('selfsigned');
+                    const lanIps = Object.values(require('os').networkInterfaces()).flat()
+                        .filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
+                    const pems = selfsigned.generate([{ name: 'commonName', value: 'spaceverse.local' }], {
+                        days: 3650, keySize: 2048, algorithm: 'sha256',
+                        extensions: [{
+                            name: 'subjectAltName',
+                            altNames: [
+                                { type: 2, value: 'localhost' }, { type: 7, ip: '127.0.0.1' },
+                                ...lanIps.map(ip => ({ type: 7, ip }))
+                            ]
+                        }]
+                    });
+                    fs.mkdirSync(certDir, { recursive: true });
+                    fs.writeFileSync(keyPath, pems.private);
+                    fs.writeFileSync(certPath, pems.cert);
+                    console.log('🔐 Generated self-signed dev certificate in certs/ (accept the browser warning once)');
+                }
+                server = https.createServer({ key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }, app);
+                server.listen(availablePort);
+            } else {
+                server = app.listen(availablePort);
+            }
+            server.on('listening', () => {
+                const proto = useHttps ? 'https' : 'http';
+                console.log(`🚀 Enhanced Spaceverse Server is running on ${proto}://localhost:${availablePort}`);
+                const lan = Object.values(require('os').networkInterfaces()).flat()
+                    .filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
+                if (lan.length) {
+                    console.log(`📱 On your phone (same Wi-Fi): ${lan.map(ip => `${proto}://${ip}:${availablePort}`).join('  ')}`);
+                    if (!useHttps) console.log('   Phone gyro / VR needs HTTPS — restart with  HTTPS=true npm start  (or npm run start:https)');
+                }
             });
 
             // On a managed host a bind failure must kill the process so the

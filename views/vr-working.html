@@ -251,6 +251,40 @@
 
         body.in-vr .hud, body.in-vr #mode-menu, body.in-vr #info-card, body.in-vr #toast { display: none !important; }
 
+        /* ── phone VR (Cardboard) ────────────────────────────────────
+           Side-by-side stereo: nothing flat is readable, so every DOM panel
+           goes away except two tiny corner buttons you can hit with a thumb
+           before the phone goes in the viewer. */
+        body.in-cardboard .hud, body.in-cardboard #mode-menu, body.in-cardboard #info-card,
+        body.in-cardboard #toast, body.in-cardboard #narration, body.in-cardboard #warning,
+        body.in-cardboard #ride-done { display: none !important; }
+        #cardboard-bar { position: fixed; inset: 0 0 auto 0; z-index: 70; display: none; justify-content: space-between; padding: 8px; pointer-events: none; }
+        body.in-cardboard #cardboard-bar { display: flex; }
+        #cardboard-bar .chip { pointer-events: auto; padding: 6px 12px; min-height: 32px; font-size: 12px; opacity: 0.55; }
+        #cardboard-bar .chip:active { opacity: 1; }
+        #cardboard-divider { position: fixed; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: rgba(0,0,0,0.85); z-index: 65; display: none; pointer-events: none; }
+        body.in-cardboard #cardboard-divider { display: block; }
+
+        /* the cockpit has its own instruments — the flat ride panel steps
+           aside into a corner so the dashboard is what you look at */
+        body.cockpit-on #ride-panel {
+            left: auto; right: 96px; bottom: 18px; transform: none;
+            width: min(330px, calc(100% - 120px)); padding: 10px 14px;
+        }
+        body.cockpit-on #seg-title { font-size: 14px; }
+        body.cockpit-on #seg-sub { font-size: 11.5px; }
+        body.cockpit-on #ride-bar { margin: 8px 0 10px; }
+        body.cockpit-on .ride-btns .chip { padding: 5px 10px; font-size: 11.5px; min-height: 30px; }
+        body.cockpit-on #narration { bottom: auto; top: 128px; }
+        body.cockpit-on #toast { bottom: auto; top: 180px; }
+        body.in-vr #sv-chat-btn, body.in-vr #sv-chat-modal,
+        body.in-cardboard #sv-chat-btn, body.in-cardboard #sv-chat-modal { display: none !important; }
+
+        #phone-row { display: none; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
+        #phone-note { flex: 1 1 100%; font-size: 12px; color: var(--muted); line-height: 1.5; }
+        #phone-note.warn { color: #ffb46b; }
+        .chip.on { background: rgba(34, 211, 238, 0.18); border-color: var(--accent); }
+
         @media (max-width: 640px) {
             #explore-panel { left: 10px; right: 10px; bottom: 10px; max-width: none; }
             #ride-panel { bottom: 10px; }
@@ -269,6 +303,8 @@
     <link rel="stylesheet" href="/public/css/liquid-glass-theme.css">
     <link rel="icon" type="image/svg+xml" href="/public/favicon.svg">
     <script src="/public/js/liquid-glass.js" defer></script>
+    <link rel="stylesheet" href="/public/css/mobile.css">
+    <script src="/public/js/mobile.js" defer></script>
 </head>
 <body>
     <div id="vr-container"></div>
@@ -289,7 +325,17 @@
     <div class="hud" id="top-bar">
         <a href="/" class="chip ghost">← Home</a>
         <div id="brand">SPACEVERSE · VR</div>
-        <button id="btn-menu" class="chip ghost">☰ Menu</button>
+        <div style="display:flex; gap:8px;">
+            <button id="btn-recenter" class="chip ghost" title="Recentre view (V)">⟲</button>
+            <button id="btn-menu" class="chip ghost">☰ Menu</button>
+        </div>
+    </div>
+
+    <!-- phone VR: the only chrome that survives split-screen -->
+    <div id="cardboard-divider"></div>
+    <div id="cardboard-bar">
+        <button id="exit-phone-vr" class="chip ghost">✕ Exit VR</button>
+        <button id="recenter-phone-vr" class="chip ghost">⟲ Recentre</button>
     </div>
 
     <!-- mode menu -->
@@ -322,14 +368,16 @@
                 <button class="card ride" id="start-ride">
                     <span class="tag">RIDE · 3 MIN</span>
                     <h3>🎢 Start the ride</h3>
-                    <p>A rail-guided plunge: solar slingshot, asteroid gauntlet, Jupiter barrel roll,
-                       a shot straight through Saturn's rings, and four things that come far too close.</p>
+                    <p>Strap into the pilot seat. A rail-guided plunge: solar slingshot, asteroid gauntlet,
+                       Jupiter barrel roll, a shot straight through Saturn's rings, and four things that come
+                       far too close. Look around the cockpit — drag, move your phone, or turn your head.</p>
                 </button>
             </div>
 
             <div class="settings">
                 <label class="for-ride"><input type="checkbox" id="opt-comfort"> Comfort mode (damps rolls, adds tunnel vignette)</label>
                 <label class="for-ride"><input type="checkbox" id="opt-scares" checked> Jumpscares enabled</label>
+                <label class="for-ride"><input type="checkbox" id="opt-cockpit" checked> Cockpit view (sit in the ship, look around)</label>
                 <label><input type="checkbox" id="opt-sound" checked> Sound</label>
                 <label class="for-explore"><input type="checkbox" id="opt-labels" checked> Name labels</label>
                 <label class="for-explore"><input type="checkbox" id="opt-orbits" checked> Orbit lines</label>
@@ -347,6 +395,11 @@
             <div class="btn-row">
                 <button id="enter-vr" class="chip">🥽 Checking for headset…</button>
                 <span id="vr-ready">Headset detected — enter VR first, then start.</span>
+            </div>
+            <div id="phone-row">
+                <button id="btn-gyro" class="chip">🧭 Gyro look</button>
+                <button id="btn-phone-vr" class="chip">📱 Phone VR (Cardboard)</button>
+                <span id="phone-note"></span>
             </div>
         </div>
     </div>
@@ -372,7 +425,8 @@
                 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> fly · <kbd>Q</kbd><kbd>E</kbd> up/down ·
                 <kbd>Shift</kbd> boost<br>
                 Drag to look · scroll to change speed · click a planet to scan<br>
-                In VR: left stick flies, right stick snap-turns, trigger scans
+                In VR: left stick flies, right stick snap-turns, trigger scans<br>
+                On a phone: 🧭 Gyro look turns the view with the phone · 📱 Phone VR for a Cardboard viewer
             </div>
         </div>
     </div>

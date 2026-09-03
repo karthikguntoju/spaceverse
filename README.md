@@ -90,6 +90,31 @@ This will automatically start:
    - The AI service will be running on `http://localhost:8001`
    - When using the single-command startup, both services will be managed automatically
 
+## Phone VR & Cockpit Ride 📱🥽
+
+Both VR pages (`/vr-solar-system` and `/vr-ride`) work on a phone with head-tracking:
+
+- **🧭 Gyro look** — hold the phone up and turn around; the view follows the phone in every
+  direction (DeviceOrientation). Drag adds yaw on top; **⟲ / V** recentres.
+- **📱 Phone VR (Cardboard)** — side-by-side stereo, fullscreen, landscape lock, gaze reticle.
+  Put the phone in any Cardboard-style viewer. **Tap** (or the viewer's button) = fly / stop in
+  Explore, pause / resume on the Ride. Look at a world for ~1.5 s to scan it.
+- **🛩 Cockpit** (Ride) — you sit in the pilot seat of a ship: canopy, dashboard with live
+  velocity / hull / shield / route screens, flight-plan and systems consoles, a throttle that
+  follows the burn, a stick that leans into every bank, alert lamps, narration on the dash.
+  Look around with mouse, touch, phone gyro or a headset. Toggle in the launcher settings.
+
+**Phones only send gyroscope data over HTTPS**, so to try it on your phone:
+
+```bash
+npm run start:https          # or: HTTPS=true npm start
+```
+
+The server prints a `https://<your-LAN-IP>:5000` URL — open that on the phone (same Wi‑Fi),
+accept the self-signed certificate warning once, sign in, open a VR page and tap **🧭** or **📱**.
+On iOS Safari, allow the *Motion & Orientation* permission prompt. The cert is generated into
+`certs/` on first run and is git-ignored.
+
 ## Project Structure 📁
 
 ```

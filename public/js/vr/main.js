@@ -20,6 +20,9 @@ import { SolarSystem, BODIES } from './solar-system.js';
 import { SpaceAudio } from './audio.js';
 import { ScareDirector } from './scares.js';
 import { Ride } from './ride.js';
+import { GyroLook } from './gyro.js';
+import { Cockpit } from './cockpit.js';
+import { StereoEffect } from 'three/addons/effects/StereoEffect.js';
 import MissionCore from '../game/core.js';
 import { createScanHunt } from '../game/missions/scan-hunt.js';
 
@@ -47,6 +50,20 @@ class VRApp {
         this.baseFov = 62;
         this.hudDirty = true;
         this.hudText = { title: 'SPACEVERSE', sub: 'Solar system', warn: '' };
+
+        /* Head look inside the cabin (ride) — the dolly rides the rails, the
+           camera is the head. Mouse/touch move these; the gyro replaces them. */
+        this.lookYaw = 0;
+        this.lookPitch = 0;
+        this.gyro = new GyroLook();
+        this.gyroOn = false;
+        /* Phone VR: side-by-side stereo for a Cardboard-style viewer, gaze
+           reticle instead of a pointer, tap instead of buttons. */
+        this.stereo = false;
+        this.autoFly = false;
+        this.gaze = { key: null, t: 0, done: false };
+        this.cockpitOn = true;
+        this.isTouch = (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
     }
 
     async init() {
@@ -130,6 +147,10 @@ class VRApp {
             }
         };
 
+        this.cockpit = new Cockpit({ dolly: this.dolly, camera: this.camera, renderer: this.renderer });
+        this.stereoEffect = new StereoEffect(this.renderer);
+        this.buildReticle();
+
         // Missions run on the shared core. VRApp stays the only owner of the
         // scene, the camera and the audio; the core owns nothing but the run.
         MissionCore.register(createScanHunt({
@@ -159,6 +180,7 @@ class VRApp {
         this.renderer.setAnimationLoop((t, frame) => this.loop(frame));
 
         this.checkXR();
+        this.checkPhone();
         $('loading').style.display = 'none';
         $('mode-menu').classList.add('show');
 
@@ -187,7 +209,203 @@ class VRApp {
     }
 
     applyLook() {
-        this.dolly.quaternion.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
+        // with the gyro driving the camera, the dolly only carries the yaw
+        // offset from touch-drag; pitch is the phone's job
+        const pitch = this.gyroActive ? 0 : this.pitch;
+        this.dolly.quaternion.setFromEuler(new THREE.Euler(pitch, this.yaw, 0, 'YXZ'));
+    }
+
+    /** true while the phone's sensors are steering the camera */
+    get gyroActive() {
+        return this.gyroOn && this.gyro.enabled && this.gyro.hasReading && !this.renderer.xr.isPresenting;
+    }
+
+    /* ── phone VR: gyro look + Cardboard stereo ─────────────────────── */
+
+    checkPhone() {
+        const wrap = $('phone-row');
+        if (!wrap) return;
+        // Offer it on anything with a touch screen; a desktop has no sensors
+        // to give and the buttons would only confuse.
+        if (!this.isTouch) { wrap.style.display = 'none'; return; }
+        wrap.style.display = 'flex';
+        const reason = GyroLook.blockedReason;
+        const note = $('phone-note');
+        if (note) {
+            note.textContent = reason
+                ? '⚠ ' + reason
+                : 'Hold the phone up and turn around — the view follows. Phone VR splits the screen for a Cardboard-style headset.';
+            note.classList.toggle('warn', !!reason);
+        }
+    }
+
+    async enableGyro(silent) {
+        if (this.gyroOn) return true;
+        if (!GyroLook.available) {
+            if (!silent) this.toast(GyroLook.blockedReason || 'Motion sensors unavailable.');
+            return false;
+        }
+        const ok = await this.gyro.enable();
+        if (!ok) {
+            if (!silent) this.toast('Motion sensor permission was refused. Allow it in browser settings and try again.');
+            return false;
+        }
+        this.gyroOn = true;
+        // whatever way you face when it starts is "forward" — and the free-
+        // flight yaw is carried by the dolly from here on
+        this.gyro.recenter();
+        this.applyLook();
+        this.updatePhoneButtons();
+        if (!silent) this.toast('Gyro look ON — move your phone to look around. ⟲ recenters.');
+        return true;
+    }
+
+    disableGyro() {
+        if (!this.gyroOn) return;
+        this.gyro.disable();
+        this.gyroOn = false;
+        this.camera.quaternion.identity();
+        this.applyLook();
+        this.updatePhoneButtons();
+        this.toast('Gyro look OFF');
+    }
+
+    recenterView() {
+        if (this.gyroActive) this.gyro.recenter();
+        this.lookYaw = 0; this.lookPitch = 0;
+        this.audio.blip(700);
+        this.toast('View recentred');
+    }
+
+    async enterPhoneVR() {
+        if (this.renderer.xr.isPresenting) return;
+        await this.enableGyro(true);
+        this.stereo = true;
+        document.body.classList.add('in-cardboard');
+        const el = document.documentElement;
+        try {
+            if (el.requestFullscreen) await el.requestFullscreen({ navigationUI: 'hide' });
+            else if (el.webkitRequestFullscreen) el.webkitRequestFullscreen();
+        } catch (e) { /* iOS Safari has no fullscreen for pages */ }
+        try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); }
+        catch (e) { /* not lockable here — user rotates by hand */ }
+        this.reticle.visible = true;
+        this.vrHud.visible = this.mode !== 'ride';
+        this.audio.init();
+        this.onResize();
+        this.updatePhoneButtons();
+        const gyroMsg = this.gyroOn ? '' : ' (no gyro — drag to look)';
+        this.toast('Phone VR' + gyroMsg + ' — put the phone in your viewer. Tap = ' +
+            (this.entry === 'ride' ? 'pause / resume' : 'fly / stop') + '. Look at a world to scan it.');
+        this._fsHandler = () => {
+            if (!document.fullscreenElement && this.stereo) this.exitPhoneVR();
+        };
+        document.addEventListener('fullscreenchange', this._fsHandler);
+    }
+
+    exitPhoneVR() {
+        if (!this.stereo) return;
+        this.stereo = false;
+        this.autoFly = false;
+        document.body.classList.remove('in-cardboard');
+        if (this._fsHandler) document.removeEventListener('fullscreenchange', this._fsHandler);
+        try { if (document.fullscreenElement && document.exitFullscreen) document.exitFullscreen(); } catch (e) { /* ignore */ }
+        try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) { /* ignore */ }
+        this.reticle.visible = false;
+        this.vrHud.visible = false;
+        this.renderer.setScissorTest(false);
+        this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+        this.onResize();
+        this.updatePhoneButtons();
+    }
+
+    updatePhoneButtons() {
+        const g = $('btn-gyro'), p = $('btn-phone-vr');
+        if (g) g.textContent = this.gyroOn ? '🧭 Gyro look: ON' : '🧭 Gyro look';
+        if (p) p.textContent = this.stereo ? '📱 Exit Phone VR' : '📱 Phone VR (Cardboard)';
+    }
+
+    /** a small ring at the centre of view — the pointer when there is no pointer */
+    buildReticle() {
+        const ring = new THREE.Mesh(
+            new THREE.RingGeometry(0.006, 0.009, 32),
+            new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.9, depthTest: false })
+        );
+        ring.position.set(0, 0, -0.6);
+        ring.renderOrder = 999;
+        ring.visible = false;
+        const fill = new THREE.Mesh(
+            new THREE.CircleGeometry(0.006, 32),
+            new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.0, depthTest: false })
+        );
+        fill.renderOrder = 999;
+        ring.add(fill);
+        this.reticleFill = fill;
+        this.camera.add(ring);
+        this.reticle = ring;
+    }
+
+    /**
+     * Cardboard has no pointer, so looking at a world for a moment scans it.
+     * Runs only in stereo, only in modes where scanning means something.
+     */
+    gazeUpdate(dt) {
+        if (!this.stereo || this.mode === 'ride' || this.mode === 'menu') {
+            if (this.reticleFill.material.opacity !== 0) this.reticleFill.material.opacity = 0;
+            return;
+        }
+        this.pointer.set(0, 0);
+        this.raycaster.setFromCamera(this.pointer, this.camera);
+        const hits = this.raycaster.intersectObjects(this.system.pickTargets, false);
+        const key = hits.length ? hits[0].object.userData.bodyKey : null;
+        if (key !== this.gaze.key) { this.gaze.key = key; this.gaze.t = 0; this.gaze.done = false; }
+        if (!key) { this.reticleFill.material.opacity = 0; this.reticle.scale.setScalar(1); return; }
+        this.gaze.t += dt;
+        const DWELL = 1.4;
+        const p = clamp(this.gaze.t / DWELL, 0, 1);
+        this.reticleFill.material.opacity = p * 0.9;
+        this.reticle.scale.setScalar(1 + p * 0.6);
+        if (p >= 1 && !this.gaze.done) {
+            this.gaze.done = true;
+            this.showBody(key, this.mode === 'explore');
+            this.audio.blip(920);
+        }
+    }
+
+    /** a tap on the screen (or the Cardboard button) — no pointer, one action */
+    onPhoneTap() {
+        if (this.mode === 'ride') {
+            this.ride.playing ? this.ride.pause() : this.ride.resume();
+            this.updateHudDom();
+            this.audio.blip(this.ride.playing ? 720 : 480);
+        } else if (this.mode === 'explore' || this.mode === 'mission') {
+            this.autoFly = !this.autoFly;
+            this.audio.blip(this.autoFly ? 760 : 420);
+            this.setHud(this.autoFly ? 'FLYING' : 'HOLDING',
+                this.autoFly ? 'Look where you want to go · tap to stop' : 'Tap to fly toward where you look');
+        }
+    }
+
+    /**
+     * Camera pose inside the dolly for the flat/phone paths. In an XR session
+     * the headset owns the camera and this must not touch it.
+     */
+    updateHead(dt) {
+        if (this.renderer.xr.isPresenting) return;
+        if (this.gyroActive) {
+            this.gyro.apply(this.camera.quaternion, 0);
+            return;
+        }
+        if (this.mode === 'ride') {
+            // seated head-look; without input the head slowly settles forward
+            if (!this.dragging) {
+                this.lookYaw += (0 - this.lookYaw) * Math.min(1, dt * 0.35);
+                this.lookPitch += (0 - this.lookPitch) * Math.min(1, dt * 0.35);
+            }
+            this.camera.quaternion.setFromEuler(new THREE.Euler(this.lookPitch, this.lookYaw, 0, 'YXZ'));
+        } else if (this.camera.quaternion.w !== 1) {
+            this.camera.quaternion.identity();
+        }
     }
 
     /* ── WebXR ──────────────────────────────────────────────────────── */
@@ -218,6 +436,7 @@ class VRApp {
 
     async enterVR() {
         if (!navigator.xr) return;
+        if (this.stereo) this.exitPhoneVR();
         try {
             const session = await navigator.xr.requestSession('immersive-vr', {
                 optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers']
@@ -421,6 +640,24 @@ class VRApp {
 
     /* ── input ──────────────────────────────────────────────────────── */
 
+    /**
+     * One look-around routine for mouse and touch. Where the rotation lands
+     * depends on the mode: free flight turns the whole dolly, the ride turns
+     * the head inside the cabin, and with the gyro on a drag only adds yaw so
+     * you can spin the ship without spinning your chair.
+     */
+    lookDelta(dx, dy) {
+        if (this.mode === 'ride') {
+            this.lookYaw = clamp(this.lookYaw - dx, -2.6, 2.6);
+            this.lookPitch = clamp(this.lookPitch - dy, -1.2, 1.2);
+            return;
+        }
+        this.yaw -= dx;
+        if (!this.gyroActive) this.pitch = clamp(this.pitch - dy, -1.35, 1.35);
+        this.focusTween = null;
+        this.applyLook();
+    }
+
     bindInput() {
         const dom = this.renderer.domElement;
         dom.addEventListener('mousedown', e => {
@@ -433,14 +670,11 @@ class VRApp {
             this.dragging = false;
         });
         window.addEventListener('mousemove', e => {
-            if (!this.dragging || this.mode === 'ride') return;
+            if (!this.dragging) return;
             const dx = e.clientX - this.lastX, dy = e.clientY - this.lastY;
             this.dragMoved += Math.abs(dx) + Math.abs(dy);
             this.lastX = e.clientX; this.lastY = e.clientY;
-            this.yaw -= dx * 0.0032;
-            this.pitch = clamp(this.pitch - dy * 0.0032, -1.35, 1.35);
-            this.focusTween = null;
-            this.applyLook();
+            this.lookDelta(dx * 0.0032, dy * 0.0032);
         });
         dom.addEventListener('wheel', e => {
             e.preventDefault();
@@ -452,17 +686,27 @@ class VRApp {
         dom.addEventListener('touchstart', e => {
             if (e.touches.length !== 1) return;
             this.dragging = true;
+            this.touchMoved = 0;
             this.lastX = e.touches[0].clientX; this.lastY = e.touches[0].clientY;
         }, { passive: true });
         dom.addEventListener('touchmove', e => {
-            if (!this.dragging || this.mode === 'ride' || e.touches.length !== 1) return;
+            if (!this.dragging || e.touches.length !== 1) return;
             const dx = e.touches[0].clientX - this.lastX, dy = e.touches[0].clientY - this.lastY;
+            this.touchMoved += Math.abs(dx) + Math.abs(dy);
             this.lastX = e.touches[0].clientX; this.lastY = e.touches[0].clientY;
-            this.yaw -= dx * 0.005;
-            this.pitch = clamp(this.pitch - dy * 0.005, -1.35, 1.35);
-            this.applyLook();
+            this.lookDelta(dx * 0.005, dy * 0.005);
         }, { passive: true });
-        dom.addEventListener('touchend', () => { this.dragging = false; });
+        dom.addEventListener('touchend', e => {
+            const wasDrag = this.dragging;
+            this.dragging = false;
+            if (!wasDrag) return;
+            // a tap, not a drag: in phone VR that is the only button there is;
+            // on a plain phone screen it scans whatever is under the finger
+            if (this.touchMoved < 8) {
+                if (this.stereo) this.onPhoneTap();
+                else if (e.changedTouches && e.changedTouches[0]) this.pickAt(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+            }
+        });
 
         window.addEventListener('keydown', e => {
             this.keys.add(e.code);
@@ -474,6 +718,7 @@ class VRApp {
             if (e.code === 'ArrowRight' && this.mode === 'ride') this.ride.skipSegment();
             if (e.code === 'KeyR' && this.mode === 'ride') this.startRide();
             if (e.code === 'KeyC') this.setComfort(!this.comfort);
+            if (e.code === 'KeyV') this.recenterView();
             if (e.code === 'Escape' && this.mode !== 'menu') this.toMenu();
         });
         window.addEventListener('keyup', e => this.keys.delete(e.code));
@@ -506,6 +751,24 @@ class VRApp {
         $('opt-labels').onchange = e => this.system.setLabelsVisible(this.mode === 'explore' && e.target.checked);
         $('opt-orbits').onchange = e => this.system.setOrbitLinesVisible(e.target.checked);
         $('info-close').onclick = () => $('info-card').classList.remove('show');
+        const ck = $('opt-cockpit');
+        if (ck) ck.onchange = e => {
+            this.cockpitOn = e.target.checked;
+            if (this.mode === 'ride') {
+                this.cockpit.setVisible(this.cockpitOn);
+                document.body.classList.toggle('cockpit-on', this.cockpitOn);
+            }
+        };
+        const bg = $('btn-gyro');
+        if (bg) bg.onclick = () => (this.gyroOn ? this.disableGyro() : this.enableGyro());
+        const bp = $('btn-phone-vr');
+        if (bp) bp.onclick = () => (this.stereo ? this.exitPhoneVR() : this.enterPhoneVR());
+        const bx = $('exit-phone-vr');
+        if (bx) bx.onclick = () => this.exitPhoneVR();
+        const br = $('btn-recenter');
+        if (br) br.onclick = () => this.recenterView();
+        const br2 = $('recenter-phone-vr');
+        if (br2) br2.onclick = () => this.recenterView();
     }
 
     setComfort(v) {
@@ -609,6 +872,9 @@ class VRApp {
 
         this.mode = 'menu';
         this.ride.stop();
+        this.cockpit.setVisible(false);
+        document.body.classList.remove('cockpit-on');
+        this.autoFly = false;
         this.system.orbitRate = 1;
         this.system.setLabelsVisible(false);
         this.camera.fov = this.baseFov;
@@ -625,6 +891,8 @@ class VRApp {
         this.audio.init();
         this.mode = 'explore';
         this.ride.stop();
+        this.cockpit.setVisible(false);
+        this.autoFly = false;
         this.system.setOrbitLinesVisible($('opt-orbits').checked);
         this.system.setLabelsVisible($('opt-labels').checked);
         this.placeAtEarth();
@@ -644,6 +912,8 @@ class VRApp {
         this.audio.init();
         this.mode = 'mission';
         this.ride.stop();
+        this.cockpit.setVisible(false);
+        this.autoFly = false;
         this.system.setOrbitLinesVisible($('opt-orbits').checked);
         this.system.setLabelsVisible(false);   // finding it is the game
         this.placeAtEarth();
@@ -727,11 +997,21 @@ class VRApp {
         this.audio.setPad(0.18);
         this.ride.prepare();
         this.ride.start();
-        this.toast('VR DEEP SPACE RIDE — hold on. Space pauses, → skips a section, C toggles comfort mode.');
+        this.lookYaw = 0; this.lookPitch = 0;
+        if (this.gyroActive) this.gyro.recenter();
+        this.cockpit.reset();
+        this.cockpit.setSegment('IGNITION', 'Departing Earth orbit', 0, this.ride.segments.length,
+            this.ride.segments.map(s => ({ title: s.title, dur: s.dur })));
+        this.cockpit.setVisible(this.cockpitOn);
+        document.body.classList.toggle('cockpit-on', this.cockpitOn);
+        if (this.stereo) this.vrHud.visible = false;
+        this.toast('VR DEEP SPACE RIDE — you are in the pilot seat. Drag / move your phone to look around, V recentres. Space pauses, → skips, C comfort.');
     }
 
     onSegment(s, i, n) {
         this.clearWarning();
+        this.cockpit.setSegment(s.title, s.subtitle, i, n,
+            this.ride.segments.map(x => ({ title: x.title, dur: x.dur })));
         $('seg-title').textContent = s.title;
         $('seg-sub').textContent = s.subtitle;
         $('seg-index').textContent = `${i + 1}/${n}`;
@@ -755,6 +1035,7 @@ class VRApp {
     }
 
     narrate(text) {
+        if (this.cockpit) this.cockpit.setNarration(text);
         const el = $('narration');
         el.textContent = text;
         el.classList.add('show');
@@ -767,6 +1048,7 @@ class VRApp {
         const warn = $('warning');
         clearTimeout(this._warnT);
         if (e.type === 'incoming') {
+            this.cockpit.setAlert(e.label, 'warn');
             warn.textContent = '⚠ ' + e.label;
             warn.classList.remove('hit', 'ok');
             warn.classList.add('show');
@@ -776,6 +1058,7 @@ class VRApp {
             this._warnT = setTimeout(() => this.clearWarning(), 6000);
         } else {
             const hit = e.type === 'hit';
+            this.cockpit.setAlert(hit ? 'HULL BREACH' : 'NEAR MISS', hit ? 'hit' : 'ok');
             warn.textContent = hit ? '💥 HULL BREACH' : '✅ NEAR MISS';
             warn.classList.add('show', hit ? 'hit' : 'ok');
             this.setHud(this.hudText.title, this.hudText.sub, hit ? 'HULL STRESSED' : 'NEAR MISS');
@@ -785,6 +1068,7 @@ class VRApp {
 
     clearWarning() {
         clearTimeout(this._warnT);
+        if (this.cockpit) this.cockpit.setAlert('');
         $('warning').classList.remove('show', 'hit', 'ok');
         this.setHud(this.hudText.title, this.hudText.sub, '');
     }
@@ -833,6 +1117,7 @@ class VRApp {
         if (this.keys.has('KeyD') || this.keys.has('ArrowRight')) v.x += 1;
         if (this.keys.has('KeyQ')) v.y -= 1;
         if (this.keys.has('KeyE')) v.y += 1;
+        if (this.autoFly) v.z -= 1;   // phone VR: tap toggles "fly where I look"
 
         // headset thumbsticks: left = translate, right = snap turn
         if (this.xrSession) {
@@ -858,8 +1143,9 @@ class VRApp {
         if (v.lengthSq() > 0) {
             const boost = this.keys.has('ShiftLeft') || this.keys.has('ShiftRight') ? 4 : 1;
             v.normalize().multiplyScalar(this.flySpeed * boost * dt);
-            // in a headset, fly where the visor points; on desktop, where the dolly points
-            const q = this.renderer.xr.isPresenting
+            // in a headset or with the phone gyro, fly where the visor points;
+            // on desktop, where the dolly points
+            const q = (this.renderer.xr.isPresenting || this.gyroActive)
                 ? this.camera.getWorldQuaternion(new THREE.Quaternion())
                 : this.dolly.quaternion;
             v.applyQuaternion(q);
@@ -891,6 +1177,45 @@ class VRApp {
         this.camera.updateProjectionMatrix();
         this.renderer.setSize(window.innerWidth, window.innerHeight);
         if (this.composer) this.composer.setSize(window.innerWidth, window.innerHeight);
+        if (this.stereo) this.stereoEffect.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    /* ── cockpit instruments: live data from the scene ─────────────── */
+
+    /** hazards near the ship, in ship-local x/z (right / forward-negative) */
+    radarContacts() {
+        const out = [];
+        if (!this.scares || !this.scares.actors) return out;
+        const tmp = this._radarTmp || (this._radarTmp = new THREE.Vector3());
+        for (const a of this.scares.actors) {
+            tmp.copy(a.mesh.position);
+            this.dolly.worldToLocal(tmp);
+            if (Math.abs(tmp.x) > 90 || Math.abs(tmp.z) > 90) continue;
+            out.push({ x: tmp.x, z: tmp.z, hit: !!(a.spec && a.spec.hit) });
+        }
+        return out;
+    }
+
+    /** where the current segment's focus body sits on the canopy HUD */
+    hudTarget() {
+        const seg = this.ride.segments && this.ride.segments[this.ride.segIndex];
+        if (!seg || !seg.focus || seg.focus === 'ahead' || !this.system.bodies.has(seg.focus)) return null;
+        const p = this.system.worldPos(seg.focus, this._hudTmp || (this._hudTmp = new THREE.Vector3()));
+        const dist = p.distanceTo(this.dolly.position);
+        // project into the ship's own frame (the HUD is glued to the canopy,
+        // not to the head, so it uses the dolly, not the camera)
+        const local = p.clone(); this.dolly.worldToLocal(local);
+        if (local.z >= -0.5) return { visible: true, x: local.x > 0 ? 1.2 : -1.2, y: 0, name: seg.focus, dist };
+        const f = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+        const ndcY = -local.y / (local.z * f), ndcX = -local.x / (local.z * f * this.camera.aspect);
+        return { visible: true, x: ndcX * 1.1, y: ndcY * 1.1, name: seg.focus, dist };
+    }
+
+    /** compass heading of the ship's nose in the ecliptic plane */
+    shipHeading() {
+        const f = this._hdgTmp || (this._hdgTmp = new THREE.Vector3());
+        f.set(0, 0, -1).applyQuaternion(this.dolly.quaternion);
+        return Math.atan2(f.x, -f.z);
     }
 
     /* ── frame ──────────────────────────────────────────────────────── */
@@ -904,6 +1229,23 @@ class VRApp {
 
         if (this.mode === 'ride') this.ride.update(dt);
         else this.flyUpdate(dt);
+
+        this.updateHead(dt);
+        this.gazeUpdate(dt);
+        if (this.cockpit.visible) {
+            this.cockpit.update(dt, {
+                speedNorm: this.ride.speedNorm || 0,
+                speedKmh: (this.ride.speedNorm || 0) * 42000 + 1800,
+                progress: this.ride.total ? this.ride.time / this.ride.total : 0,
+                time: this.ride.time, total: this.ride.total || 1,
+                paused: !this.ride.playing,
+                bank: this.ride._bank || 0, roll: this.ride._roll || 0,
+                comfort: this.comfort, scares: this.scaresOn,
+                radar: this.radarContacts(),
+                target: this.hudTarget(),
+                heading: this.shipHeading()
+            });
+        }
 
         // The mission core owns no frame loop of its own on purpose: inside an
         // immersive session window.requestAnimationFrame never fires, so a core
@@ -925,7 +1267,9 @@ class VRApp {
 
         // XR sessions render per-eye through three's own pipeline — the
         // composer only serves the flat screen
-        if (this.composer && !this.renderer.xr.isPresenting) this.composer.render();
+        if (this.renderer.xr.isPresenting) this.renderer.render(this.scene, this.camera);
+        else if (this.stereo) this.stereoEffect.render(this.scene, this.camera);
+        else if (this.composer) this.composer.render();
         else this.renderer.render(this.scene, this.camera);
     }
 
@@ -940,7 +1284,8 @@ class VRApp {
             speedNorm: +(this.ride.speedNorm || 0).toFixed(3),
             actors: this.scares.actors.length,
             pos: this.dolly.position.toArray().map(n => +n.toFixed(1)),
-            xr: this.renderer.xr.isPresenting
+            xr: this.renderer.xr.isPresenting,
+            stereo: this.stereo, gyro: this.gyroActive, cockpit: this.cockpit ? this.cockpit.visible : false
         };
     }
 }

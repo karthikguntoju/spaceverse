@@ -18,3 +18,5 @@ env/
 venv/
 .env
 .gstack/
+certs/
+scratch/

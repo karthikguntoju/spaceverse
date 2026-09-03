@@ -46,7 +46,7 @@ describe('the arcade hub', () => {
         const cookie = await login();
         const hub = await request(app).get('/games').set('Cookie', cookie).expect(200);
         const linked = [...hub.text.matchAll(/href="\/games\/([a-z-]+)"/g)].map((m) => m[1]);
-        expect(linked.length).toBe(10);
+        expect(linked.length).toBe(11);
         // Every card on the hub must resolve; a dead card is a dead end for the
         // player and the hub is the only way most people will find these.
         for (const slug of linked) {

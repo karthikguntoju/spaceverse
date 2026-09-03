@@ -7,6 +7,7 @@
   },
   "scripts": {
     "start": "node app-enhanced.js",
+    "start:https": "node app-enhanced.js --https",
     "start-all": "node simple-start.js",
     "dev": "nodemon app-enhanced.js",
     "build:vrsystem": "node scripts/build-vrsystem.js",
@@ -42,6 +43,7 @@
     "morgan": "^1.10.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
+    "selfsigned": "^2.4.1",
     "three": "^0.182.0",
     "tough-cookie": "^6.0.0"
   },
