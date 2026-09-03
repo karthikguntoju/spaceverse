@@ -110,16 +110,22 @@ app.use(helmet({
         useDefaults: true,
         directives: {
             'default-src': ["'self'"],
+            // Third-party scripts: the CDNs are kept as a safety net (the 3D and
+            // animation libs are now vendored under /lib), plus gstatic +
+            // apis.google.com for the optional Firebase / Google sign-in SDK and
+            // the YouTube embed API.
             'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'",
                 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com',
-                'https://unpkg.com', 'https://www.youtube.com'],
+                'https://www.gstatic.com', 'https://apis.google.com',
+                'https://www.youtube.com'],
             'style-src': ["'self'", "'unsafe-inline'",
                 'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
             'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
             'img-src': ["'self'", 'data:', 'blob:', 'https:'],
             'media-src': ["'self'", 'data:', 'blob:', 'https:'],
             'connect-src': ["'self'", 'https:'],
-            'frame-src': ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+            'frame-src': ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com',
+                'https://accounts.google.com', 'https://spaceverse-d263d.firebaseapp.com'],
             'worker-src': ["'self'", 'blob:'],
             'object-src': ["'none'"],
             'base-uri': ["'self'"],
@@ -345,6 +351,11 @@ app.use('/models', express.static('models', STATIC_CACHE));
 // Addons must be registered before the build mount so `three/addons/…` resolves.
 app.use('/lib/three/addons', express.static(path.join(__dirname, 'node_modules', 'three', 'examples', 'jsm'), STATIC_CACHE));
 app.use('/lib/three', express.static(path.join(__dirname, 'node_modules', 'three', 'build'), STATIC_CACHE));
+// Vendored three r128 (classic global-`THREE` build + examples/js addons) and
+// the animation libs (GSAP, tween.js, Lenis). The 3D and landing pages load
+// these locally instead of from a CDN, so the app renders with no network.
+app.use('/lib/three128', express.static(path.join(__dirname, 'public', 'lib', 'three128'), STATIC_CACHE));
+app.use('/lib/anim', express.static(path.join(__dirname, 'public', 'lib', 'anim'), STATIC_CACHE));
 // Local react-three builds: prefer a checked-in public override, then fall back
 // to the installed dist.
 app.use('/lib/fiber', express.static(path.join(__dirname, 'public', 'lib', 'fiber'), STATIC_CACHE));
