@@ -34,50 +34,60 @@
         .navbar {
             position: fixed;
             top: 0;
+            left: 0;
             width: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            padding: 1rem 2rem;
+            box-sizing: border-box;
+            background: rgba(4, 6, 15, 0.72);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-bottom: 1px solid rgba(34, 211, 238, 0.14);
+            padding: 0.9rem 2rem;
             z-index: 1000;
             display: flex;
+            gap: 1.5rem;
             justify-content: space-between;
             align-items: center;
         }
 
         .logo {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #fbbf24;
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-decoration: none;
+            background: linear-gradient(100deg, #22d3ee, #2dd4bf 34%, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
         }
 
         .nav-links {
             display: flex;
-            gap: 2rem;
+            gap: 1.75rem;
             list-style: none;
+            margin: 0;
+            padding: 0;
         }
 
         .nav-links a {
-            color: white;
+            color: rgba(242, 246, 255, 0.82);
             text-decoration: none;
-            transition: color 0.3s;
+            font-size: 0.95rem;
+            transition: color 0.2s;
         }
 
-        .nav-links a:hover {
-            color: #fbbf24;
-        }
+        .nav-links a:hover { color: #22d3ee; }
+
+        @media (max-width: 720px) { .nav-links { display: none; } }
 
         .back-btn {
-            position: absolute;
-            top: 20px;
-            left: 20px;
             background: rgba(34, 211, 238, 0.06);
-            border: 2px solid #22d3ee;
+            border: 1px solid #22d3ee;
             color: #f2f6ff;
-            padding: 10px 20px;
+            padding: 8px 18px;
             border-radius: 25px;
             text-decoration: none;
-            transition: all 0.3s;
-            z-index: 15;
+            white-space: nowrap;
+            transition: all 0.2s;
         }
 
         .back-btn:hover {
@@ -424,7 +434,17 @@
 </head>
 
 <body>
-    <a href="/space-traffic-simulator" class="back-btn">← Back to Simulator</a>
+    <nav class="navbar">
+        <a href="/app" class="logo">Spaceverse</a>
+        <ul class="nav-links">
+            <li><a href="/app">Deck</a></li>
+            <li><a href="/solar-system">Explore</a></li>
+            <li><a href="/space-traffic-simulator">Simulator</a></li>
+            <li><a href="/games">Arcade</a></li>
+            <li><a href="/reviews">Reviews</a></li>
+        </ul>
+        <a href="/space-traffic-simulator" class="back-btn">← Back to Simulator</a>
+    </nav>
 
     <div class="container">
         <div class="header">

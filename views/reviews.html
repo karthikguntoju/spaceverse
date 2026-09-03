@@ -30,50 +30,60 @@
         .navbar {
             position: fixed;
             top: 0;
+            left: 0;
             width: 100%;
-            background: rgba(0, 0, 0, 0.8);
-            backdrop-filter: blur(10px);
-            padding: 1rem 2rem;
+            box-sizing: border-box;
+            background: rgba(4, 6, 15, 0.72);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-bottom: 1px solid rgba(34, 211, 238, 0.14);
+            padding: 0.9rem 2rem;
             z-index: 1000;
             display: flex;
+            gap: 1.5rem;
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .logo {
-            font-size: 1.8rem;
-            font-weight: bold;
-            color: #fbbf24;
+            font-size: 1.4rem;
+            font-weight: 700;
+            letter-spacing: 0.02em;
+            text-decoration: none;
+            background: linear-gradient(100deg, #22d3ee, #2dd4bf 34%, #a78bfa);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
         }
-        
+
         .nav-links {
             display: flex;
-            gap: 2rem;
+            gap: 1.75rem;
             list-style: none;
+            margin: 0;
+            padding: 0;
         }
-        
+
         .nav-links a {
-            color: white;
+            color: rgba(242, 246, 255, 0.82);
             text-decoration: none;
-            transition: color 0.3s;
+            font-size: 0.95rem;
+            transition: color 0.2s;
         }
-        
-        .nav-links a:hover {
-            color: #fbbf24;
-        }
-        
+
+        .nav-links a:hover { color: #22d3ee; }
+
+        @media (max-width: 720px) { .nav-links { display: none; } }
+
         .back-btn {
-            position: absolute;
-            top: 20px;
-            left: 20px;
             background: rgba(34, 211, 238, 0.06);
-            border: 2px solid #22d3ee;
+            border: 1px solid #22d3ee;
             color: #f2f6ff;
-            padding: 10px 20px;
+            padding: 8px 18px;
             border-radius: 25px;
             text-decoration: none;
-            transition: all 0.3s;
-            z-index: 15;
+            white-space: nowrap;
+            transition: all 0.2s;
         }
         
         .back-btn:hover {
@@ -335,8 +345,18 @@
     <script src="/public/js/mobile.js" defer></script>
 </head>
 <body>
-    <a href="/" class="back-btn">← Back to Home</a>
-    
+    <nav class="navbar">
+        <a href="/app" class="logo">Spaceverse</a>
+        <ul class="nav-links">
+            <li><a href="/app">Deck</a></li>
+            <li><a href="/solar-system">Explore</a></li>
+            <li><a href="/space-traffic-simulator">Simulator</a></li>
+            <li><a href="/games">Arcade</a></li>
+            <li><a href="/mission-tracker">Missions</a></li>
+        </ul>
+        <a href="/" class="back-btn">← Back to Home</a>
+    </nav>
+
     <div class="container">
         <div class="header">
             <h1>Community Reviews</h1>
@@ -350,13 +370,13 @@
             <div class="success-message" id="successMessage" style="display: none;"></div>
             
             <div class="form-group">
-                <label for="rating">Rating</label>
-                <div class="rating-stars" id="ratingStars">
-                    <span class="star" data-rating="1">★</span>
-                    <span class="star" data-rating="2">★</span>
-                    <span class="star" data-rating="3">★</span>
-                    <span class="star" data-rating="4">★</span>
-                    <span class="star" data-rating="5">★</span>
+                <span id="ratingLabel">Rating</span>
+                <div class="rating-stars" id="ratingStars" role="radiogroup" aria-labelledby="ratingLabel">
+                    <span class="star" data-rating="1" role="radio" tabindex="0" aria-checked="false" aria-label="1 star">★</span>
+                    <span class="star" data-rating="2" role="radio" tabindex="0" aria-checked="false" aria-label="2 stars">★</span>
+                    <span class="star" data-rating="3" role="radio" tabindex="0" aria-checked="false" aria-label="3 stars">★</span>
+                    <span class="star" data-rating="4" role="radio" tabindex="0" aria-checked="false" aria-label="4 stars">★</span>
+                    <span class="star" data-rating="5" role="radio" tabindex="0" aria-checked="false" aria-label="5 stars">★</span>
                 </div>
                 <input type="hidden" id="rating" name="rating" value="0">
             </div>
@@ -392,21 +412,40 @@
         const successMessage = document.getElementById('successMessage');
         
         // Set up star rating
-        ratingStars.forEach(star => {
-            star.addEventListener('click', () => {
-                const rating = parseInt(star.getAttribute('data-rating'));
-                ratingInput.value = rating;
-                
-                // Update star appearance
-                ratingStars.forEach((s, index) => {
-                    if (index < rating) {
-                        s.classList.add('selected');
-                    } else {
-                        s.classList.remove('selected');
-                    }
-                });
+        function setRating(rating) {
+            ratingInput.value = rating;
+            ratingStars.forEach((s, index) => {
+                const on = index < rating;
+                s.classList.toggle('selected', on);
+                s.setAttribute('aria-checked', String(index === rating - 1));
+                // Only the active (or first, if none) star is a tab stop, so the
+                // radiogroup is one Tab away and arrow keys move within it.
+                s.tabIndex = (rating ? index === rating - 1 : index === 0) ? 0 : -1;
             });
-            
+        }
+
+        ratingStars.forEach((star, i) => {
+            star.addEventListener('click', () => setRating(parseInt(star.getAttribute('data-rating'))));
+
+            // Keyboard: arrows change rating, Enter/Space confirm the focused star.
+            star.addEventListener('keydown', (e) => {
+                const current = parseInt(ratingInput.value) || 0;
+                if (e.key === 'ArrowRight' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const next = Math.min(5, current + 1);
+                    setRating(next);
+                    ratingStars[next - 1].focus();
+                } else if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    const next = Math.max(1, current - 1);
+                    setRating(next);
+                    ratingStars[next - 1].focus();
+                } else if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setRating(i + 1);
+                }
+            });
+
             star.addEventListener('mouseover', () => {
                 const rating = parseInt(star.getAttribute('data-rating'));
                 ratingStars.forEach((s, index) => {
@@ -468,8 +507,7 @@
                 if (response.ok) {
                     showSuccess('Review submitted successfully!');
                     commentInput.value = '';
-                    ratingInput.value = '0';
-                    ratingStars.forEach(star => star.classList.remove('selected'));
+                    setRating(0);
                     
                     // Refresh reviews
                     fetchReviews();

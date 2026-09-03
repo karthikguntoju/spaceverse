@@ -1,236 +1,125 @@
-# Spaceverse 
+# Spaceverse
 
-An interactive 3D educational platform for exploring our Solar System with authentication, quizzes, user reviews, and an AI-powered Space Traffic Simulator.
+An interactive 3D and VR platform for exploring the solar system — with planet
+quizzes, an eleven‑game arcade, live mission and space‑weather data, and an
+AI‑assisted Space Traffic Simulator that models orbital congestion, collision
+risk and the Kessler syndrome.
 
-## Features ✨
+Everything runs in one browser tab. No install, no plugin.
 
-- **🌍 3D Solar System Explorer**: Interactive 3D models of all planets with realistic textures and orbital mechanics
-- **🥽 VR Solar System Explorer**: Immerse yourself in the solar system with WebXR-based virtual reality
-- **🔐 User Authentication**: Secure registration and login system with session management
-- **🧠 Interactive Quiz System**: Educational quizzes about each planet with score tracking
-- **⭐ Review System**: Users can rate and review their experience with the platform
-- **🚀 AI-Powered Space Traffic Simulator**: Create hypothetical space scenarios and visualize their impact on orbital congestion, collision risk, and sustainability
-- **🔮 Advanced AI Integration**: Real-time predictive analytics and personalized recommendations
-- **👥 Social Features**: Community scenario sharing, likes, comments, and user reviews
-- **🤖 Space Chatbot**: Ask questions about space in plain English and get informative answers
-- **🎨 Modern Interface Design**: Enhanced UI/UX with animations, transitions, and contemporary aesthetics
-- **📱 Responsive Design**: Works seamlessly across desktop and mobile devices
-- **🎵 Immersive Audio**: Background music for enhanced user experience
+## Features
 
-## Technologies Used 🛠️
+- **3D Solar System Explorer** — Three.js planet models with textures, orbits and click‑through info
+- **VR Solar System + Cockpit Ride** — WebXR, plus phone gyro / Google‑Cardboard stereo mode
+- **Planet Quiz** — per‑body multiple choice with score tracking (AI‑generated questions when a Gemini key is set, curated bank otherwise)
+- **The Arcade** — eleven self‑contained canvas games with medals and progression
+- **Space Traffic Simulator** — set a launch / break‑up / collision scenario and see the change in orbital congestion, a 0–100 collision‑risk index, debris probability, and a safety / sustainability / efficiency score
+- **Space Assistant** — ask space questions in plain English; answered by Gemini when configured, otherwise by a built‑in 45‑topic offline corpus
+- **Mission Tracker & Launch Archive** — real agency missions and historic launch footage
+- **Astronomical Events** — eclipse / meteor calendar with list and calendar views
+- **Community** — share simulator scenarios, like and comment; star‑rated reviews with profanity filtering
+- **Live data** — NASA DONKI space weather and CelesTrak catalogue counts feed the simulator
 
-- **Backend**: Node.js, Express.js
-- **Database**: MongoDB with Mongoose ODM
-- **Authentication**: Express-session, bcryptjs
-- **Frontend**: HTML5, CSS3, JavaScript (ES6+)
-- **3D Graphics**: Three.js for 3D planet models and animations
-- **VR Technology**: WebXR, @react-three/fiber, @react-three/xr for immersive virtual reality
-- **AI Service**: Python, FastAPI, scikit-learn
-- **Security**: Rate limiting, input validation, profanity filtering
+## Tech
 
-## Installation & Setup 🔧
+- **Server**: Node.js ≥ 20, Express 4, `helmet`, `compression`, `express-rate-limit`
+- **Data**: MongoDB (Mongoose) with a `planets.json` fallback when the DB is unreachable
+- **Auth**: session‑based; bcrypt + Firebase for real accounts, or a passwordless demo mode
+- **3D / VR**: Three.js, WebXR, `@react-three/fiber` + `@react-three/xr`
+- **Astronomy**: `astronomy-engine` for ephemeris
+- **AI**: `@google/genai` (Gemini) when a key is present; a local heuristic model + knowledge corpus otherwise
+- **Tests**: Vitest + Supertest + `mongodb-memory-server` — 139 tests, `npm audit` clean
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/karthikguntoju/spaceverse
-   cd Spaceverse
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Install AI service dependencies**
-   ```bash
-   cd ai-service
-   pip install -r requirements.txt
-   cd ..
-   ```
-
-4. **Environment Setup**
-   - Copy `.env.example` to `.env`
-   - Add your MongoDB connection string to `MONGODB_URI` in `.env`
-
-## Quick Start ⚡
-
-For the easiest way to start the complete system, use the single-command approach:
+## Quick start
 
 ```bash
-npm run start-all
+npm install
+cp .env.example .env      # then edit .env (see below)
+npm start
 ```
 
-This will automatically start:
-- MongoDB (if not already running)
-- The AI Service (on port 8001)
-- The main Spaceverse application (on port 5002+)
+Open **http://localhost:5000**. In demo mode any callsign / access code signs you in.
 
-✅ **AI Services Status: Working**
+| Script | What it does |
+| --- | --- |
+| `npm start` | Run the server (`app-enhanced.js`) on `PORT` (default 5000) |
+| `npm run start:https` | Same, over HTTPS with a self‑signed cert — needed for **phone gyro / VR**, which browsers only allow on a secure origin. Prints a `https://<LAN-IP>:5000` URL for your phone; the cert is generated into `certs/` on first run. |
+| `npm run dev` | Run with `nodemon` (reload on change) |
+| `npm test` | Full Vitest suite |
+| `npm run test:e2e` | The end‑to‑end smoke flow only |
+| `npm run health-check` | Hit `/api/health` and report |
+| `npm run migrate-atlas` / `migrate:scores` | One‑off data migrations |
 
-**Note**: If the AI service fails to start due to missing Python dependencies, you can either:
-1. Install the dependencies manually: `cd ai-service && pip install -r requirements.txt`
-2. Or continue using the application without AI features (some simulator features will be limited)
+## Environment
 
-5. **Start the application**
-   ```bash
-   # Option 1: Start all services with one command (recommended)
-   npm run start-all
-   
-   # Option 2: Manual start (traditional method)
-   # Terminal 1: Start the main application
-   npm start
-   
-   # Terminal 2: Start the AI service
-   cd ai-service
-   python ai_service.py
-   ```
+Copy `.env.example` to `.env`. Only `SESSION_SECRET` is required to boot in
+production; everything else has a working default or a graceful fallback.
 
-6. **Access the application**
-   - Open your browser and navigate to `http://localhost:5002`
-   - The AI service will be running on `http://localhost:8001`
-   - When using the single-command startup, both services will be managed automatically
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `PORT` | `5000` | Off‑prod the server scans upward if the port is busy; in production it binds exactly `PORT`. |
+| `SESSION_SECRET` | dev‑only fallback | **Required in production** — the server refuses to boot without it. |
+| `MONGODB_URI` | — | MongoDB connection string. Absent ⇒ file‑backed mode (static planet data, in‑memory sessions). |
+| `DEMO_AUTH` | `true` | `true` = passwordless demo pilots (nothing written to Firebase). `false` = real Firebase + bcrypt login. |
+| `GEMINI_API_KEY` | — | Google AI Studio key. Absent or invalid ⇒ quiz falls back to the curated bank and the assistant to the offline corpus. Leading/trailing spaces are trimmed. |
+| `NASA_API_KEY` | `DEMO_KEY` | For NASA DONKI space‑weather. `DEMO_KEY` works but is rate‑limited. |
+| `CORS_ORIGINS` | localhost dev ports | Comma‑separated allowlist of origins permitted to make credentialed API calls. |
+| `FIREBASE_*` | bundled project | `FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`, … — only used when `DEMO_AUTH=false`. |
+| `TRUST_PROXY` | off | Set `true` (or `NODE_ENV=production`) behind a TLS‑terminating proxy so secure cookies and per‑IP rate limiting work. |
 
-## Phone VR & Cockpit Ride 📱🥽
+## Security
 
-Both VR pages (`/vr-solar-system` and `/vr-ride`) work on a phone with head-tracking:
+- `helmet` — CSP, HSTS, `X-Frame-Options`, `nosniff`, no `X-Powered-By`
+- CORS is an explicit allowlist (`CORS_ORIGINS`), not an origin mirror
+- Rate limiting on `/api/login`, `/api/register`, `/api/google-login` and review submission
+- Protected pages are gated server‑side; legacy `*.html` URLs 301 to the guarded route
+- `npm audit` reports **0 vulnerabilities**; run `npm run audit:ci` in CI
 
-- **🧭 Gyro look** — hold the phone up and turn around; the view follows the phone in every
-  direction (DeviceOrientation). Drag adds yaw on top; **⟲ / V** recentres.
-- **📱 Phone VR (Cardboard)** — side-by-side stereo, fullscreen, landscape lock, gaze reticle.
-  Put the phone in any Cardboard-style viewer. **Tap** (or the viewer's button) = fly / stop in
-  Explore, pause / resume on the Ride. Look at a world for ~1.5 s to scan it.
-- **🛩 Cockpit** (Ride) — you sit in the pilot seat of a ship: canopy, dashboard with live
-  velocity / hull / shield / route screens, flight-plan and systems consoles, a throttle that
-  follows the burn, a stick that leans into every bank, alert lamps, narration on the dash.
-  Look around with mouse, touch, phone gyro or a headset. Toggle in the launcher settings.
+## Optional: standalone ML microservice
 
-**Phones only send gyroscope data over HTTPS**, so to try it on your phone:
+`ai-service/` is an **optional** FastAPI service with scikit‑learn / TensorFlow
+models for offline experimentation. The main app does **not** depend on it — all
+simulator analysis runs in‑process. It pins older library versions and is not
+guaranteed to install on Python 3.13; skip it unless you specifically want to
+work on the ML side.
 
-```bash
-npm run start:https          # or: HTTPS=true npm start
-```
-
-The server prints a `https://<your-LAN-IP>:5000` URL — open that on the phone (same Wi‑Fi),
-accept the self-signed certificate warning once, sign in, open a VR page and tap **🧭** or **📱**.
-On iOS Safari, allow the *Motion & Orientation* permission prompt. The cert is generated into
-`certs/` on first run and is git-ignored.
-
-## Project Structure 📁
+## Project layout
 
 ```
-Spaceverse_final/
-├── config/
-│   └── auth.js              # Authentication middleware
-├── models/
-│   └── review.js            # Review data model
-├── routes/
-│   ├── reviews.js           # Review API routes
-│   └── simulator.js         # Space Traffic Simulator API routes
-├── views/
-│   ├── home.html            # Landing page with auth
-│   ├── about.html           # About page with reviews
-│   ├── solar-system.html    # 3D solar system explorer
-│   ├── quiz.html            # Interactive quiz system
-│   ├── space-traffic-simulator.html  # Space Traffic Simulator UI
-│   ├── space-traffic-visualization.html  # 3D space traffic visualization
-│   ├── community-scenarios.html      # Community scenarios browser
-│   └── reviews.html         # Community reviews page
-├── public/
-│   ├── textures/            # Planet textures
-│   ├── markers/             # AR markers
-│   └── audio/               # Background music
-├── images/                  # Planet images
-├── models/                  # 3D planet models (.glb files)
-├── ai-service/              # AI microservice for space traffic analysis
-│   ├── ai_service.py        # AI service implementation
-│   ├── requirements.txt     # Python dependencies
-│   └── Dockerfile           # Containerization
-├── app-enhanced.js          # Main application server
-└── package.json             # Project dependencies
+app-enhanced.js            Express server: routes, auth, middleware, planet seed
+routes/
+  simulator.js             Space Traffic Simulator: models, gamification, community, chatbot
+  game.js  reviews.js       Arcade missions API; reviews + moderation
+  nasa-api.js  celestrak.js  advanced-orbital-mechanics.js
+services/
+  space-knowledge.js       Offline assistant corpus + matcher
+models/                    Mongoose schemas (review, user-score)
+config/auth.js             ensureAuthenticated middleware
+views/                     One HTML file per page (+ views/games/ for the arcade)
+public/
+  js/vr/                   VR scene, cockpit ride, gyro, audio
+  js/arcade/               One file per game + shared shell
+  css/  textures/  ...
+models/*.glb               3D planet + spacecraft models
+tests/                     Vitest suites (unit + API + e2e/)
 ```
 
-## Features in Detail 🌟
+## API (selected)
 
-### 3D Solar System Explorer
-- Realistic planet models with accurate textures
-- Interactive orbital mechanics
-- Click on planets for detailed information
-- Smooth camera controls and navigation
+`POST /api/register` · `POST /api/login` · `POST /api/logout` · `GET /api/user`
+· `GET /api/health` · `GET /api/planets` · `GET /api/ephemeris` ·
+`GET /api/planets/:key/quiz` · `POST /api/quiz/submit` · `GET /api/reviews` ·
+`POST /api/reviews` · `POST /api/simulator/run` · `GET /api/simulator/history` ·
+`GET /api/simulator/leaderboard` · `GET /api/simulator/scores` ·
+`GET /api/simulator/nasa-data` · `POST /api/simulator/real-time-prediction` ·
+`POST /api/simulator/share-scenario` · `GET /api/simulator/community-scenarios` ·
+`POST /api/simulator/chatbot` · `GET /api/game/missions` · `POST /api/game/run`
 
-### Authentication System
-- Secure user registration and login
-- Session-based authentication
-- Password hashing with bcryptjs
-- Protected routes for authenticated users
+## License
 
-### Quiz System
-- Planet-specific quiz questions
-- Score tracking and progress saving
-- Multiple choice questions with instant feedback
-- Educational content for all age groups
+MIT — see [LICENSE](LICENSE).
 
-### Review System
-- Star rating system (1-5 stars)
-- Comment submission with profanity filtering
-- User authentication required for reviews
-- Real-time review display
+## Acknowledgments
 
-### Community Features
-- Share space traffic scenarios with the community
-- Like and comment on community scenarios
-- Browse community-created simulations
-- Participate in collaborative learning
-
-### Advanced AI Features
-- Real-time predictive analytics for space traffic
-- Personalized recommendations based on user history
-- Environmental factor integration (space weather, asteroids)
-- Skill-level adaptive guidance
-
-## API Endpoints 🔌
-
-- `POST /api/register` - User registration
-- `POST /api/login` - User login
-- `POST /api/logout` - User logout
-- `GET /api/user` - Get current user status
-- `GET /api/reviews` - Get all approved reviews
-- `POST /api/reviews` - Submit a new review (authenticated)
-- `GET /api/planets` - Get planet data
-- `GET /api/ephemeris` - Get current planet positions
-- `GET /vr-solar-system` - Access the VR solar system explorer
-- `POST /api/simulator/run` - Run a space traffic simulation (authenticated)
-- `GET /api/simulator/:id` - Get a specific simulation (authenticated)
-- `GET /api/simulator/history` - Get user's simulation history (authenticated)
-- `GET /api/simulator/scores` - Get user's gamification scores (authenticated)
-- `GET /api/simulator/leaderboard` - Get leaderboard (authenticated)
-
-- `POST /api/simulator/personalized-recommendations` - Get personalized recommendations (authenticated)
-- `POST /api/simulator/share-scenario` - Share a scenario with the community (authenticated)
-- `GET /api/simulator/community-scenarios` - Get community scenarios (authenticated)
-- `POST /api/simulator/like-scenario/:id` - Like/unlike a scenario (authenticated)
-- `POST /api/simulator/comment-scenario/:id` - Comment on a scenario (authenticated)
-- `POST /api/simulator/chatbot` - Ask questions about space and get informative answers (authenticated)
-
-## Contributing 🤝
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License 📄
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-
-## Acknowledgments 🙏
-
-- NASA for planetary data and textures
-- Three.js community for 3D graphics support
-- MongoDB for database solutions
-- Express.js for web framework
-
----
-
-**🌌 Explore the cosmos with Spaceverse - Where learning meets adventure!**
+NASA (planetary data, DONKI, textures), CelesTrak (catalogue data), the Three.js
+community, Express and MongoDB.
