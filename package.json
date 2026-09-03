@@ -1,6 +1,6 @@
 {
   "name": "spaceverse",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "engines": {
     "node": ">=20"
@@ -8,52 +8,47 @@
   "scripts": {
     "start": "node app-enhanced.js",
     "start:https": "node app-enhanced.js --https",
-    "start-all": "node simple-start.js",
     "dev": "nodemon app-enhanced.js",
-    "build:vrsystem": "node scripts/build-vrsystem.js",
-    "original": "node app.js",
     "migrate-atlas": "node migrate-to-atlas.js",
     "health-check": "node health-check.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "migrate:scores": "node scripts/migrate-user-scores.js"
+    "test:e2e": "vitest run tests/e2e",
+    "migrate:scores": "node scripts/migrate-user-scores.js",
+    "audit:ci": "npm audit --omit=dev --audit-level=high"
   },
   "dependencies": {
-    "@babel/standalone": "^7.28.5",
     "@google/genai": "^1.44.0",
-    "@google/generative-ai": "^0.24.1",
     "@react-three/fiber": "^9.4.2",
     "@react-three/xr": "^6.6.28",
     "astronomy-engine": "^2.1.19",
     "axios": "^1.6.0",
     "bcryptjs": "^2.4.3",
+    "compression": "^1.8.1",
     "connect-mongo": "^6.0.0",
-    "cookie-parser": "~1.4.4",
     "cors": "^2.8.5",
-    "debug": "~2.6.9",
     "dotenv": "^17.2.1",
     "express": "^4.22.1",
     "express-rate-limit": "^8.1.0",
     "express-session": "^1.18.2",
     "firebase": "^12.11.0",
-    "http-errors": "~1.6.3",
-    "jade": "^0.29.0",
+    "helmet": "^8.3.0",
     "leo-profanity": "^1.8.0",
     "mongoose": "^8.18.0",
-    "morgan": "^1.10.1",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
     "selfsigned": "^2.4.1",
-    "three": "^0.182.0",
-    "tough-cookie": "^6.0.0"
+    "three": "^0.182.0"
   },
   "devDependencies": {
     "esbuild": "^0.27.2",
     "mongodb-memory-server": "^11.2.0",
     "nodemon": "^3.1.10",
-    "npm-run-all": "^4.1.5",
-    "puppeteer": "^24.34.0",
+    "puppeteer": "^25.10.0",
     "supertest": "^7.2.2",
     "vitest": "^4.1.10"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
   }
 }

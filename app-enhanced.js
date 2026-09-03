@@ -2,6 +2,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
+const helmet = require('helmet');
+const compression = require('compression');
+const rateLimit = require('express-rate-limit');
 const session = require('express-session');
 const MongoStore = require('connect-mongo').default || require('connect-mongo');
 const bcrypt = require('bcryptjs');
@@ -12,23 +15,30 @@ require('dns').setServers(['8.8.8.8', '8.8.4.4']);
 const { GoogleGenAI } = require('@google/genai');
 
 // --- Firebase Authentication Setup ---
+// Firebase web config is not a secret (it ships to every browser), but it is
+// deployment-specific, so it reads from the environment with the original
+// project as the fallback for local dev. Only used when DEMO_AUTH=false.
 const { initializeApp } = require('firebase/app');
 const { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword } = require('firebase/auth');
 
 const firebaseConfig = {
-  apiKey: "AIzaSyAYuJAIjnHjBvyc5gvZJDJIanc5fnolW0A",
-  authDomain: "spaceverse-d263d.firebaseapp.com",
-  projectId: "spaceverse-d263d",
-  storageBucket: "spaceverse-d263d.firebasestorage.app",
-  messagingSenderId: "34859465212",
-  appId: "1:34859465212:web:ed34af048d9d1852bfda79"
+  apiKey: process.env.FIREBASE_API_KEY || "AIzaSyAYuJAIjnHjBvyc5gvZJDJIanc5fnolW0A",
+  authDomain: process.env.FIREBASE_AUTH_DOMAIN || "spaceverse-d263d.firebaseapp.com",
+  projectId: process.env.FIREBASE_PROJECT_ID || "spaceverse-d263d",
+  storageBucket: process.env.FIREBASE_STORAGE_BUCKET || "spaceverse-d263d.firebasestorage.app",
+  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID || "34859465212",
+  appId: process.env.FIREBASE_APP_ID || "1:34859465212:web:ed34af048d9d1852bfda79"
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
 const firebaseAuth = getAuth(firebaseApp);
 // -------------------------------------
 
-const ai = new GoogleGenAI({}); // Automatically picks up GEMINI_API_KEY from .env
+// Trims stray whitespace so a key pasted into .env with a leading space (as the
+// bundled one had) still authenticates.
+const GEMINI_API_KEY = (process.env.GEMINI_API_KEY || '').trim();
+if (GEMINI_API_KEY) process.env.GEMINI_API_KEY = GEMINI_API_KEY;
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY || undefined });
 
 const app = express();
 
@@ -84,9 +94,73 @@ const BEHIND_PROXY = process.env.NODE_ENV === 'production' || process.env.TRUST_
 if (BEHIND_PROXY) app.set('trust proxy', 1);
 
 // Middleware
-app.use(cors({ credentials: true, origin: true }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// --------------------------------------------------------------------------
+// gzip every text response (HTML, JS, JSON, SVG). The scene code and view
+// files are large and highly compressible; without this every page paid full
+// weight on the wire.
+app.use(compression());
+
+// Security headers. `X-Powered-By` is removed, HSTS / frame-guard / nosniff /
+// referrer-policy are added. The CSP allowlists the CDNs the 3D and animation
+// pages legitimately load (three.js, React, GSAP, YouTube embeds) and keeps
+// `'unsafe-inline'` for now because several pages set up their scene in an
+// inline <script>; tightening that is tracked in TODOS.md.
+app.use(helmet({
+    contentSecurityPolicy: {
+        useDefaults: true,
+        directives: {
+            'default-src': ["'self'"],
+            'script-src': ["'self'", "'unsafe-inline'", "'unsafe-eval'",
+                'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com',
+                'https://unpkg.com', 'https://www.youtube.com'],
+            'style-src': ["'self'", "'unsafe-inline'",
+                'https://fonts.googleapis.com', 'https://cdnjs.cloudflare.com'],
+            'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
+            'img-src': ["'self'", 'data:', 'blob:', 'https:'],
+            'media-src': ["'self'", 'data:', 'blob:', 'https:'],
+            'connect-src': ["'self'", 'https:'],
+            'frame-src': ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com'],
+            'worker-src': ["'self'", 'blob:'],
+            'object-src': ["'none'"],
+            'base-uri': ["'self'"],
+            'upgrade-insecure-requests': null
+        }
+    },
+    // three.js loads GLB models and textures that are same-origin, but the CDN
+    // script tags trip COEP. WebXR does not need cross-origin isolation here.
+    crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: 'cross-origin' }
+}));
+
+// CORS. The browser app is same-origin, so credentialed cross-origin calls are
+// only ever needed from a short allowlist (local dev ports, the deployed
+// origins in CORS_ORIGINS). The previous `origin: true` reflected ANY site,
+// which with `credentials: true` let any page on the internet make
+// authenticated API calls on a signed-in visitor's behalf.
+const CORS_ALLOWLIST = (process.env.CORS_ORIGINS ||
+    'http://localhost:5000,http://127.0.0.1:5000,http://localhost:5001,http://localhost:3000')
+    .split(',').map(s => s.trim()).filter(Boolean);
+app.use(cors({
+    credentials: true,
+    origin(origin, cb) {
+        // No Origin header => same-origin navigation, curl, or server-to-server.
+        if (!origin || CORS_ALLOWLIST.includes(origin)) return cb(null, true);
+        return cb(null, false);
+    }
+}));
+
+app.use(express.json({ limit: '1mb' }));
+app.use(express.urlencoded({ extended: true, limit: '1mb' }));
+
+// Brute-force guard for the credential endpoints. Reviews already had its own
+// limiter; login / register / google-login had none.
+const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 40,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too many attempts from this address. Try again in a few minutes.' }
+});
 
 // Shared MongoDB connection options. Defaults are tuned for a stable datacenter
 // link; on a home/hotspot connection a brief drop would otherwise surface as
@@ -218,22 +292,12 @@ app.get('/astronomical-events', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'astronomical-events.html'));
 });
 
-app.get('/vr-solar-system', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'vr-working.html'));
-});
-
-// Add route for original VR page
-app.get('/vr-solar-system-original', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'vr-solar-system-original.html'));
-});
-
-// Add route for working VR page
-app.get('/vr-working', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'vr-working.html'));
-});
-
-// Direct entry into the space roller-coaster ride (same page, ride mode preselected)
-app.get('/vr-ride', ensureAuthenticated, (req, res) => {
+// The one live VR page. `vr-working.html` is what won; the eight WebXR spikes
+// that preceded it (vr-simple / vr-bundled / vr-esm / vr-pure-html /
+// vr-standalone / vr-debug / vr-diagnostics / vr-component-test) and the
+// unpkg-pinned vr-solar-system(-original) pages were deleted — git history keeps
+// them. All three aliases below serve the same page.
+app.get(['/vr-solar-system', '/vr-working', '/vr-ride'], ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'vr-working.html'));
 });
 
@@ -267,45 +331,33 @@ app.get('/planet', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'planet-detail.html'));
 });
 
-// Add our new VR diagnostic routes
-app.get('/vr-diagnostics', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'vr-diagnostics.html'));
-});
+// Static assets. `immutable`-style caching for the heavy, content-stable
+// directories (textures, GLB models, brand art, compiled JS); a browser that
+// has them never re-requests them for a week.
+const STATIC_CACHE = { maxAge: '7d', etag: true, lastModified: true };
+app.use('/images', express.static('images', STATIC_CACHE));
+app.use('/public', express.static('public', STATIC_CACHE));
+app.use('/models', express.static('models', STATIC_CACHE));
+// Local three.js build + addons, so the VR page has no runtime CDN dependency.
+// Addons must be registered before the build mount so `three/addons/…` resolves.
+app.use('/lib/three/addons', express.static(path.join(__dirname, 'node_modules', 'three', 'examples', 'jsm'), STATIC_CACHE));
+app.use('/lib/three', express.static(path.join(__dirname, 'node_modules', 'three', 'build'), STATIC_CACHE));
+// Local react-three builds: prefer a checked-in public override, then fall back
+// to the installed dist.
+app.use('/lib/fiber', express.static(path.join(__dirname, 'public', 'lib', 'fiber'), STATIC_CACHE));
+app.use('/lib/xr', express.static(path.join(__dirname, 'public', 'lib', 'xr'), STATIC_CACHE));
+app.use('/lib/fiber', express.static(path.join(__dirname, 'node_modules', '@react-three', 'fiber', 'dist'), STATIC_CACHE));
+app.use('/lib/xr', express.static(path.join(__dirname, 'node_modules', '@react-three', 'xr', 'dist'), STATIC_CACHE));
 
-app.get('/vr-simple', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'vr-simple.html'));
+// Legacy `/foo.html` URLs 301 to the guarded clean route `/foo`. Previously
+// `express.static('views')` served every view file directly, so /quiz.html,
+// /home.html, /space-traffic-simulator.html … all opened WITHOUT a session,
+// bypassing ensureAuthenticated on the clean paths. The view directory is no
+// longer statically mounted; each real page has an explicit route above.
+app.get(/\.html?$/i, (req, res) => {
+    const clean = req.path.replace(/\/?(?:index)?\.html?$/i, '') || '/';
+    res.redirect(301, clean);
 });
-
-app.get('/vr-bundled', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'vr-bundled.html'));
-});
-
-// Add our new VR fallback routes
-app.get('/vr-fallback', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'vr-fallback.html'));
-});
-
-app.get('/vr-pure-html', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'vr-pure-html.html'));
-});
-
-app.use('/images', express.static('images'));
-app.use('/galaxy', express.static('galaxy'));
-app.use('/public', express.static('public'));
-app.use('/models', express.static('models'));
-app.use('/src', express.static('src'));
-// Serve local builds for important libraries as a CDN fallback
-// Addons (examples/jsm) must be registered before the build mount so VRButton etc. resolve
-app.use('/lib/three/addons', express.static(path.join(__dirname, 'node_modules', 'three', 'examples', 'jsm')));
-app.use('/lib/three', express.static(path.join(__dirname, 'node_modules', 'three', 'build')));
-// Optionally expose other local libs if needed in future
-// Prefer any local public lib overrides first (useful for CI/local fallbacks)
-app.use('/lib/fiber', express.static(path.join(__dirname, 'public', 'lib', 'fiber')));
-app.use('/lib/xr', express.static(path.join(__dirname, 'public', 'lib', 'xr')));
-// Then fall back to node_modules dist if present
-app.use('/lib/fiber', express.static(path.join(__dirname, 'node_modules', '@react-three', 'fiber', 'dist')));
-app.use('/lib/xr', express.static(path.join(__dirname, 'node_modules', '@react-three', 'xr', 'dist')));
-app.use(express.static('views'));
 
 // Include reviews route (after session middleware)
 app.use('/api/reviews', require('./routes/reviews'));
@@ -589,7 +641,7 @@ function respondWithDemoSession(req, res, username, message) {
     });
 }
 
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', authLimiter, async (req, res) => {
     try {
         const { username, email, password } = req.body;
 
@@ -645,7 +697,7 @@ app.post('/api/register', async (req, res) => {
     }
 });
 
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', authLimiter, async (req, res) => {
     try {
         const { username, password } = req.body;
 
@@ -687,7 +739,7 @@ app.post('/api/login', async (req, res) => {
     }
 });
 
-app.post('/api/google-login', async (req, res) => {
+app.post('/api/google-login', authLimiter, async (req, res) => {
     try {
         const { idToken } = req.body;
         
