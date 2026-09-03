@@ -16,6 +16,10 @@ const advancedOrbitalMechanics = require('./advanced-orbital-mechanics');
 // Import NASA API integration module
 const nasaApi = require('./nasa-api');
 
+// Offline space-science corpus. Answers the chatbot whenever Gemini is
+// unavailable (no key, quota, network) so the assistant is never dead weight.
+const spaceKnowledge = require('../services/space-knowledge');
+
 // Create new models for the simulator
 const simulationSchema = new mongoose.Schema({
   userId: {
@@ -671,13 +675,19 @@ router.get('/leaderboard', ensureAuthenticated, async (req, res) => {
       const s = entry.scores || {};
       return (s.safetyScore || 0) + (s.sustainabilityScore || 0) + (s.efficiencyScore || 0);
     };
+    // Round to one decimal so the board shows "18.8", not "18.762192526039506".
+    const round1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
 
-    const formattedLeaderboard = leaderboard.map((entry, index) => ({
-      rank: index + 1,
-      username: userMap[entry.userId.toString()] || 'Unknown User',
-      totalScore: derivedTotal(entry),
-      level: entry.level
-    }));
+    const formattedLeaderboard = leaderboard
+      // A score row whose User document is gone (deleted account, wiped dev DB)
+      // has nothing to show and was rendering as "Unknown User"; drop it.
+      .filter((entry) => userMap[entry.userId.toString()])
+      .map((entry, index) => ({
+        rank: index + 1,
+        username: userMap[entry.userId.toString()],
+        totalScore: round1(derivedTotal(entry)),
+        level: entry.level
+      }));
 
     // Get current user's rank
     const currentUserScore = await UserScore.findOne({ userId: req.session.userId });
@@ -704,7 +714,7 @@ router.get('/leaderboard', ensureAuthenticated, async (req, res) => {
         // Re-deriving here would omit missionXp, so a player's own total would
         // disagree with their own row in the leaderboard above — in the same
         // response.
-        totalScore: currentUserScore ? currentUserScore.totalScore : 0,
+        totalScore: round1(currentUserScore ? currentUserScore.totalScore : 0),
         level: currentUserScore ? currentUserScore.level : 'Safe Launcher'
       }
     });
@@ -790,18 +800,24 @@ router.get('/scores', ensureAuthenticated, async (req, res) => {
       });
     }
 
+    const r1 = (n) => Math.round((Number(n) || 0) * 10) / 10;
+    const s = userScore.scores || {};
     res.json({
       success: true,
-      scores: userScore.scores,
+      scores: {
+        safetyScore: r1(s.safetyScore),
+        sustainabilityScore: r1(s.sustainabilityScore),
+        efficiencyScore: r1(s.efficiencyScore)
+      },
       level: userScore.level,
       badges: userScore.badges,
       achievements: userScore.achievements,
       totalSimulations: userScore.totalSimulations,
       // Mission progression. Without these the dashboard can show a player's
       // simulator scores but not the rank they actually earned playing.
-      missionXp: userScore.missionXp || 0,
+      missionXp: r1(userScore.missionXp),
       totalMissions: userScore.totalMissions || 0,
-      totalScore: userScore.totalScore || 0
+      totalScore: r1(userScore.totalScore)
     });
 
   } catch (error) {
@@ -916,11 +932,12 @@ router.post('/real-time-prediction', ensureAuthenticated, async (req, res) => {
         10;
 
       // Generate explanation based on environmental factors
+      const envKeys = Object.keys(environmentalFactors || {});
       let explanation = `Real-time prediction for scenario at ${parameters.altitude}km altitude:\n`;
       explanation += `• Current orbital congestion: ${(currentState.averageCongestion * 100).toFixed(1)}%\n`;
-      explanation += `• Environmental factors considered: ${JSON.stringify(environmentalFactors || {})}\n`;
-      explanation += `• Time horizon: ${timeHorizon || 24} hours\n`;
-      explanation += `• Predicted collision risk: ${collisionRiskPercentage.toFixed(1)}%\n`;
+      explanation += `• Environmental factors considered: ${envKeys.length ? envKeys.join(', ') : 'none supplied'}\n`;
+      explanation += `• Time horizon: ${timeHorizon || 30} days\n`;
+      explanation += `• Predicted collision-risk index: ${collisionRiskPercentage.toFixed(1)}/100\n`;
 
       // Generate recommendations based on environmental conditions
       const recommendations = [];
@@ -1194,14 +1211,21 @@ router.get('/community-scenarios', ensureAuthenticated, async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const scenarios = await SharedScenario.find()
+    // Hide artefacts left by the automated test suites from the public gallery
+    // (usernames like "qa-…", "qa2-…", scenario names starting "QA " / "Test ").
+    const hideTestData = {
+      username: { $not: /^(qa\d*|test|automated)[-_ ]/i },
+      scenarioName: { $not: /^(qa|test|automated)\b/i }
+    };
+
+    const scenarios = await SharedScenario.find(hideTestData)
       .sort({ likes: -1, createdAt: -1 })
       .skip(skip)
       .limit(limit)
       .lean();
 
     // Get total count for pagination
-    const totalScenarios = await SharedScenario.countDocuments();
+    const totalScenarios = await SharedScenario.countDocuments(hideTestData);
 
     res.json({
       success: true,
@@ -1443,171 +1467,83 @@ router.post('/chatbot', ensureAuthenticated, async (req, res) => {
 });
 
 // Helper function to generate chatbot responses using Gemini API
+// Trimmed so a key pasted into .env with a stray leading space still works.
+// Never call the network from the test suite — force the offline corpus there.
+const GEMINI_KEY = process.env.NODE_ENV === 'test'
+  ? ''
+  : (process.env.GEMINI_API_KEY || '').trim();
+
 async function generateGeminiChatbotResponse(question) {
+  // No key configured: go straight to the offline corpus, no failed network call.
+  if (!GEMINI_KEY) return generateSpaceChatbotResponse(question);
+
   try {
-    console.log('Calling Gemini API for question:', question);
-
-    // Use the newer @google/genai SDK (same one used in app-enhanced.js)
     const { GoogleGenAI } = require('@google/genai');
+    const ai = new GoogleGenAI({ apiKey: GEMINI_KEY });
 
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const prompt = `You are the expert space-science assistant for Spaceverse, a space education platform. Answer the question about astronomy, the solar system, orbital mechanics, the Kessler syndrome, stars, black holes, cosmology, rockets or space missions.
 
-    // Create a space-focused prompt
-    const prompt = `You are an expert space science assistant for Spaceverse, a space education platform. Answer the following question about space science, astronomy, planets, stars, galaxies, rocket science, orbital mechanics, black holes, or related space topics.
-
-Be informative, accurate, engaging, and conversational. Keep your response concise but comprehensive (2-4 paragraphs maximum). Use simple language that anyone can understand.
+Be accurate, engaging and conversational. 2-4 short paragraphs, plain language. If the question is not about space, say so briefly and invite a space question.
 
 Question: ${question}
 
 Answer:`;
 
-    console.log('Sending prompt to Gemini API');
-
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: prompt,
-    });
-
-    const answer = response.text;
-
-    console.log('Received response from Gemini API:', answer.substring(0, 100) + '...');
-
-    return answer;
+    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt });
+    const answer = (response.text || '').trim();
+    if (answer) return answer;
+    // Empty completion: fall through to the corpus.
+    return generateSpaceChatbotResponse(question);
   } catch (error) {
-    console.error('Error calling Gemini API:', error.message || error);
-    // Fallback to the original response generator if API fails
+    console.warn('Gemini chatbot unavailable, using offline corpus:', error.message || error);
     return generateSpaceChatbotResponse(question);
   }
 }
 
-// Helper function to generate chatbot responses (fallback)
+// Offline chatbot brain. Delegates to the curated space-science corpus in
+// services/space-knowledge.js, which covers orbital mechanics, the Kessler
+// syndrome, the solar system, stellar physics, cosmology and the major
+// missions. Always returns a useful string.
 function generateSpaceChatbotResponse(question) {
-  // Convert question to lowercase for easier matching
-  const lowerQuestion = question.toLowerCase();
-
-  // Define responses for common space questions
-
-  // Greetings
-  if (lowerQuestion.includes('hi') || lowerQuestion.includes('hello') || lowerQuestion.includes('hey') || lowerQuestion.includes('greetings')) {
-    return "Hello! I'm your Space Science Assistant. I can answer questions about space, astronomy, stars, planets, black holes, and related topics. What would you like to know about the universe today?";
-  }
-
-  // Farewells
-  if (lowerQuestion.includes('bye') || lowerQuestion.includes('goodbye') || lowerQuestion.includes('see you') || lowerQuestion.includes('farewell')) {
-    return "Goodbye! It was great chatting about space with you. Feel free to come back anytime you have more questions about the cosmos. Safe travels through the universe! 🚀";
-  }
-
-  // Thanks
-  if (lowerQuestion.includes('thank') || lowerQuestion.includes('thanks')) {
-    return "You're welcome! I'm glad I could help with your space questions. Keep exploring the cosmos and feel free to ask anytime!";
-  }
-
-  if (lowerQuestion.includes('who are you') || lowerQuestion.includes('what are you')) {
-    return "I'm a Space Science Assistant powered by AI! I'm here to help you learn about space, astronomy, and the wonders of the universe. Feel free to ask me about planets, stars, galaxies, black holes, or any other space-related topics!";
-  }
-
-  // How are you
-  if (lowerQuestion.includes('how are you') || lowerQuestion.includes('how do you do')) {
-    return "I'm doing great, thank you for asking! I'm here and ready to help you explore the wonders of space. What would you like to learn about today?";
-  }
-  // Planets
-  if (lowerQuestion.includes('how many planets') || lowerQuestion.includes('planets in solar system')) {
-    return "There are 8 planets in our solar system: Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus, and Neptune. Pluto was reclassified as a 'dwarf planet' in 2006. The planets are divided into rocky inner planets (Mercury, Venus, Earth, Mars) and gas giants (Jupiter, Saturn) plus ice giants (Uranus, Neptune).";
-  }
-
-  if (lowerQuestion.includes('what is space') || lowerQuestion.includes('define space')) {
-    return "Space, also known as outer space, is the expanse that exists beyond Earth and between celestial bodies. It is a vacuum containing a low density of particles, predominantly a plasma of hydrogen and helium, as well as electromagnetic radiation, magnetic fields, neutrinos, dust, and cosmic rays.";
-  }
-
-  if (lowerQuestion.includes('how big is the universe') || lowerQuestion.includes('size of universe')) {
-    return "The observable universe is estimated to be about 93 billion light-years in diameter. However, the entire universe could be much larger, and some theories suggest it might be infinite. The universe is also expanding, with distant galaxies moving away from us.";
-  }
-
-  if (lowerQuestion.includes('black hole') || lowerQuestion.includes('what is a black hole')) {
-    return "A black hole is a region of spacetime where gravity is so strong that nothing—no particles or even electromagnetic radiation such as light—can escape from it. The theory of general relativity predicts that a sufficiently compact mass can deform spacetime to form a black hole.";
-  }
-
-  if (lowerQuestion.includes('how do rockets work') || lowerQuestion.includes('rocket propulsion')) {
-    return "Rockets work on the principle of Newton's third law of motion: for every action, there is an equal and opposite reaction. They expel mass (burned fuel) at high speed in one direction, which propels the rocket in the opposite direction. This works even in the vacuum of space where there is no air to push against.";
-  }
-
-  if (lowerQuestion.includes('what is the speed of light') || lowerQuestion.includes('speed of light')) {
-    return "The speed of light in a vacuum is approximately 299,792,458 meters per second (or about 186,282 miles per second). This is roughly 300,000 kilometers per second. According to Einstein's theory of special relativity, nothing can travel faster than the speed of light.";
-  }
-
-  if (lowerQuestion.includes('what is gravity') || lowerQuestion.includes('define gravity')) {
-    return "Gravity is a natural phenomenon by which all things with mass or energy—including planets, stars, galaxies, and even light—are brought toward one another. On Earth, gravity gives weight to physical objects and causes the ocean tides. Einstein's general theory of relativity describes gravity as a consequence of the curvature of spacetime.";
-  }
-
-  if (lowerQuestion.includes('how are stars formed') || lowerQuestion.includes('star formation') || lowerQuestion.includes('formation of stars')) {
-    return "Stars form from vast clouds of gas and dust in space called nebulae. Here's the process in simple terms:\n\n1. **Gravitational Collapse**: A region within a nebula becomes denser and starts collapsing under its own gravity.\n\n2. **Protostar Formation**: As the material collapses, it heats up and forms a spinning disk with a hot, dense core called a protostar.\n\n3. **Nuclear Fusion Ignition**: When the core temperature reaches about 10 million degrees Celsius, hydrogen atoms begin fusing into helium—this is nuclear fusion, and it marks the birth of a star!\n\n4. **Main Sequence Star**: The outward pressure from fusion balances the inward pull of gravity, creating a stable star that can shine for billions of years.\n\nOur Sun formed this way about 4.6 billion years ago, and new stars are still being born in nebulae like the Orion Nebula today!";
-  }
-
-  if (lowerQuestion.includes('what is a galaxy') || lowerQuestion.includes('define galaxy')) {
-    return "A galaxy is a system of millions or billions of stars, together with gas and dust, held together by gravitational attraction. Our solar system is part of the Milky Way galaxy, which contains an estimated 100-400 billion stars. There are many different types of galaxies, including spiral, elliptical, and irregular galaxies.";
-  }
-
-  if (lowerQuestion.includes('what is dark matter') || lowerQuestion.includes('dark matter')) {
-    return "Dark matter is a form of matter thought to account for approximately 85% of the matter in the universe. It is called 'dark' because it does not appear to interact with the electromagnetic field, making it invisible to direct observation. Its existence is inferred from gravitational effects on visible matter and the structure of the universe.";
-  }
-
-  if (lowerQuestion.includes('what is dark energy') || lowerQuestion.includes('dark energy')) {
-    return "Dark energy is a mysterious force that is causing the expansion of the universe to accelerate. It makes up about 68% of the universe. Unlike gravity, which pulls things together, dark energy seems to push space apart. Scientists don't yet understand what dark energy is, but its effects are clearly observed through measurements of distant supernovae.";
-  }
-
-  if (lowerQuestion.includes('how old is the earth') || lowerQuestion.includes('age of earth')) {
-    return "Earth is approximately 4.54 billion years old. Scientists have determined this age through radiometric dating of the oldest Earth materials, as well as meteorites and lunar samples. This age is consistent with the ages of other bodies in the Solar System.";
-  }
-
-  if (lowerQuestion.includes('what is the ozone layer') || lowerQuestion.includes('ozone layer')) {
-    return "The ozone layer is a region of Earth's stratosphere that absorbs most of the Sun's ultraviolet radiation. It contains a higher concentration of ozone (O3) than the rest of the atmosphere. The ozone layer is mainly found 15 to 35 kilometers above Earth's surface and plays a crucial role in protecting life on Earth from harmful UV radiation.";
-  }
-
-  if (lowerQuestion.includes('what is a comet') || lowerQuestion.includes('define comet')) {
-    return "A comet is an icy, small Solar System body that, when passing close to the Sun, warms and begins to release gases, a process called outgassing. This produces a visible atmosphere or coma, and sometimes also a tail. These phenomena are due to the effects of solar radiation and the solar wind acting upon the nucleus of the comet.";
-  }
-
-  if (lowerQuestion.includes('what is an asteroid') || lowerQuestion.includes('define asteroid')) {
-    return "An asteroid is a rocky object that orbits the Sun. Asteroids are smaller than planets but larger than meteoroids. Most asteroids orbit in the asteroid belt between Mars and Jupiter. They are remnants from the formation of the solar system about 4.6 billion years ago.";
-  }
-
-  if (lowerQuestion.includes('what is the kuiper belt') || lowerQuestion.includes('kuiper belt')) {
-    return "The Kuiper Belt is a region of the outer solar system beyond the orbit of Neptune, extending from about 30 to 50 astronomical units (AU) from the Sun. It is similar to the asteroid belt but is far larger—20 times as wide and 20 to 200 times as massive. The Kuiper Belt is home to three officially recognized dwarf planets: Pluto, Haumea, and Makemake.";
-  }
-
-  // Default response for unrecognized questions
-  return "That's an interesting question about space! While I don't have a specific answer prepared for that topic, I recommend exploring our Space Traffic Simulator to learn more about orbital mechanics, or checking out our educational content about the solar system. Is there something more specific about space you'd like to know?";
+  return spaceKnowledge.answerSpaceQuestion(question);
 }
 
-// Helper function to calculate collision risk locally
+// Collision-risk INDEX (0-100), not a literal probability. It is a teaching
+// score: a routine LEO launch lands low (~15-30), a heavy fragmentation in a
+// crowded shell lands high (75+). The label thresholds in
+// generateLocalExplanation() are aligned to these bands so the words match the
+// number (the old scale called a nominal ~39 "LOW", which read as a bug).
 function calculateLocalCollisionRisk(beforeState, afterState, parameters) {
   const { altitude, inclination, velocity, mass } = parameters;
 
-  // Base risk from congestion
-  const baseRisk = afterState.averageCongestion * 50; // Scale congestion to percentage
+  // Contribution from how crowded the resulting shell is. Scaled so a busy but
+  // routine LEO still leaves room under the MODERATE band for a clean scenario.
+  const congestionRisk = Math.min(26, (afterState.averageCongestion || 0) * 34);
 
-  // Risk from altitude (LEO has higher traffic)
-  let altitudeRisk = 0;
-  if (altitude < 500) altitudeRisk = 25; // Very low Earth orbit - high risk
-  else if (altitude < 1000) altitudeRisk = 15; // Low Earth orbit - medium-high risk
-  else if (altitude < 2000) altitudeRisk = 10; // Mid LEO - medium risk
-  else if (altitude < 35786) altitudeRisk = 5; // MEO - low risk
-  else altitudeRisk = 2; // GEO - very low risk
+  // Altitude band — the 750-950 km debris belt is the danger zone; the Starlink
+  // shell below it and self-cleaning VLEO are markedly safer, MEO/GEO safer still.
+  let altitudeRisk;
+  if (altitude < 450) altitudeRisk = 10;        // VLEO: drag clears debris in months
+  else if (altitude < 650) altitudeRisk = 14;   // lower LEO / Starlink shell
+  else if (altitude < 950) altitudeRisk = 22;   // debris-belt heart of LEO
+  else if (altitude < 1300) altitudeRisk = 15;  // upper LEO
+  else if (altitude < 2000) altitudeRisk = 9;   // LEO fringe
+  else if (altitude < 35786) altitudeRisk = 4;  // MEO
+  else altitudeRisk = 3;                         // GEO
 
-  // Risk from inclination (equatorial and polar orbits have specific patterns)
-  const inclinationRisk = Math.abs(Math.sin(inclination * Math.PI / 180)) * 10;
+  // Inclination: crossing orbits raise conjunction geometry variety.
+  const inclinationRisk = Math.abs(Math.sin(inclination * Math.PI / 180)) * 5;
 
-  // Risk from velocity (higher velocity = higher kinetic energy = higher damage potential)
-  const velocityRisk = Math.min(20, (velocity / 7.8) * 15); // Normalize to typical LEO velocity
+  // Kinetic energy scales damage potential; normalise to typical LEO speed.
+  const velocityRisk = Math.min(10, (velocity / 7.8) * 7);
 
-  // Risk from mass (larger objects cause more damage)
-  const massRisk = Math.min(15, (mass / 1000) * 5);
+  // Bigger objects are bigger targets and bigger debris sources.
+  const massRisk = Math.min(12, (mass / 1000) * 3.5);
 
-  // Combine all risk factors
-  let totalRisk = baseRisk + altitudeRisk + inclinationRisk + velocityRisk + massRisk;
+  const total = congestionRisk + altitudeRisk + inclinationRisk + velocityRisk + massRisk;
 
-  // Cap at 95% to allow for some uncertainty
-  return Math.min(95, totalRisk);
+  // Keep some headroom for uncertainty at the top of the range.
+  return Math.round(Math.min(95, total) * 10) / 10;
 }
 
 // Helper function to calculate congestion change locally
@@ -1642,13 +1578,14 @@ function generateLocalExplanation(eventType, parameters, collisionRisk, congesti
 
   let explanation = `Analysis of ${eventType} event at ${altitude}km altitude with ${mass}kg mass, ${inclination}° inclination, and ${velocity}km/s velocity:\n\n`;
 
-  // Add collision risk explanation
-  if (collisionRisk > 70) {
-    explanation += `• HIGH collision risk (${collisionRisk.toFixed(1)}%) due to dense orbital environment and object characteristics.\n`;
-  } else if (collisionRisk > 40) {
-    explanation += `• MODERATE collision risk (${collisionRisk.toFixed(1)}%) - monitor closely for potential conjunctions.\n`;
+  // Collision-risk index band. Thresholds match calculateLocalCollisionRisk()'s
+  // 0-100 teaching scale so the label always agrees with the number.
+  if (collisionRisk >= 65) {
+    explanation += `• HIGH collision-risk index (${collisionRisk.toFixed(1)}/100) — dense shell and energetic object; treat as a conjunction hotspot.\n`;
+  } else if (collisionRisk >= 35) {
+    explanation += `• MODERATE collision-risk index (${collisionRisk.toFixed(1)}/100) — monitor closely for potential conjunctions.\n`;
   } else {
-    explanation += `• LOW collision risk (${collisionRisk.toFixed(1)}%) - favorable orbital conditions.\n`;
+    explanation += `• LOW collision-risk index (${collisionRisk.toFixed(1)}/100) — favourable orbital conditions.\n`;
   }
 
   // Add congestion explanation

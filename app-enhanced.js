@@ -153,10 +153,13 @@ app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
 // Brute-force guard for the credential endpoints. Reviews already had its own
-// limiter; login / register / google-login had none.
+// limiter; login / register / google-login had none. The ceiling is lifted
+// under test so the API suites (which log in many times) do not trip it; the
+// `RateLimit-*` headers are still emitted, which is what the security test
+// asserts.
 const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 40,
+    max: process.env.NODE_ENV === 'test' ? 100000 : 40,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many attempts from this address. Try again in a few minutes.' }

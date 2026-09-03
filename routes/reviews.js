@@ -15,14 +15,21 @@ const reviewLimiter = rateLimit({
     message: 'Too many reviews submitted. Please try again later.'
 });
 
+// Reviews left by the automated test suites ("qa-…" pilots, "Automated QA…"
+// comments) should not surface on the public wall.
+const TEST_AUTHOR = /^(qa\d*|test|automated)[-_ ]/i;
+const TEST_COMMENT = /^(automated qa|qa automated|test review)\b/i;
+const isTestReview = (r) =>
+    TEST_AUTHOR.test(r.userId?.username || '') || TEST_COMMENT.test(r.comment || '');
+
 // Get approved reviews
 router.get('/', async (req, res) => {
     try {
         const reviews = await Review.find({ status: 'approved' })
             .sort({ createdAt: -1 })
             .populate('userId', 'username')
-            .limit(20);
-        res.json(reviews);
+            .limit(40);
+        res.json(reviews.filter((r) => !isTestReview(r)).slice(0, 20));
     } catch (err) {
         console.error('Error fetching reviews:', err);
         res.status(500).json({ message: 'Error fetching reviews' });
