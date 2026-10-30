@@ -5,8 +5,7 @@ gsap.registerPlugin(ScrollTrigger);
    SPACE SHUTTLE DISCOVERY — Cinematic 3D Launch Engine
    - Loads discovery_space_shuttle.glb (actual 3D model)
    - UnrealBloom post-processing
-   - 15,000 particle fire plume (shock diamond + SRB)
-   - 6,000 particle volumetric smoke
+   - Scroll-linked engine plume and volumetric smoke
    - Realistic heat-shimmer / ground exhaust glow
    - Dynamic point light + camera shake
    ====================================================================== */
@@ -131,9 +130,10 @@ class LaunchExperience {
 
         this.scene  = new THREE.Scene();
         this.camera = new THREE.PerspectiveCamera(38, W / H, 0.05, 5000);
-        // Camera centered — shuttle fills the frame
-        this.camera.position.set(0, 0, 18);
-        this.camera.lookAt(0, 0, 0);
+        // On phones, frame the whole orbiter below the compact intro card.
+        const phone = W <= 640;
+        this.camera.position.set(0, phone ? 3.2 : 0, phone ? 29 : 18);
+        this.camera.lookAt(0, phone ? 3.2 : 0, 0);
 
         /* Renderer */
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -156,9 +156,9 @@ class LaunchExperience {
 
         this.bloomPass = new THREE.UnrealBloomPass(
             new THREE.Vector2(W, H),
-            /* strength */ 1.4,
-            /* radius   */ 0.55,
-            /* threshold*/ 0.22
+            /* strength */ 0.35,
+            /* radius   */ 0.35,
+            /* threshold*/ 0.85
         );
         this.composer.addPass(this.bloomPass);
 
@@ -193,9 +193,12 @@ class LaunchExperience {
        LOAD SHUTTLE GLTF MODEL
     ──────────────────────────────────────────────────────────── */
     loadShuttle() {
+        // Keep a recognizable orbiter on screen while the detailed GLB and
+        // its embedded textures decode (or if a device cannot load them).
+        this.buildFallbackRocket();
         const loader = new THREE.GLTFLoader();
         loader.load(
-            '/models/discovery_space_shuttle.glb',
+            '/models/discovery_space_shuttle_web.glb',
             (gltf) => {
                 const model = gltf.scene;
 
@@ -235,32 +238,66 @@ class LaunchExperience {
                     }
                 });
 
+                if (this.fallbackRocket) {
+                    this.shuttleGroup.remove(this.fallbackRocket);
+                    this.fallbackRocket.traverse(child => {
+                        if (child.geometry) child.geometry.dispose();
+                        if (child.material) child.material.dispose();
+                    });
+                    this.fallbackRocket = null;
+                }
                 this.shuttleGroup.add(model);
                 this.shuttleLoaded = true;
                 console.log('Space Shuttle Discovery loaded ✓');
             },
-            (xhr) => {
-                console.log(`Shuttle: ${Math.round(xhr.loaded / xhr.total * 100)}% loaded`);
-            },
+            undefined,
             (err) => {
                 console.error('Failed to load shuttle model:', err);
-                this.buildFallbackRocket();
+                // The stand-in is already visible; leave it in place.
             }
         );
     }
 
     /* ────────────────────────────────────────────────────────────
-       FALLBACK simple rocket if GLTF fails
+       Lightweight orbiter while the detailed GLB loads
     ──────────────────────────────────────────────────────────── */
     buildFallbackRocket() {
-        const mat = new THREE.MeshStandardMaterial({ color: 0xdddddd, roughness: 0.3, metalness: 0.8 });
-        const body  = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.45, 6, 32), mat);
-        const nose  = new THREE.Mesh(new THREE.ConeGeometry(0.4, 2, 32), mat);
-        nose.position.y = 4;
         const group = new THREE.Group();
-        group.add(body); group.add(nose);
+        const ceramic = new THREE.MeshStandardMaterial({ color: 0xe0e4e9, roughness: 0.78, metalness: 0.04 });
+        const thermal = new THREE.MeshStandardMaterial({ color: 0x242b38, roughness: 0.91, metalness: 0.02 });
+        const metal = new THREE.MeshStandardMaterial({ color: 0x777f8c, roughness: 0.48, metalness: 0.38 });
+        const accent = new THREE.MeshStandardMaterial({ color: 0x224c86, roughness: 0.68, metalness: 0.1 });
+        const add = (geo, mat, x, y, z) => {
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            group.add(mesh);
+            return mesh;
+        };
+        add(new THREE.CylinderGeometry(0.49, 0.66, 5.7, 28), ceramic, 0, 0, 0);
+        add(new THREE.ConeGeometry(0.49, 1.55, 28), ceramic, 0, 3.62, 0);
+        add(new THREE.CylinderGeometry(0.68, 0.7, 1.45, 28), thermal, 0, -2.15, -0.03);
+        const cockpit = add(new THREE.SphereGeometry(0.55, 20, 12), thermal, 0, 2.45, 0.43);
+        cockpit.scale.set(0.88, 0.45, 0.38);
+
+        for (const side of [-1, 1]) {
+            const outline = new THREE.Shape();
+            outline.moveTo(side * 0.48, 0.7);
+            outline.lineTo(side * 3.05, -2.50);
+            outline.lineTo(side * 2.76, -3.10);
+            outline.lineTo(side * 0.55, -2.67);
+            outline.closePath();
+            const wing = add(new THREE.ExtrudeGeometry(outline, { depth: 0.11, bevelEnabled: false }), ceramic, 0, 0, -0.06);
+            wing.rotation.z = 0;
+            const stripe = add(new THREE.BoxGeometry(1.55, 0.08, 0.14), accent, side * 1.58, -2.52, 0.12);
+            stripe.rotation.z = side * -0.32;
+            add(new THREE.CylinderGeometry(0.28, 0.31, 1.23, 20), ceramic, side * 0.56, -2.75, 0.08);
+            add(new THREE.CylinderGeometry(0.22, 0.26, 0.36, 20), metal, side * 0.56, -3.55, 0.08);
+        }
+        add(new THREE.CylinderGeometry(0.22, 0.28, 0.40, 20), metal, 0, -3.62, 0.26);
+        group.position.y = -1.2;
         this.shuttleGroup.add(group);
-        this.shuttleLoaded = true;
+        this.fallbackRocket = group;
+        this.shuttleLoaded = false;
     }
 
     /* ────────────────────────────────────────────────────────────
@@ -268,7 +305,8 @@ class LaunchExperience {
     ──────────────────────────────────────────────────────────── */
     buildVFX() {
         this.buildFireParticles();
-        this.buildSRBParticles();
+        // The asset is the orbiter alone, without solid rocket boosters.
+        // Side plumes would float beside its wings rather than leave nozzles.
         this.buildSmokeParticles();
         this.buildGlowSprites();
         this.buildSteamCloud();
@@ -277,7 +315,7 @@ class LaunchExperience {
 
     /* ── Star streaks — vertical speed lines that fade in during high ascent ── */
     buildStarStreaks() {
-        const N = 220;
+        const N = 110;
         this.STREAK_N  = N;
         this.streakArr = new Float32Array(N * 6);
         this.streakVel = new Float32Array(N);
@@ -304,7 +342,7 @@ class LaunchExperience {
 
     /* ── Main Engine Fire (SSME × 3 near main nozzle) ── */
     buildFireParticles() {
-        const COUNT = 15000;
+        const COUNT = 5200;
         this.firePosArr  = new Float32Array(COUNT * 3);
         this.fireVelArr  = new Float32Array(COUNT * 3);
         this.fireLifeArr = new Float32Array(COUNT);
@@ -318,7 +356,7 @@ class LaunchExperience {
         const mat = new THREE.PointsMaterial({
             map: this._makeGradientSprite(64,
                 ['rgba(255,255,255,1)', 'rgba(255,200,60,0.9)', 'rgba(255,80,0,0.5)', 'rgba(0,0,0,0)']),
-            size: 0.45,
+            size: 0.30,
             sizeAttenuation: true,
             transparent: true,
             blending: THREE.AdditiveBlending,
@@ -344,48 +382,6 @@ class LaunchExperience {
         this.fireSzArr[i]      = 0.2 + Math.random() * 0.5;
     }
 
-    /* ── SRB side booster plumes ── */
-    buildSRBParticles() {
-        const COUNT = 6000;
-        this.srbPosArr  = new Float32Array(COUNT * 3);
-        this.srbVelArr  = new Float32Array(COUNT * 3);
-        this.srbLifeArr = new Float32Array(COUNT);
-        this.SRB_N      = COUNT;
-        for (let i = 0; i < COUNT; i++) this._resetSRB(i, true);
-
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.BufferAttribute(this.srbPosArr, 3));
-
-        const mat = new THREE.PointsMaterial({
-            map: this._makeGradientSprite(64,
-                ['rgba(255,220,100,1)', 'rgba(255,120,0,0.8)', 'rgba(200,50,0,0.4)', 'rgba(0,0,0,0)']),
-            size: 0.55,
-            sizeAttenuation: true,
-            transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            color: 0xffaa44,
-        });
-        this.srbPts = new THREE.Points(geo, mat);
-        this.srbPts.renderOrder = 4;
-        this.scene.add(this.srbPts);
-    }
-
-    _resetSRB(i, scatter = false) {
-        // Two SRBs: offset left and right of shuttle
-        const side = (i % 2 === 0) ? -1.8 : 1.8;
-        const ang  = Math.random() * Math.PI * 2;
-        const r    = Math.random() * 0.14;
-        this.srbPosArr[i*3]   = side + Math.cos(ang) * r;
-        this.srbPosArr[i*3+1] = scatter ? (Math.random() * -8) : 0;
-        this.srbPosArr[i*3+2] = Math.sin(ang) * r;
-        const spd = 4.5 + Math.random() * 5;
-        this.srbVelArr[i*3]   = (Math.random() - 0.5) * 0.3;
-        this.srbVelArr[i*3+1] = -spd;
-        this.srbVelArr[i*3+2] = (Math.random() - 0.5) * 0.3;
-        this.srbLifeArr[i]    = scatter ? Math.random() : 0;
-    }
-
     /* ── Volumetric smoke cloud ──
        Per-particle billowing plume driven by a custom ShaderMaterial:
        - each particle grows over its lifetime (small ember → giant puff)
@@ -394,7 +390,7 @@ class LaunchExperience {
        Motion (curl turbulence + buoyancy) lives in _updateSmoke().
     */
     buildSmokeParticles() {
-        const COUNT = 9000;
+        const COUNT = 2700;
         this.smkPosArr   = new Float32Array(COUNT * 3);
         this.smkVelArr   = new Float32Array(COUNT * 3);
         this.smkLifeArr  = new Float32Array(COUNT);   // 0..1 age
@@ -435,7 +431,7 @@ class LaunchExperience {
                     // large overlapping sprites — puffs merge into one cloud
                     // mass instead of reading as separate dots
                     gl_PointSize = grow * uPixelRatio * (200.0 / -mv.z);
-                    gl_PointSize = clamp(gl_PointSize, 5.0, 180.0);
+                    gl_PointSize = clamp(gl_PointSize, 3.0, 75.0);
                     gl_Position = projectionMatrix * mv;
                 }
             `,
@@ -497,7 +493,7 @@ class LaunchExperience {
 
         this.smkLifeArr[i] = scatter ? Math.random() : 0;
         this.smkSeedArr[i] = Math.random() * 1000;
-        this.smkSizeArr[i] = 1.2 + Math.random() * 2.4;      // wider size spread — mixed puff scales read more natural
+        this.smkSizeArr[i] = 0.55 + Math.random() * 0.85;
     }
 
     /* ── Fluffy multi-blob smoke alpha texture ── */
@@ -670,6 +666,8 @@ class LaunchExperience {
         const dt = Math.min(this.clock.getDelta(), 0.05);
         const p  = this.progress;
         const t  = this.clock.elapsedTime;
+        const phone = window.innerWidth <= 640;
+        const cameraDistance = phone ? 29 : 18;
         const pxOff = this.mouse.x * 0.12;   // parallax horizontal offset
         const pyOff = this.mouse.y * 0.08;   // parallax vertical offset
 
@@ -686,18 +684,22 @@ class LaunchExperience {
              p=0.5 → y≈12  (mid-ascent)
              p=1.0 → y≈35  (out of frame above)
         ──────────────────────────────────────────────────────── */
-        const ascentEase = Math.pow(Math.max(0, p), 1.8) * 35;
+        const ascentEase = Math.pow(Math.max(0, p), 1.65) * 31;
         this.shuttleGroup.position.y = ascentEase;
 
-        /* Camera chases half the ascent — the shuttle pulls away slowly and
-           stays framed for most of the climb instead of leaving at ~40% */
-        const followY = ascentEase * 0.5;
-        this.camera.position.y += (pyOff * 0.4 + followY - this.camera.position.y) * 0.07;
-        this.camera.lookAt(0, followY, 0);
+        /* Stay with the orbiter through ascent, then let it depart during the
+           final sixth of the scroll. The old half-speed chase lost the nose
+           halfway through and left an empty screen for the last act. */
+        const depart = Math.min(1, Math.max(0, (p - 0.84) / 0.16));
+        const followY = ascentEase * 0.86 * (1 - depart * 0.55);
+        const mobileIntroFrame = phone ? Math.max(0, 1 - p / 0.3) * 3.2 : 0;
+        const trackingY = followY + mobileIntroFrame;
+        this.camera.position.y += (pyOff * 0.4 + trackingY - this.camera.position.y) * 0.07;
+        this.camera.lookAt(0, trackingY, 0);
 
-        /* Speed feel — FOV widens gently through mid-ascent */
+        /* Pull back slightly as speed builds; the full shuttle remains legible. */
         const spdT = Math.min(1, Math.max(0, (p - 0.25) / 0.5));
-        this.camera.fov = 38 + spdT * 7;
+        this.camera.fov = 38 + spdT * 5;
         this.camera.updateProjectionMatrix();
 
         /* Gravity turn — real launches lean downrange after the tower */
@@ -708,7 +710,7 @@ class LaunchExperience {
         if (p < 0.04) {
             // Gentle camera oscillation at rest — feels alive
             this.camera.position.x = Math.sin(t * 0.9) * 0.018 + pxOff * 0.3;
-            this.camera.position.z = 18 + Math.sin(t * 0.5) * 0.015;
+            this.camera.position.z = cameraDistance + Math.sin(t * 0.5) * 0.015;
         }
 
         /* ── Idle engine pre-glow heartbeat ── */
@@ -755,7 +757,7 @@ class LaunchExperience {
 
             // Combine all layers
             this.camera.position.x = camJitterX + camSwayX + camTremorX + pxOff * 0.3;
-            this.camera.position.z = 18 + camJitterZ;
+            this.camera.position.z = cameraDistance + spdT * 5 + camJitterZ;
             this.camera.position.y += camSwayY;
 
             // Camera roll tremor (tiny rotation — very cinematic)
@@ -768,7 +770,7 @@ class LaunchExperience {
         } else {
             // Smoothly return to neutral when not shaking
             this.camera.position.x  += (pxOff * 0.3 - this.camera.position.x) * 0.12;
-            this.camera.position.z  += (18 - this.camera.position.z) * 0.12;
+            this.camera.position.z  += (cameraDistance + spdT * 5 - this.camera.position.z) * 0.12;
             this.camera.rotation.z  += (0 - this.camera.rotation.z) * 0.1;
             this.shuttleGroup.rotation.z += (this.baseTilt - this.shuttleGroup.rotation.z) * 0.1;
         }
@@ -790,57 +792,47 @@ class LaunchExperience {
         this.firePts.material.visible = thrust > 0.02;
         this.firePts.material.opacity = thrust;
 
-        // SRB
-        this._updateParticles(
-            this.srbPosArr, this.srbVelArr, this.srbLifeArr, this.SRB_N,
-            dt, thrust, 2.0, nozzleX, nozzleY, 0.18,
-            (i) => this._resetSRB(i)
-        );
-        this.srbPts.geometry.attributes.position.needsUpdate = true;
-        this.srbPts.material.visible = thrust > 0.02 && p < 0.7;
-        this.srbPts.material.opacity = thrust * (p < 0.65 ? 1 : Math.max(0, (0.7 - p) / 0.05));
-
         // Smoke
         const smokeThrust = p < 0.45 ? thrust : thrust * Math.max(0, 1 - (p - 0.45) / 0.35);
         this._updateSmoke(dt, nozzleX, nozzleY, smokeThrust);
         this.smkPts.geometry.attributes.position.needsUpdate = true;
         this.smkPts.material.visible = smokeThrust > 0.01;
-        this.smkPts.material.uniforms.uOpacity.value = 0.20 * smokeThrust;
+        this.smkPts.material.uniforms.uOpacity.value = 0.11 * smokeThrust;
         this.smkPts.material.uniforms.uTime.value = t;
 
         // Steam — disabled (no launch pad in this layout)
         this.stmPts.material.visible = false;
 
         /* ── Glow ── */
-        const glowY = this.shuttleGroup.position.y - 3.0;
+        const glowY = nozzleY - 0.4;
         const fl = thrust;
 
         this.glowCore.position.y   = glowY;
-        this.glowCore.material.opacity = fl * 0.85;
-        this.glowCore.scale.set(2, 3.5 + fl * 2, 1);
+        this.glowCore.material.opacity = fl * 0.55;
+        this.glowCore.scale.set(1.25, 2.4 + fl * 1.2, 1);
 
         this.glowOrange.position.y  = glowY - 0.5;
-        this.glowOrange.material.opacity = fl * 0.55;
-        this.glowOrange.scale.set(4 + fl * 3, 8 + fl * 6, 1);
+        this.glowOrange.material.opacity = fl * 0.26;
+        this.glowOrange.scale.set(2.6 + fl, 5 + fl * 3, 1);
 
         const gdActive = p < 0.3;
-        this.glowGround.material.opacity = gdActive ? fl * 0.35 : 0;
+        this.glowGround.material.opacity = gdActive ? fl * 0.18 : 0;
         this.glowGround.scale.set(10 + fl * 8, 2.5, 1);
 
         /* ── Dynamic fire lights ── */
-        this.fireLight1.intensity = fl * 12;
+        this.fireLight1.intensity = fl * 2.5;
         this.fireLight1.position.y = glowY + 1;
-        this.fireLight2.intensity = fl * 7;
+        this.fireLight2.intensity = fl * 1.2;
         this.fireLight2.position.y = glowY - 1;
 
         /* ── Bloom strength reacts accurately to thrust ── */
         if (this.bloomPass) {
-            this.bloomPass.strength = 0.5 + fl * 0.7; // Fixed severe overexposure bug
+            this.bloomPass.strength = 0.3 + fl * 0.3;
         }
 
         /* ── Star streaks — speed lines fade in past mid-ascent ── */
         const streakLvl = Math.min(1, Math.max(0, (p - 0.5) / 0.25));
-        this.streakMat.opacity = streakLvl * 0.55;
+        this.streakMat.opacity = streakLvl * 0.24;
         if (streakLvl > 0.01) {
             const camY = this.camera.position.y;
             for (let i = 0; i < this.STREAK_N; i++) {

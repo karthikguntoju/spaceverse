@@ -54,7 +54,7 @@ export class GyroLook {
         if (typeof window === 'undefined') return 'no window';
         if (!('DeviceOrientationEvent' in window)) return 'This browser has no motion sensors API.';
         if (window.isSecureContext === false)
-            return 'Motion sensors need HTTPS. Open this page over https:// (see README: HTTPS=true npm start).';
+            return 'Motion sensors need a secure origin. Use HTTPS with a certificate your phone trusts (see README: npm run start:https).';
         return '';
     }
 
@@ -77,7 +77,8 @@ export class GyroLook {
         this._readScreen();
         window.addEventListener('deviceorientation', this._onOrient, true);
         window.addEventListener('orientationchange', this._onScreen);
-        if (screen.orientation) screen.orientation.addEventListener('change', this._onScreen);
+        if (screen.orientation && typeof screen.orientation.addEventListener === 'function')
+            screen.orientation.addEventListener('change', this._onScreen);
         this.enabled = true;
         this.hasReading = false;
         return true;
@@ -87,7 +88,8 @@ export class GyroLook {
         if (!this.enabled) return;
         window.removeEventListener('deviceorientation', this._onOrient, true);
         window.removeEventListener('orientationchange', this._onScreen);
-        if (screen.orientation) screen.orientation.removeEventListener('change', this._onScreen);
+        if (screen.orientation && typeof screen.orientation.removeEventListener === 'function')
+            screen.orientation.removeEventListener('change', this._onScreen);
         this.enabled = false;
         this.hasReading = false;
     }
@@ -100,10 +102,10 @@ export class GyroLook {
     }
 
     _read(e) {
-        if (e.alpha === null || e.alpha === undefined) return;
+        if (![e.alpha, e.beta, e.gamma].every(Number.isFinite)) return;
         this.alpha = e.alpha * DEG;
-        this.beta = (e.beta || 0) * DEG;
-        this.gamma = (e.gamma || 0) * DEG;
+        this.beta = e.beta * DEG;
+        this.gamma = e.gamma * DEG;
         // 'YXZ' — yaw about Y (alpha), pitch about X (beta), roll about Z (-gamma)
         EULER.set(this.beta, this.alpha, -this.gamma, 'YXZ');
         this.q.setFromEuler(EULER);

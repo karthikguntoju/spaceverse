@@ -283,8 +283,8 @@
         <div class="hero">
             <div class="hero-copy">
                 <h1>THE ARCADE</h1>
-                <p class="sub">Eleven quick games set in the SpaceVerse. No briefings, no simulations — pick one,
-                    play in five seconds, chase your best score.</p>
+                <p class="sub">Twelve games set in the SpaceVerse. Chase your best score, or try hands-free
+                    Asteroid Dodge in Phone VR.</p>
             </div>
             <div class="stats" id="stats"></div>
         </div>
@@ -294,6 +294,25 @@
         <div class="rank" id="rank"></div>
 
         <div class="grid" id="grid">
+            <a class="game" href="/games/asteroid-dodge" style="--c:#ffb46b" data-slug="asteroid-dodge" data-practice="true">
+                <span class="pvwrap">
+                    <svg class="pv" viewBox="0 0 320 100" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+                        <path d="M0 96L155 22M320 96L165 22M85 100L158 22M235 100L162 22" fill="none" stroke="#22d3ee" stroke-opacity=".45"/>
+                        <g fill="#75685e" stroke="#ffb46b" stroke-width="1.5">
+                            <path d="M68 23L86 15L105 26L110 45L96 61L73 57L60 42Z"/>
+                            <path d="M220 48L237 39L254 45L261 64L250 81L228 77L215 63Z"/>
+                            <path d="M183 13L191 9L198 15L195 23L186 24L181 18Z"/>
+                        </g>
+                        <path d="M147 66L160 54L173 66M160 54V81" fill="none" stroke="#e4fbff" stroke-width="2"/>
+                    </svg>
+                    <span class="icon">☄️</span>
+                </span>
+                <span class="tag">VR</span>
+                <h2>ASTEROID DODGE</h2>
+                <p>Turn your head to dodge incoming rocks. Survive 60 seconds with three shields. Hands-free Phone VR, headset or drag-to-look. Stay seated.</p>
+                <span class="foot"><span class="play">PLAY →</span><span class="best">LOCAL PRACTICE</span></span>
+            </a>
+
             <a class="game" href="/games/gravity-runner" style="--c:#64ffda" data-slug="gravity-runner">
                 <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">☄️</span></span>
                 <span class="tag">Reflex</span>
@@ -439,6 +458,11 @@
 
         cards.forEach(function (card) {
             var slug = card.dataset.slug;
+            var tagEl = card.querySelector('.tag');
+            card.dataset.tag = tagEl ? tagEl.textContent.trim().toLowerCase() : 'other';
+            // Practice has no stored score or medal ladder. Keep it discoverable
+            // in filters without awarding a zero-threshold gold medal.
+            if (card.dataset.practice === 'true') return;
             var best = Number(localStorage.getItem('spaceverse.arcade.' + slug + '.best') || 0);
             if (!isFinite(best) || best < 0) best = 0;
             var t = TIERS[slug] || [0, 0, 0];
@@ -477,9 +501,6 @@
             }
             (card.querySelector('.pvwrap') || card).appendChild(pip);
 
-            // Cached so the filter row does not re-read the DOM per keystroke.
-            var tagEl = card.querySelector('.tag');
-            card.dataset.tag = tagEl ? tagEl.textContent.trim().toLowerCase() : 'other';
         });
 
         /* ═════════════════════════════════════════════════════════════════
@@ -487,7 +508,8 @@
            ═════════════════════════════════════════════════════════════════
            Titles are spaced so the first is quick to reach and the last
            genuinely is not. */
-        var max = total * 3;
+        var rankedTotal = cards.filter(function (card) { return card.dataset.practice !== 'true'; }).length;
+        var max = rankedTotal * 3;
         var pct = max ? earned / max : 0;
         var TITLES = [
             [0, 'Groundcrew'], [0.1, 'Cadet'], [0.25, 'Pilot'],
@@ -500,7 +522,7 @@
             '<span class="rank-title">' + title + '</span>' +
             '<span><b>' + earned + '</b> / ' + max + ' medals</span>' +
             '<span class="bar"><i style="width:' + Math.round(pct * 100) + '%"></i></span>' +
-            '<span><b>' + played + '</b> / ' + total + ' games played</span>';
+            '<span><b>' + played + '</b> / ' + rankedTotal + ' scored games played</span>';
 
         /* ═════════════════════════════════════════════════════════════════
            3 · Aggregate stat strip
@@ -514,7 +536,7 @@
             var v = tone ? '<i>' + value + '</i>' : value;
             return '<div class="chip stat"><b>' + v + '</b><span>' + label + '</span></div>';
         }
-        var unplayed = total - played;
+        var unplayed = rankedTotal - played;
         var topName = topCard ? topCard.querySelector('h2').textContent.trim() : '—';
         if (topName.length > 17) topName = topName.replace(/^SPACE /, '');
 

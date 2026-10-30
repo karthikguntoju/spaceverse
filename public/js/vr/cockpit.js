@@ -7,8 +7,7 @@
  * free.
  *
  * What's here:
- *   • curved canopy glass (physical material with real reflections from a
- *     small PMREM environment that only the cabin uses — planets untouched)
+ *   • clear curved canopy with faint, view-dependent cabin-light reflections
  *   • a tube-frame following the glass edge, A/B pillars, roof, floor,
  *     rear bulkhead with hatch, all with a procedural panel-seam texture
  *   • a wraparound dashboard: three rounded MFD screens with key rows,
@@ -165,7 +164,7 @@ export class Cockpit {
 
     /* ── materials ──────────────────────────────────────────────────── */
     _materials() {
-        // A tiny neutral room, baked to a PMREM, gives the metals and glass
+        // A tiny neutral room, baked to a PMREM, gives the cabin metals
         // believable reflections. Assigned per material — the scene's own
         // environment stays untouched so the planets do not change.
         let env = null;
@@ -195,15 +194,56 @@ export class Cockpit {
         this.mSoft = new THREE.MeshStandardMaterial({ color: 0x1c2333, roughness: 0.95, metalness: 0.0 });
         this.mSoftTrim = new THREE.MeshStandardMaterial({ color: 0x2b3448, roughness: 0.9, metalness: 0.05 });
         this.mAccent = new THREE.MeshStandardMaterial({
-            color: 0x061014, emissive: C.accentHex, emissiveIntensity: 1.7, roughness: 0.4, metalness: 0.2
+            color: 0x061014, emissive: C.accentHex, emissiveIntensity: 0.65, roughness: 0.4, metalness: 0.2
         });
         this.mAccentSoft = new THREE.MeshStandardMaterial({
             color: 0x061014, emissive: 0x2a8fa8, emissiveIntensity: 0.9, roughness: 0.4, metalness: 0.2
         });
-        this.mGlass = new THREE.MeshPhysicalMaterial({
-            color: 0xeaf6ff, transparent: true, opacity: 0.045, roughness: 0.03, metalness: 0.0,
-            envMap: env, envMapIntensity: 0.28, clearcoat: 0.5, clearcoatRoughness: 0.05,
-            side: THREE.BackSide, depthWrite: false
+        // Reflection-only glass: no milky diffuse layer or room-environment
+        // reflection over the planets. Analytic cabin rails keep this cheap
+        // in both stereo eyes, without screen-space transmission/refraction.
+        this.worldToCabin = new THREE.Matrix4();
+        this.mGlass = new THREE.ShaderMaterial({
+            uniforms: { worldToCabin: { value: this.worldToCabin } },
+            vertexShader: `
+                uniform mat4 worldToCabin;
+                varying vec3 cabinPosition;
+                varying vec3 cabinNormal;
+                varying vec3 cabinEye;
+                void main() {
+                    mat4 toCabin = worldToCabin * modelMatrix;
+                    cabinPosition = (toCabin * vec4(position, 1.0)).xyz;
+                    cabinNormal = mat3(toCabin) * normal;
+                    // cameraPosition is supplied per eye by Three.js.
+                    cabinEye = (worldToCabin * vec4(cameraPosition, 1.0)).xyz;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                varying vec3 cabinPosition;
+                varying vec3 cabinNormal;
+                varying vec3 cabinEye;
+                void main() {
+                    vec3 normal = normalize(cabinNormal);
+                    vec3 view = normalize(cabinEye - cabinPosition);
+                    float fresnel = 0.02 + 0.98 * pow(1.0 - abs(dot(view, normal)), 5.0);
+                    vec3 ray = reflect(-view, normal);
+                    float rail = 0.0;
+                    if (ray.y > 0.015) {
+                        float distanceToRoof = (0.97 - cabinPosition.y) / ray.y;
+                        vec3 hit = cabinPosition + ray * distanceToRoof;
+                        float strip = exp(-pow((abs(hit.x) - 1.21) / 0.09, 2.0));
+                        rail = strip * smoothstep(-0.3, 0.0, hit.z)
+                            * (1.0 - smoothstep(1.1, 1.5, hit.z)) * step(0.0, distanceToRoof);
+                    }
+                    float reflection = min(0.10, fresnel * (0.06 + rail * 0.8));
+                    gl_FragColor = vec4(vec3(0.48, 0.78, 0.85), reflection);
+                    #include <tonemapping_fragment>
+                    #include <colorspace_fragment>
+                }
+            `,
+            transparent: true, blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide, depthWrite: false, forceSinglePass: true
         });
         this.mLampOn = new THREE.MeshBasicMaterial({ color: C.accentHex });
         this.mLampBlue = new THREE.MeshBasicMaterial({ color: 0x7dd3fc });
@@ -247,8 +287,7 @@ export class Cockpit {
         this._box(2.4, 0.012, 0.02, 0, -1.05, 1.15, this.mAccentSoft, 0);
         // roof: a full glass moon-roof from the canopy edge back to the bulkhead,
         // carried on two side rails, a rear rail and a centre spine
-        const roofGlass = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.3), this.mGlass.clone());
-        roofGlass.material.side = THREE.DoubleSide;
+        const roofGlass = new THREE.Mesh(new THREE.PlaneGeometry(2.5, 2.3), this.mGlass);
         roofGlass.position.set(0, 1.0, 0.16); roofGlass.rotation.x = Math.PI / 2; roofGlass.renderOrder = 5;
         this.group.add(roofGlass);
         this._strut(V(-1.25, 1.0, -0.2), V(-1.25, 1.0, 1.3), 0.03);
@@ -301,7 +340,7 @@ export class Cockpit {
         // glass wraps around the pilot. phi runs around Y (front = 3π/2).
         const R = 1.62, CTR = V(0, -0.12, 0.18);
         const phi0 = 1.5 * Math.PI - 0.88, phiL = 1.76;     // ±50° each side — edges land on the pillars
-        const th0 = 0.8, thL = 0.91;                          // top edge at the roof line, bottom at the dash sill
+        const th0 = 0.8, thL = 1.18;                          // lower sill keeps the forward view open
         const glass = new THREE.Mesh(new THREE.SphereGeometry(R, 64, 32, phi0, phiL, th0, thL), this.mGlass);
         glass.position.copy(CTR);
         glass.renderOrder = 5;
@@ -314,12 +353,11 @@ export class Cockpit {
         const bot = edge(k => pt(phi0 + phiL * k, th0 + thL));
         const left = edge(k => pt(phi0, th0 + thL * k), 10);
         const right = edge(k => pt(phi0 + phiL, th0 + thL * k), 10);
-        this._tube(top, 0.034); this._tube(bot, 0.03); this._tube(left, 0.032); this._tube(right, 0.032);
-        // two slim ribs, well clear of the boresight
-        this._tube(edge(k => pt(phi0 + phiL * 0.2, th0 + thL * k), 10), 0.011, this.mMetalDark);
-        this._tube(edge(k => pt(phi0 + phiL * 0.8, th0 + thL * k), 10), 0.011, this.mMetalDark);
+        // One uninterrupted windshield; supports stay at its perimeter.
+        this._tube(top, 0.012, this.mMetalDark); this._tube(bot, 0.012, this.mMetalDark);
+        this._tube(left, 0.012, this.mMetalDark); this._tube(right, 0.012, this.mMetalDark);
         // A-pillars from the glass top corners back to the roof
-        for (const c of [top[0], top[top.length - 1]]) this._strut(c, V(Math.sign(c.x) * 1.25, 1.0, -0.2), 0.036);
+        for (const c of [top[0], top[top.length - 1]]) this._strut(c, V(Math.sign(c.x) * 1.25, 1.0, -0.2), 0.018, this.mMetalDark);
         this._strut(V(-1.25, 1.0, -0.2), V(1.25, 1.0, -0.2), 0.03);
         // B-pillars
         this._strut(V(-1.27, 1.0, 0.06), V(-1.27, -1.08, 0.06), 0.036);
@@ -328,11 +366,11 @@ export class Cockpit {
         for (const sx of [-1, 1]) {
             const sg = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 1.3), this.mGlass);
             sg.position.set(sx * 1.24, 0.28, -0.42); sg.rotation.y = sx > 0 ? -Math.PI / 2 : Math.PI / 2;
-            sg.material = this.mGlass.clone(); sg.material.side = THREE.DoubleSide;
+            sg.renderOrder = 5;
             this.group.add(sg);
         }
         // sill from the glass bottom corners along to the pillars
-        for (const c of [bot[0], bot[bot.length - 1]]) this._strut(c, V(Math.sign(c.x) * 1.27, -0.36, 0.06), 0.026);
+        for (const c of [bot[0], bot[bot.length - 1]]) this._strut(c, V(Math.sign(c.x) * 1.27, -0.54, 0.06), 0.026);
 
         // overhead console with a switch bank and a lamp row
         this._box(0.78, 0.09, 0.52, 0, 0.94, 0.16, this.mHullDark, 0.02);
@@ -354,6 +392,7 @@ export class Cockpit {
 
     /* ── dashboard: curved shelf, three MFDs, lamps, key rows ─────────── */
     _buildDash() {
+        const firstDashPart = this.group.children.length;
         // curved shelf: an inside-facing cylinder segment around the head
         const shelf = new THREE.Mesh(
             new THREE.CylinderGeometry(1.14, 1.2, 0.34, 48, 1, true, -1.32, 2.64),
@@ -365,10 +404,10 @@ export class Cockpit {
         shelf.rotation.y = Math.PI;
         this.group.add(shelf);
         // top lip of the shelf (glare shield) with a light strip
-        const lip = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.035, 12, 64, 2.64), this.mBezel);
+        const lip = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.018, 8, 64, 2.64), this.mBezel);
         lip.position.set(0, -0.45, 0.02); lip.rotation.set(Math.PI / 2, 0, -Math.PI / 2 - 1.32);   // arc centred on -Z
         this.group.add(lip);
-        const strip = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.008, 8, 64, 2.64), this.mAccent);
+        const strip = new THREE.Mesh(new THREE.TorusGeometry(1.15, 0.004, 6, 64, 2.64), this.mAccent);
         strip.position.set(0, -0.415, 0.02); strip.rotation.copy(lip.rotation);
         this.group.add(strip);
         // lower fascia under the shelf
@@ -381,7 +420,7 @@ export class Cockpit {
 
         // MFD builder: rounded bezel, recessed screen, key rows on the bezel
         const mfd = (w, h, pos, rot, texObj, keys = true) => {
-            const bezel = new THREE.Mesh(new RoundedBoxGeometry(w + 0.07, h + 0.07, 0.04, 4, 0.02), this.mBezel);
+            const bezel = new THREE.Mesh(new RoundedBoxGeometry(w + 0.035, h + 0.035, 0.025, 4, 0.012), this.mBezel);
             bezel.position.copy(pos); bezel.rotation.copy(rot);
             const normal = V(0, 0, 1).applyEuler(rot);
             bezel.position.addScaledVector(normal, -0.022);
@@ -408,11 +447,11 @@ export class Cockpit {
         };
 
         this.main = screenTexture(1024, 512);
-        mfd(0.86, 0.43, V(0, -0.29, -1.02), new THREE.Euler(0.4, 0, 0), this.main);
+        this.mainDisplay = mfd(0.58, 0.29, V(0, -0.30, -1.06), new THREE.Euler(0.4, 0, 0), this.main);
         this.left = screenTexture(512, 512);
-        mfd(0.36, 0.36, V(-0.72, -0.35, -0.8), new THREE.Euler(0.35, 0.68, 0, 'YXZ'), this.left);
+        this.leftDisplay = mfd(0.25, 0.25, V(-0.72, -0.37, -0.8), new THREE.Euler(0.35, 0.68, 0, 'YXZ'), this.left);
         this.right = screenTexture(512, 512);
-        mfd(0.36, 0.36, V(0.72, -0.35, -0.8), new THREE.Euler(0.35, -0.68, 0, 'YXZ'), this.right);
+        this.rightDisplay = mfd(0.25, 0.25, V(0.72, -0.37, -0.8), new THREE.Euler(0.35, -0.68, 0, 'YXZ'), this.right);
 
         // status lamps under the main screen (8, chase with thrust / flash on alert)
         this.dashLamps = [];
@@ -437,6 +476,8 @@ export class Cockpit {
         p1.position.set(-0.55, -0.5, -0.86); p1.rotation.x = 0.4; p1.rotation.y = 0.35; this.group.add(p1);
         const p2 = new THREE.Mesh(new THREE.PlaneGeometry(0.2, 0.05), stencil('NAV · AUTO', C.blue));
         p2.position.set(0.55, -0.5, -0.86); p2.rotation.x = 0.4; p2.rotation.y = -0.35; this.group.add(p2);
+        // Keep the instrument deck beneath the sightline, including in portrait.
+        for (const part of this.group.children.slice(firstDashPart)) part.position.y -= 0.28;
     }
 
     /* ── throttle + stick on side consoles ──────────────────────────── */
@@ -512,9 +553,9 @@ export class Cockpit {
     _buildHUD() {
         this.hud = screenTexture(1024, 640);
         const mesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(1.24, 0.775),
+            new THREE.PlaneGeometry(0.94, 0.5875),
             new THREE.MeshBasicMaterial({
-                map: this.hud.tex, transparent: true, opacity: 0.92, depthWrite: false,
+                map: this.hud.tex, transparent: true, opacity: 0.25, depthWrite: false,
                 blending: THREE.AdditiveBlending, side: THREE.DoubleSide
             })
         );
@@ -596,6 +637,8 @@ export class Cockpit {
         const want = Math.abs(camY) > 0.3 ? camY : 0;
         this._xrY += (want - this._xrY) * Math.min(1, dt * 2);
         this.group.position.y = this._xrY;
+        this.group.updateWorldMatrix(true, false);
+        this.worldToCabin.copy(this.group.matrixWorld).invert();
 
         this._redrawT += dt;
         if (this._redrawT > 1 / 15) { this._redrawT = 0; this.redraw(); }

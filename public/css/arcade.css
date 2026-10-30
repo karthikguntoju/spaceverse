@@ -274,3 +274,22 @@ body.arcade.a-overlay-open .a-hud { opacity: 0; }
 @media (max-width: 640px) {
     .a-hud { top: 46px; left: 12px; }
 }
+
+/* Short phone-landscape viewports must be able to reach PLAY, RESUME and QUIT.
+   The fixed overlay used to center a card taller than the screen and clipped
+   its actions below the bottom edge. Scroll the overlay, not the game canvas. */
+@media (max-width: 900px) and (max-height: 500px) {
+    body.arcade.a-overlay-open { touch-action: pan-y; }
+    .a-screen {
+        align-items: flex-start; justify-content: center;
+        overflow-y: auto; -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain; touch-action: pan-y;
+        padding: 10px 16px 24px;
+    }
+    .a-card { padding: 18px 20px; margin-inline: auto; }
+    .a-card h1 { font-size: 27px; }
+    .a-tag { margin-bottom: 9px; font-size: 13px; }
+    .a-controls { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 10px; margin-bottom: 12px; }
+    .a-controls li { justify-content: flex-start; font-size: 12.5px; }
+    #game { touch-action: none; }
+}

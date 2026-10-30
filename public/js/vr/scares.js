@@ -1,11 +1,9 @@
 /**
- * Jumpscare director.
+ * Jumpscare director & Interactive Asteroid Deflector Turret.
  *
  * Spawns objects on a genuine collision course with the rider and makes them
- * miss by a hair. Because the ride camera position is known ahead of time
- * (the track is a curve), the near miss is computed rather than faked: we ask
- * the ride where the camera *will* be, aim the rock at a point a couple of
- * metres beside that spot, and let it fly.
+ * miss by a hair — or lets the pilot vaporize them mid-flight with twin
+ * plasma deflector cannons!
  *
  * Everything is camera-attached so the effects work identically on a flat
  * screen and inside a headset.
@@ -18,7 +16,6 @@ function crackTexture(size = 1024) {
     c.width = c.height = size;
     const x = c.getContext('2d');
     x.clearRect(0, 0, size, size);
-    // off-centre so the break reads as a strike on the canopy, not a screen effect
     const cx = size * (0.24 + Math.random() * 0.26), cy = size * (0.3 + Math.random() * 0.3);
     x.lineCap = 'round';
     for (let i = 0; i < 13; i++) {
@@ -41,14 +38,12 @@ function crackTexture(size = 1024) {
         x.lineWidth = 0.9;
         x.stroke();
     }
-    // frosted impact star
     const g = x.createRadialGradient(cx, cy, 0, cx, cy, size * 0.075);
     g.addColorStop(0, 'rgba(220,240,255,0.42)');
     g.addColorStop(1, 'rgba(220,240,255,0)');
     x.fillStyle = g;
     x.fillRect(0, 0, size, size);
 
-    // fade the whole sheet toward the edges so it never looks like a full-screen filter
     const mask = x.createRadialGradient(cx, cy, size * 0.05, cx, cy, size * 0.55);
     mask.addColorStop(0, 'rgba(0,0,0,1)');
     mask.addColorStop(0.75, 'rgba(0,0,0,0.35)');
@@ -108,8 +103,6 @@ export class ScareDirector {
     }
 
     _buildOverlays() {
-        // full-FOV quads parented to the camera; z = -0.4 keeps them inside the
-        // near plane for both the desktop camera and XR eye cameras
         const mk = (mat) => {
             const m = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 1.6), mat);
             m.position.z = -0.42;
@@ -119,9 +112,6 @@ export class ScareDirector {
             this.camera.add(m);
             return m;
         };
-        // the alarm flash is shaped like a vignette: red pushed to the edges of
-        // vision, centre left clear. A flat red wash over the whole frame reads
-        // as a broken renderer, and in a headset it is genuinely unpleasant.
         this.flash = mk(new THREE.MeshBasicMaterial({
             map: vignetteTexture(), color: 0xff3524, transparent: true, opacity: 0,
             blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
@@ -141,13 +131,11 @@ export class ScareDirector {
     }
 
     _pool() {
-        // scare rocks fill the frame, so they carry more detail than belt rocks
         this.geoRock = rockGeometry(9.3, 3);
         this.matRock = new THREE.MeshStandardMaterial({ color: 0x6f665e, roughness: 1, flatShading: true });
         this.matIce = new THREE.MeshStandardMaterial({ color: 0x9db0c6, roughness: 0.85, flatShading: true });
         this.matMetal = new THREE.MeshStandardMaterial({ color: 0x9aa3ad, roughness: 0.35, metalness: 0.85, flatShading: true });
 
-        // debris burst shared particle system — soft round sparks, not quads
         const n = 140;
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(n * 3), 3));
@@ -161,6 +149,22 @@ export class ScareDirector {
         this.debris.pts.frustumCulled = false;
         this.debris.pts.visible = false;
         this.scene.add(this.debris.pts);
+
+        // Twin plasma deflector laser beams (world-space lines from ship cannons to target rock)
+        this.laserBeams = [];
+        for (let i = 0; i < 2; i++) {
+            const lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
+            const lm = new THREE.LineBasicMaterial({
+                color: 0x5eead4, transparent: true, opacity: 0,
+                blending: THREE.AdditiveBlending, depthTest: false, depthWrite: false
+            });
+            const line = new THREE.Line(lg, lm);
+            line.frustumCulled = false;
+            line.renderOrder = 995;
+            this.scene.add(line);
+            this.laserBeams.push(line);
+        }
+        this.laserLife = 0;
     }
 
     setEnabled(v) { this.enabled = v; }
@@ -180,7 +184,6 @@ export class ScareDirector {
         const right = new THREE.Vector3(1, 0, 0).applyQuaternion(ctx.quaternion);
         const up = new THREE.Vector3(0, 1, 0).applyQuaternion(ctx.quaternion);
 
-        // where the rider will be when the rock arrives
         const meet = ctx.predict ? ctx.predict(lead) : ctx.position.clone();
 
         const dirs = {
@@ -193,7 +196,6 @@ export class ScareDirector {
         };
         const approach = (dirs[spec.from] || dirs.front).normalize();
 
-        // sideways offset so it shaves past instead of hitting
         const lat = right.clone().multiplyScalar((spec.from === 'front-left' ? 1 : -1) * miss)
             .addScaledVector(up, (Math.random() - 0.5) * miss * 0.6);
         const target = meet.clone().add(lat);
@@ -224,19 +226,91 @@ export class ScareDirector {
         this.scene.add(mesh);
 
         const vel = target.clone().sub(start).divideScalar(lead);
-        this.actors.push({
+        const actor = {
             mesh, vel, t: 0, lead, spec,
             spin: new THREE.Vector3((Math.random() - 0.5) * 2.2, (Math.random() - 0.5) * 2.2, (Math.random() - 0.5) * 2.2),
             firedWarn: false, firedNear: false, ttl: lead + 2.4
-        });
+        };
+        mesh.userData.scareActor = actor;
+        mesh.traverse(ch => { ch.userData.scareActor = actor; });
+        this.actors.push(actor);
 
         if (this.audio) {
             this.audio.alarm(spec.from === 'behind' ? 2 : 3);
-            // the whoosh peaks right as the rock passes the canopy
-            setTimeout(() => this.audio.whoosh(1.2, spec.from === 'front-left' ? -0.9 : 0.9, this.intensity),
-                Math.max(0, (lead - 0.75) * 1000));
+            actor._whooshT = setTimeout(() => {
+                if (!actor.deflected && this.audio) {
+                    this.audio.whoosh(1.2, spec.from === 'front-left' ? -0.9 : 0.9, this.intensity);
+                }
+            }, Math.max(0, (lead - 0.75) * 1000));
         }
         this.onEvent({ type: 'incoming', label: spec.label || 'COLLISION WARNING' });
+    }
+
+    /**
+     * Interactive Asteroid Deflector Turret: fires twin plasma cannons at the
+     * given actor (or the nearest incoming actor), shattering it into glowing
+     * debris before it can strike the canopy.
+     */
+    deflectActor(actor) {
+        if (!actor || actor.deflected) return false;
+        const idx = this.actors.indexOf(actor);
+        if (idx === -1) return false;
+        actor.deflected = true;
+        actor.firedNear = true;
+        clearTimeout(actor._whooshT);
+
+        const targetPos = actor.mesh.position.clone();
+        const camPos = this.camera.getWorldPosition(new THREE.Vector3());
+        const camQuat = this.camera.getWorldQuaternion(new THREE.Quaternion());
+        const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camQuat);
+        const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camQuat);
+        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(camQuat);
+
+        // Position twin plasma beams from lower left/right cannon mounts to target rock
+        for (let i = 0; i < 2; i++) {
+            const side = i === 0 ? -0.45 : 0.45;
+            const muzzle = camPos.clone()
+                .addScaledVector(right, side)
+                .addScaledVector(up, -0.28)
+                .addScaledVector(fwd, 0.5);
+            const line = this.laserBeams[i];
+            const arr = line.geometry.attributes.position.array;
+            arr[0] = muzzle.x; arr[1] = muzzle.y; arr[2] = muzzle.z;
+            arr[3] = targetPos.x; arr[4] = targetPos.y; arr[5] = targetPos.z;
+            line.geometry.attributes.position.needsUpdate = true;
+            line.material.opacity = 0.95;
+            line.visible = true;
+        }
+        this.laserLife = 0.28;
+
+        this.scene.remove(actor.mesh);
+        this.actors.splice(idx, 1);
+
+        this.shake.amp = 0.024 * this.intensity;
+        this._burst(targetPos, true);
+        if (this.audio) {
+            this.audio.blip(980);
+            setTimeout(() => { if (this.audio) this.audio.impact(this.intensity * 0.65); }, 45);
+        }
+        this.haptics(0.75, 130);
+        this.onEvent({
+            type: 'deflected',
+            label: 'THREAT VAPORIZED · ' + (actor.spec?.label || 'ASTEROID')
+        });
+        return true;
+    }
+
+    /** Deflects the closest active threat (used on click/tap/trigger/KeyF during hazard alert) */
+    deflectNearest() {
+        if (!this.actors.length) return false;
+        const camPos = this.camera.getWorldPosition(new THREE.Vector3());
+        let best = null, bestD = Infinity;
+        for (const a of this.actors) {
+            if (a.firedNear || a.deflected) continue;
+            const d = a.mesh.position.distanceTo(camPos);
+            if (d < bestD) { bestD = d; best = a; }
+        }
+        return best ? this.deflectActor(best) : false;
     }
 
     /** camera-attached shake + overlays; returns nothing, read this.shake */
@@ -257,9 +331,20 @@ export class ScareDirector {
             }
             if (a.t > a.ttl) {
                 this.scene.remove(a.mesh);
-                if (a.mesh.isMesh) { /* geometry is shared, only dispose clones */ }
                 this.actors.splice(i, 1);
             }
+        }
+
+        // laser beam fade
+        if (this.laserLife > 0) {
+            this.laserLife = Math.max(0, this.laserLife - dt);
+            const op = (this.laserLife / 0.28) * 0.95;
+            this.laserBeams.forEach(l => {
+                l.material.opacity = op;
+                l.visible = op > 0.01;
+            });
+        } else if (this.laserBeams) {
+            this.laserBeams.forEach(l => { l.visible = false; });
         }
 
         // shake decay
@@ -314,11 +399,12 @@ export class ScareDirector {
         }
         this.haptics(spec.hit ? 1 : 0.6, spec.hit ? 220 : 110);
         this.onEvent({ type: spec.hit ? 'hit' : 'nearmiss', label: spec.label || 'NEAR MISS' });
-        if (spec.hit) this._burst(where);
+        if (spec.hit) this._burst(where, false);
     }
 
-    _burst(where) {
+    _burst(where, plasma = false) {
         const db = this.debris;
+        db.pts.material.color.setHex(plasma ? 0x7efce6 : 0xffcf9a);
         const p = db.pts.geometry.attributes.position;
         const origin = new THREE.Vector3();
         if (where) {
@@ -330,7 +416,6 @@ export class ScareDirector {
             origin.addScaledVector(fwd, 14);
         }
         for (let i = 0; i < db.n; i++) {
-            // scatter the origin a little so the burst has volume up close
             p.array[i * 3] = origin.x + (Math.random() - 0.5) * 2.5;
             p.array[i * 3 + 1] = origin.y + (Math.random() - 0.5) * 2.5;
             p.array[i * 3 + 2] = origin.z + (Math.random() - 0.5) * 2.5;
@@ -349,10 +434,14 @@ export class ScareDirector {
     }
 
     clear() {
-        this.actors.forEach(a => this.scene.remove(a.mesh));
+        this.actors.forEach(a => {
+            clearTimeout(a._whooshT);
+            this.scene.remove(a.mesh);
+        });
         this.actors.length = 0;
         this.shake.amp = 0;
         this.flashT = this.crackT = 0;
         this.debris.life = 0;
+        this.laserLife = 0;
     }
 }

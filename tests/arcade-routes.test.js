@@ -46,7 +46,8 @@ describe('the arcade hub', () => {
         const cookie = await login();
         const hub = await request(app).get('/games').set('Cookie', cookie).expect(200);
         const linked = [...hub.text.matchAll(/href="\/games\/([a-z-]+)"/g)].map((m) => m[1]);
-        expect(linked.length).toBe(11);
+        expect(linked.length).toBe(12);
+        expect(linked).toContain('asteroid-dodge');
         // Every card on the hub must resolve; a dead card is a dead end for the
         // player and the hub is the only way most people will find these.
         for (const slug of linked) {
@@ -56,6 +57,19 @@ describe('the arcade hub', () => {
 });
 
 describe('/games/:slug', () => {
+    it('protects the VR arcade game with the same login requirement', async () => {
+        await request(app).get('/games/asteroid-dodge').expect(302);
+    });
+
+    it('serves the shared VR renderer at the dedicated arcade URL', async () => {
+        const cookie = await login();
+        for (const url of ['/games/asteroid-dodge', '/games/asteroid-dodge/']) {
+            const res = await request(app).get(url).set('Cookie', cookie).expect(200);
+            expect(res.text).toContain('/public/js/vr/main.js?v=20261015-4');
+            expect(res.text).toContain('only-dodge');
+        }
+    });
+
     it('serves a known game', async () => {
         const cookie = await login();
         const res = await request(app).get('/games/gravity-runner').set('Cookie', cookie).expect(200);

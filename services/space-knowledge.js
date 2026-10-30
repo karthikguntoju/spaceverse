@@ -322,10 +322,10 @@ const ENTRIES = [
   },
   {
     id: 'apollo-artemis',
-    phrases: ['apollo program', 'first man on the moon', 'artemis program', 'nasa going back to the moon', 'artemis 2', 'artemis 3'],
+    phrases: ['apollo program', 'first man on the moon', 'artemis program', 'nasa going back to the moon', 'artemis 3'],
     keywords: ['apollo', 'artemis'],
     answer:
-      "Apollo landed twelve astronauts on the Moon between 1969 and 1972, starting with Armstrong and Aldrin on Apollo 11. NASA's Artemis programme aims to return: Artemis I flew an uncrewed Orion around the Moon in 2022, Artemis II sends a crew on a lunar flyby, and Artemis III targets a crewed landing near the lunar south pole, where permanently shadowed craters hold water ice. This app has a dedicated Artemis II mission page."
+      "Apollo landed twelve astronauts on the Moon between 1969 and 1972, starting with Armstrong and Aldrin on Apollo 11. NASA's Artemis programme returned to lunar space with Artemis I and Artemis II, paving the way for Artemis III's crewed landing near the lunar south pole, where permanently shadowed craters hold water ice."
   },
   {
     id: 'voyager',

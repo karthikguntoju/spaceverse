@@ -123,7 +123,8 @@ app.use(helmet({
             'font-src': ["'self'", 'https://fonts.gstatic.com', 'data:'],
             'img-src': ["'self'", 'data:', 'blob:', 'https:'],
             'media-src': ["'self'", 'data:', 'blob:', 'https:'],
-            'connect-src': ["'self'", 'https:'],
+            // GLTFLoader resolves embedded GLB textures through local blob URLs.
+            'connect-src': ["'self'", 'blob:', 'https:'],
             'frame-src': ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com',
                 'https://accounts.google.com', 'https://spaceverse-d263d.firebaseapp.com'],
             'worker-src': ["'self'", 'blob:'],
@@ -289,10 +290,6 @@ app.get('/mission-tracker', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'mission-tracker.html'));
 });
 
-app.get('/artemis-2', ensureAuthenticated, (req, res) => {
-    res.sendFile(path.join(__dirname, 'views', 'artemis-2-info.html'));
-});
-
 app.get('/space-launches', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'space-launches.html'));
 });
@@ -328,6 +325,11 @@ const ARCADE_GAMES = [
 
 app.get('/games', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'games', 'arcade.html'));
+});
+
+// The hands-free arcade game reuses the VR renderer, not the solar-system menu.
+app.get('/games/asteroid-dodge', ensureAuthenticated, (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'vr-working.html'));
 });
 
 app.get('/games/:slug', ensureAuthenticated, (req, res) => {
@@ -916,21 +918,39 @@ app.get('/api/planets', async (req, res) => {
         const path = require('path');
         const pj = fs.readFileSync(path.join(__dirname, 'planets.json'), 'utf8');
         const parsed = JSON.parse(pj);
-        // normalize to same shape as DB documents
-        const normalized = parsed.map(p => ({
-            key: (p.key || (p.name || '').toLowerCase()),
-            name: p.name || p.key,
-            info: p.info || '',
-            radius: p.radius || p.size || 5,
-            distance: p.distance || p.distanceFromSun || p.sceneDistance || null,
-            speed: p.speed || p.orbitalSpeed || 0,
-            rotationSpeed: p.rotationSpeed || 0.002,
-            textureUrl: p.textureUrl || p.texture || (p.image ? `/images/${p.image}` : ''),
-            ringTextureUrl: p.ringTextureUrl || null,
-            facts: p.facts || [],
-            quizQuestions: p.quizQuestions || []
-        }));
-        return res.json(normalized);
+        // The repository data is human-readable (for example, "149.6 million km"),
+        // while the 3D scenes require a numeric distance in scene units.
+        const defaultDistances = { sun: 0, mercury: 50, venus: 70, earth: 95, mars: 120, jupiter: 180, saturn: 220, uranus: 280, neptune: 320 };
+        const defaultRadii = { mercury: 2.5, venus: 4.5, earth: 5, mars: 3.5, jupiter: 12, saturn: 10, uranus: 6, neptune: 6 };
+        const defaultSpeeds = { mercury: 0.004, venus: 0.002, earth: 0.001, mars: 0.0008, jupiter: 0.0004, saturn: 0.0003, uranus: 0.0002, neptune: 0.0001 };
+        const defaultRotationSpeeds = { mercury: 0.0008, venus: 0.0006, earth: 0.01, mars: 0.009, jupiter: 0.02, saturn: 0.018, uranus: 0.015, neptune: 0.016 };
+        const toSceneDistance = (value, key) => {
+            if (typeof value === 'number' && Number.isFinite(value)) return value;
+            if (typeof value === 'string') {
+                // Human-readable astronomical distances do not map directly to the
+                // compressed visual scene. Keep their established display spacing.
+                return defaultDistances[key] || 100;
+            }
+            return defaultDistances[key] || 100;
+        };
+        const normalized = parsed.map(p => {
+            const key = (p.key || (p.name || '').toLowerCase());
+            return {
+                key,
+                name: p.name || p.key,
+                info: p.info || p.description || '',
+                radius: p.radius || p.size || defaultRadii[key] || 5,
+                distance: toSceneDistance(p.distance || p.distanceFromSun || p.sceneDistance, key),
+                speed: p.speed || p.orbitalSpeed || defaultSpeeds[key] || 0,
+                rotationSpeed: p.rotationSpeed || defaultRotationSpeeds[key] || 0.002,
+                textureUrl: p.textureUrl || p.texture || (p.image ? `/images/${p.image}` : `/public/textures/${key}.jpg`),
+                ringTextureUrl: p.ringTextureUrl || null,
+                facts: p.facts || [],
+                quizQuestions: p.quizQuestions || []
+            };
+        });
+        // planets.json lists orbiting bodies only; add the central star for 3D scenes.
+        return res.json([{ key: 'sun', name: 'Sun', info: '', radius: 20, distance: 0, speed: 0, rotationSpeed: 0.002, textureUrl: '', ringTextureUrl: null, facts: [], quizQuestions: [] }, ...normalized]);
     } catch (err) {
         res.status(500).json({ error: 'Error fetching planets' });
     }
@@ -1610,13 +1630,28 @@ if (IS_TEST) {
             if (useHttps) {
                 const https = require('https');
                 const fs = require('fs');
+                const crypto = require('crypto');
                 const certDir = path.join(__dirname, 'certs');
-                const keyPath = path.join(certDir, 'dev-key.pem');
-                const certPath = path.join(certDir, 'dev-cert.pem');
-                if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
+                const lanIps = Object.values(require('os').networkInterfaces()).flat()
+                    .filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
+                const certCoversCurrentNetwork = certPath => {
+                    if (!fs.existsSync(certPath)) return false;
+                    try {
+                        const names = new crypto.X509Certificate(fs.readFileSync(certPath)).subjectAltName || '';
+                        return ['127.0.0.1', ...lanIps].every(ip => names.split(', ').includes(`IP Address:${ip}`));
+                    } catch (e) { return false; }
+                };
+                let keyPath = path.join(certDir, 'dev-key.pem');
+                let certPath = path.join(certDir, 'dev-cert.pem');
+                // A cached cert may be valid for yesterday's Wi-Fi IP but not
+                // today's. Keep it, and mint a network-specific dev pair.
+                if (!fs.existsSync(keyPath) || !certCoversCurrentNetwork(certPath)) {
+                    const networkId = crypto.createHash('sha256').update(lanIps.sort().join(',')).digest('hex').slice(0, 12);
+                    keyPath = path.join(certDir, `dev-${networkId}-key.pem`);
+                    certPath = path.join(certDir, `dev-${networkId}-cert.pem`);
+                }
+                if (!fs.existsSync(keyPath) || !certCoversCurrentNetwork(certPath)) {
                     const selfsigned = require('selfsigned');
-                    const lanIps = Object.values(require('os').networkInterfaces()).flat()
-                        .filter(i => i && i.family === 'IPv4' && !i.internal).map(i => i.address);
                     const pems = selfsigned.generate([{ name: 'commonName', value: 'spaceverse.local' }], {
                         days: 3650, keySize: 2048, algorithm: 'sha256',
                         extensions: [{
@@ -1630,7 +1665,7 @@ if (IS_TEST) {
                     fs.mkdirSync(certDir, { recursive: true });
                     fs.writeFileSync(keyPath, pems.private);
                     fs.writeFileSync(certPath, pems.cert);
-                    console.log('🔐 Generated self-signed dev certificate in certs/ (accept the browser warning once)');
+                    console.log('🔐 Generated a self-signed dev certificate for the current LAN addresses in certs/');
                 }
                 server = https.createServer({ key: fs.readFileSync(keyPath), cert: fs.readFileSync(certPath) }, app);
                 server.listen(availablePort);
@@ -1672,4 +1707,3 @@ if (IS_TEST) {
     // In Vercel, just initialize the database (Vercel will handle the app instance)
     initializeDatabase().catch(err => console.error('DB Init Error in Vercel:', err));
 }
-

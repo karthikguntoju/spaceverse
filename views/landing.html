@@ -309,7 +309,37 @@
             }
 
             .launch-intro {
-                bottom: 11vh;
+                top: calc(var(--dock-h) + 2rem);
+                bottom: auto;
+            }
+
+            .intro-slab {
+                padding: 1rem 1.15rem 1.1rem;
+            }
+
+            .launch-intro .hud-center {
+                margin-bottom: 0.5rem;
+            }
+
+            .launch-intro .display {
+                font-size: clamp(1.7rem, 7vw, 2rem);
+            }
+
+            .launch-intro p {
+                margin-top: 0.5rem;
+                font-size: 0.83rem;
+                line-height: 1.48;
+            }
+
+            .intro-actions {
+                flex-wrap: nowrap;
+                gap: 0.45rem;
+                margin-top: 0.8rem;
+            }
+
+            .intro-actions .btn {
+                padding: 0.7rem 0.75rem;
+                font-size: 0.8rem;
             }
         }
 
@@ -748,11 +778,6 @@
                         <h3 class="h3">Mission Tracker</h3>
                         <p>Live and upcoming missions from agencies worldwide, with historical context.</p>
                     </article>
-                    <article class="card glass glass--tap glass--violet" data-lg-tilt>
-                        <div class="tile-icon" aria-hidden="true">🌙</div>
-                        <h3 class="h3">Artemis 2</h3>
-                        <p>NASA's return to lunar orbit — 3D trajectory, crew profiles and a cost breakdown.</p>
-                    </article>
                     <article class="card glass glass--tap glass--rose" data-lg-tilt>
                         <div class="tile-icon" aria-hidden="true">🧠</div>
                         <h3 class="h3">Quiz Bot</h3>
@@ -1146,6 +1171,7 @@
             const statusEl = document.getElementById('authStatus');
             const guestBtn = document.getElementById('guestBtn');
             const navSignIn = document.getElementById('navSignIn');
+            const mobileAccess = document.querySelector('.dock-sheet a[href="#access"]');
             const logoutBtn = document.getElementById('logoutBtn');
             const access = document.getElementById('access');
 
@@ -1222,6 +1248,10 @@
             // Nav "Sign In" jumps to the panel and focuses the first field.
             if (navSignIn) {
                 navSignIn.addEventListener('click', () => {
+                    if (document.body.classList.contains('is-signed-in')) {
+                        enterApp();
+                        return;
+                    }
                     const to = access.getBoundingClientRect().top + window.scrollY - 70;
                     if (window.lenis && typeof window.lenis.scrollTo === 'function') {
                         window.lenis.scrollTo(to, { duration: 1.1 });
@@ -1260,6 +1290,10 @@
                         if (nameEl) nameEl.textContent = name;
                         if (initEl) initEl.textContent = name.trim().charAt(0).toUpperCase() || 'E';
                         if (navSignIn) navSignIn.textContent = 'Enter Spaceverse';
+                        if (mobileAccess) {
+                            mobileAccess.href = '/';
+                            mobileAccess.textContent = 'Enter Spaceverse';
+                        }
                     }
                 } catch (e) { /* not signed in, keep the forms */ }
             })();
@@ -1301,7 +1335,7 @@
         })();
     </script>
     <!-- Shared photographic night sky — takes over #space-bg -->
-    <script src="/public/js/star-sky.js" defer></script>
+    <script src="/public/js/star-sky.js?v=2" defer></script>
 </body>
 
 </html>

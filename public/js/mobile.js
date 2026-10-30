@@ -4,11 +4,11 @@
  * On phones the floating control panels of the 3D pages (solar-system
  * #ctrl, traffic-visualisation .controls-panel) cover most of the screen.
  * Here they become bottom sheets, closed by default, behind one ⚙ button.
- * Nothing runs above 768px wide.
+ * Also applies to short landscape phones up to 900px wide.
  */
 (function () {
     'use strict';
-    var mq = window.matchMedia('(max-width: 768px)');
+    var mq = window.matchMedia('(max-width: 768px), (max-width: 900px) and (max-height: 500px)');
     if (!mq.matches) return;
 
     var PANELS = [

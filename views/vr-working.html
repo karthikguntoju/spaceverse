@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>SpaceVerse VR — Solar System &amp; Deep Space Ride</title>
+    <link rel="stylesheet" href="/public/css/vr-remote.css?v=20261013-1">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="stylesheet"
@@ -118,18 +119,18 @@
             background: rgba(34, 211, 238, 0.12); color: var(--accent);
         }
         .card.ride .tag { background: rgba(255, 90, 90, 0.14); color: #ff8b8b; }
-        /* One entry point, one experience. The coaster is its own feature and
-           reaches this page through /vr-ride, so the explore launcher must not
-           offer it a second time — and the ride launcher must not offer free
-           flight. Both cards stay in the DOM; only the matching one is shown,
-           which keeps every handler and setting wired exactly as before. */
         #mode-menu.only-explore .card.ride,
+        #mode-menu.only-explore .card.dodge,
         #mode-menu.only-explore .for-ride,
+        #mode-menu.only-explore .for-dodge,
         #mode-menu.only-ride .card:not(.ride),
-        #mode-menu.only-ride .for-explore { display: none; }
-        #mode-menu.only-ride .cards { grid-template-columns: minmax(0, 1fr); }
-        /* Explore now offers free flight AND the scan hunt: same scene, same
-           controls, one of them scored. Two cards, not one. */
+        #mode-menu.only-ride .for-explore,
+        #mode-menu.only-ride .for-dodge,
+        #mode-menu.only-dodge .card:not(.dodge),
+        #mode-menu.only-dodge .for-explore,
+        #mode-menu.only-dodge .for-ride { display: none; }
+        #mode-menu.only-ride .cards,
+        #mode-menu.only-dodge .cards { grid-template-columns: minmax(0, 1fr); }
         #mode-menu.only-explore .cards { grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
         .card.hunt .tag { background: rgba(167, 139, 250, 0.16); color: #c4b5fd; }
 
@@ -158,11 +159,18 @@
             position: fixed; left: 18px; bottom: 18px; z-index: 20;
             background: var(--panel); border: 1px solid var(--line); border-radius: 14px;
             padding: 14px 16px; font-size: 12.5px; color: var(--muted); backdrop-filter: blur(9px);
-            max-width: 300px;
+            max-width: 315px;
         }
         #explore-panel b { color: var(--text); }
         #explore-panel .row { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 6px; }
         #explore-panel .keys { margin-top: 10px; line-height: 1.7; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 8px; }
+        .explore-quick-actions {
+            display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px;
+            padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.08);
+        }
+        .explore-quick-actions .chip {
+            padding: 5px 11px; min-height: 30px; font-size: 11.5px;
+        }
         kbd {
             background: rgba(255, 255, 255, 0.08); border: 1px solid rgba(255, 255, 255, 0.16);
             border-radius: 5px; padding: 1px 6px; font-size: 11px; font-family: ui-monospace, monospace;
@@ -170,11 +178,27 @@
 
         /* ── ride hud ────────────────────────────────────────────── */
         #ride-panel {
-            position: fixed; left: 50%; transform: translateX(-50%); bottom: 20px; z-index: 20;
-            width: min(720px, calc(100% - 32px));
-            background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
-            padding: 14px 18px; backdrop-filter: blur(10px);
+            position: fixed; right: 96px; bottom: max(18px, env(safe-area-inset-bottom)); z-index: 20;
+            display: flex; gap: 8px; align-items: flex-end;
         }
+        #ride-details { position: relative; }
+        #ride-details > summary { cursor: pointer; list-style: none; }
+        #ride-details > summary::-webkit-details-marker { display: none; }
+        #ride-details > summary::after { content: ' ⌃'; }
+        #ride-details[open] > summary::after { content: ' ⌄'; }
+        #ride-panel > .chip, #ride-details > summary { min-height: 44px; font-size: 12px; }
+        #btn-turret.armed {
+            border-color: #fb7185; color: #ffe4e6;
+            background: rgba(159, 18, 57, 0.55);
+            box-shadow: 0 0 18px rgba(251, 113, 133, 0.5);
+        }
+        .ride-expanded {
+            position: absolute; right: 0; bottom: calc(100% + 10px);
+            width: min(320px, calc(100vw - 32px)); padding: 14px;
+            background: rgba(6, 12, 22, 0.94); border: 1px solid var(--line); border-radius: 14px;
+            max-height: 50dvh; overflow-y: auto;
+        }
+        @media (max-width: 600px) { #ride-panel { right: 16px; bottom: max(82px, env(safe-area-inset-bottom)); } }
         .ride-top { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
         #seg-title { font-family: 'Orbitron', sans-serif; font-size: 17px; letter-spacing: 2px; color: var(--accent); }
         #seg-sub { font-size: 12.5px; color: var(--muted); }
@@ -224,7 +248,7 @@
 
         /* ── info card ───────────────────────────────────────────── */
         #info-card {
-            position: fixed; right: 18px; top: 74px; z-index: 24; width: min(320px, calc(100% - 36px));
+            position: fixed; right: 18px; top: 74px; z-index: 24; width: min(330px, calc(100% - 36px));
             background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
             padding: 18px; backdrop-filter: blur(10px);
             opacity: 0; transform: translateX(14px); pointer-events: none; transition: opacity 0.25s, transform 0.25s;
@@ -235,6 +259,8 @@
         #info-stats { display: flex; flex-wrap: wrap; gap: 8px; font-size: 11px; color: var(--muted); }
         #info-stats span { background: rgba(122, 162, 255, 0.12); border-radius: 6px; padding: 4px 8px; }
         #info-stats b { color: var(--text); }
+        #info-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        #info-actions .chip { padding: 6px 12px; min-height: 32px; font-size: 11.5px; }
         #info-close {
             position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%;
             background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14);
@@ -251,30 +277,51 @@
 
         body.in-vr .hud, body.in-vr #mode-menu, body.in-vr #info-card, body.in-vr #toast { display: none !important; }
 
-        /* ── phone VR (Cardboard) ────────────────────────────────────
-           Side-by-side stereo: nothing flat is readable, so every DOM panel
-           goes away except two tiny corner buttons you can hit with a thumb
-           before the phone goes in the viewer. */
+        /* ── phone VR (Cardboard) ──────────────────────────────────── */
         body.in-cardboard .hud, body.in-cardboard #mode-menu, body.in-cardboard #info-card,
         body.in-cardboard #toast, body.in-cardboard #narration, body.in-cardboard #warning,
         body.in-cardboard #ride-done { display: none !important; }
-        #cardboard-bar { position: fixed; inset: 0 0 auto 0; z-index: 70; display: none; justify-content: space-between; padding: 8px; pointer-events: none; }
-        body.in-cardboard #cardboard-bar { display: flex; }
-        #cardboard-bar .chip { pointer-events: auto; padding: 6px 12px; min-height: 32px; font-size: 12px; opacity: 0.55; }
+        #dodge-hud { display: none; position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); z-index: 25; width: min(560px, calc(100% - 24px)); padding: 14px; border: 1px solid var(--line); border-radius: 16px; background: #091526; box-sizing: border-box; }
+        #dodge-hud.show { display: block; }
+        #dodge-hud p { margin: 0 0 10px; line-height: 1.5; }
+        #dodge-hud .btn-row { flex-wrap: wrap; }
+        body.in-cardboard #dodge-hud, body.in-vr #dodge-hud { display: none !important; }
+        #cardboard-lens-mask { display: none; position: fixed; inset: 0; width: 100%; height: 100%; z-index: 64; pointer-events: none; }
+        body.in-cardboard { background: #000; }
+        body.in-cardboard #cardboard-lens-mask { display: block; }
+        #cardboard-bar { position: fixed; inset: 0 0 auto 0; z-index: 70; display: none; pointer-events: none; }
+        body.in-cardboard #cardboard-bar { display: block; }
+        .cardboard-eye-bar { position: absolute; top: 0; box-sizing: border-box; display: flex; justify-content: space-between; align-items: flex-start; gap: 4px; min-width: 0; padding: 8px; }
+        #cardboard-bar .chip { pointer-events: auto; padding: 5px 7px; min-height: 32px; font-size: 11px; opacity: 0.55; }
         #cardboard-bar .chip:active { opacity: 1; }
-        #cardboard-divider { position: fixed; top: 0; bottom: 0; left: 50%; width: 2px; margin-left: -1px; background: rgba(0,0,0,0.85); z-index: 65; display: none; pointer-events: none; }
+        #cardboard-bar [data-phone-awake] { min-width: 0; flex: 1; white-space: normal; font-size: 10px; opacity: 0.85; }
+        #cardboard-bar [data-phone-awake].awake-warning { color: #ffd69a; border-color: #d69b46; opacity: 1; }
+        #cardboard-divider { position: fixed; top: 61%; bottom: 4%; left: 50%; width: 2px; margin-left: -1px; background: rgba(255,255,255,0.5); z-index: 65; display: none; pointer-events: none; }
         body.in-cardboard #cardboard-divider { display: block; }
-
-        /* the cockpit has its own instruments — the flat ride panel steps
-           aside into a corner so the dashboard is what you look at */
-        body.cockpit-on #ride-panel {
-            left: auto; right: 96px; bottom: 18px; transform: none;
-            width: min(330px, calc(100% - 120px)); padding: 10px 14px;
+        #cardboard-rotate, #cardboard-sensor-warning {
+            display: none; position: fixed; left: 50%; transform: translateX(-50%);
+            z-index: 75; width: min(360px, calc(100% - 32px)); padding: 14px 18px;
+            border: 1px solid var(--line); border-radius: 14px;
+            background: rgba(4, 8, 18, 0.94); color: var(--text);
+            font-size: 13px; line-height: 1.5; text-align: center; pointer-events: none;
         }
+        #cardboard-rotate { top: 42%; }
+        #cardboard-sensor-warning { bottom: max(20px, env(safe-area-inset-bottom)); left: 0; transform: none; width: 100%; padding: 0; border: 0; background: none; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        #cardboard-sensor-warning span { position: absolute; bottom: 0; box-sizing: border-box; padding: 10px; border-radius: 12px; background: rgba(4, 8, 18, 0.94); }
+        body.in-cardboard.no-gyro #cardboard-sensor-warning { display: block; }
+        #viewer-fit { flex-basis: 100%; font-size: 13px; color: var(--muted); }
+        #viewer-fit summary { cursor: pointer; padding: 10px 0; color: var(--text); }
+        #viewer-fit label { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin: 12px 0; }
+        #viewer-fit input { grid-column: 1 / -1; width: 100%; accent-color: var(--accent); }
+        @media (orientation: portrait) {
+            body.in-cardboard #cardboard-rotate { display: block; }
+            body.in-cardboard.no-gyro #cardboard-sensor-warning { display: none; }
+        }
+
         body.cockpit-on #seg-title { font-size: 14px; }
         body.cockpit-on #seg-sub { font-size: 11.5px; }
         body.cockpit-on #ride-bar { margin: 8px 0 10px; }
-        body.cockpit-on .ride-btns .chip { padding: 5px 10px; font-size: 11.5px; min-height: 30px; }
+        body.cockpit-on .ride-btns .chip { padding: 5px 10px; font-size: 11.5px; min-height: 44px; }
         body.cockpit-on #narration { bottom: auto; top: 128px; }
         body.cockpit-on #toast { bottom: auto; top: 180px; }
         body.in-vr #sv-chat-btn, body.in-vr #sv-chat-modal,
@@ -283,6 +330,9 @@
         #phone-row { display: none; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 12px; }
         #phone-note { flex: 1 1 100%; font-size: 12px; color: var(--muted); line-height: 1.5; }
         #phone-note.warn { color: #ffb46b; }
+        #phone-flight { display: none; gap: 10px; align-items: center; margin-top: 12px; }
+        #phone-flight .chip { min-height: 44px; }
+        #phone-flight span { color: var(--muted); font-size: 12px; line-height: 1.4; }
         .chip.on { background: rgba(34, 211, 238, 0.18); border-color: var(--accent); }
 
         @media (max-width: 640px) {
@@ -290,11 +340,18 @@
             #ride-panel { bottom: 10px; }
             #narration { bottom: 150px; }
         }
+        @media (max-width: 900px) {
+            #explore-panel { width: min(330px, calc(100% - 20px)); max-height: calc(100vh - 88px); overflow-y: auto; padding: 12px; }
+            #explore-panel .keys { display: none; }
+            #phone-flight { flex-wrap: wrap; }
+            #phone-flight span { flex-basis: 100%; }
+        }
+        @media (max-width: 640px) {
+            #explore-panel { width: auto; }
+        }
     </style>
 
-    <!-- ═══ Liquid Glass ═══════════════════════════════════════════════
-         Loaded last on purpose: the bridge re-materials this page's own
-         components as glass, and it wins on source order. -->
+    <!-- ═══ Liquid Glass ═══════════════════════════════════════════════ -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -332,23 +389,47 @@
     </div>
 
     <!-- phone VR: the only chrome that survives split-screen -->
+    <svg id="cardboard-lens-mask" aria-hidden="true" preserveAspectRatio="none"><path fill="#000" fill-rule="evenodd"></path></svg>
     <div id="cardboard-divider"></div>
     <div id="cardboard-bar">
-        <button id="exit-phone-vr" class="chip ghost">✕ Exit VR</button>
-        <button id="recenter-phone-vr" class="chip ghost">⟲ Recentre</button>
+        <div class="cardboard-eye-bar">
+            <button id="exit-phone-vr" data-phone-exit class="chip ghost">✕ Exit VR</button>
+            <button id="phone-awake" data-phone-awake class="chip ghost" type="button" aria-live="polite">Keeping screen awake…</button>
+            <button id="recenter-phone-vr" data-phone-recenter class="chip ghost">⟲ Recentre</button>
+        </div>
+        <div class="cardboard-eye-bar">
+            <button data-phone-exit class="chip ghost">✕ Exit VR</button>
+            <button data-phone-awake class="chip ghost" type="button">Keeping screen awake…</button>
+            <button data-phone-recenter class="chip ghost">⟲ Recentre</button>
+        </div>
     </div>
+    <div id="cardboard-rotate" role="status">Rotate your phone to landscape before placing it in your viewer.</div>
+    <div id="cardboard-sensor-warning" role="status"><span>Motion tracking unavailable. Remove the viewer to drag and look, or exit Phone VR.</span><span aria-hidden="true">Motion tracking unavailable. Remove the viewer to drag and look, or exit Phone VR.</span></div>
+    <section id="dodge-hud" aria-label="Asteroid Dodge controls">
+        <p id="dodge-status" role="status">Asteroid Dodge — ready</p>
+        <p>Stay seated. Turn your head gently left/right to steer (or drag on screen). Avoid rocks for 60 seconds; three hits end the run. Local practice, no ranked score.</p>
+        <div class="btn-row">
+            <button id="dodge-play" type="button" class="chip">START DODGE</button>
+            <button id="dodge-restart" type="button" class="chip ghost">Restart</button>
+            <button id="dodge-phone-vr" type="button" class="chip ghost">Phone VR</button>
+            <button id="dodge-exit" type="button" class="chip ghost">Back to menu</button>
+        </div>
+    </section>
 
     <!-- mode menu -->
     <div id="mode-menu">
         <div class="menu-inner">
+            <a href="/" class="chip ghost" style="margin-bottom:14px;">← Mission deck</a>
             <h1 class="menu-title">
                 <span class="for-explore">Explore the <em>solar system</em></span>
                 <span class="for-ride">VR <em>Deep Space Ride</em></span>
+                <span class="for-dodge">Asteroid <em>Dodge</em></span>
             </h1>
             <p class="menu-sub for-explore">Free flight, on a normal screen or inside a VR headset
                (Quest, Vive, Index, WMR).</p>
             <p class="menu-sub for-ride">Three minutes on rails, on a normal screen or inside a VR
                headset (Quest, Vive, Index, WMR).</p>
+            <p class="menu-sub for-dodge">An Arcade game for Phone VR, a headset or a normal screen. Turn your head to dodge; hold your gaze on controls to select them. Stay seated.</p>
 
             <div class="cards">
                 <button class="card" id="start-explore">
@@ -372,6 +453,11 @@
                        Jupiter barrel roll, a shot straight through Saturn's rings, and four things that come
                        far too close. Look around the cockpit — drag, move your phone, or turn your head.</p>
                 </button>
+                <button class="card dodge" id="start-dodge">
+                    <span class="tag">HANDS-FREE · 60 SEC</span>
+                    <h3>☄️ Asteroid Dodge</h3>
+                    <p>Turn your head gently left or right to steer past incoming rocks. Three shields, a 60-second run, and gaze-operated pause and replay. Stay seated. Local practice — no ranked score.</p>
+                </button>
             </div>
 
             <div class="settings">
@@ -379,6 +465,7 @@
                 <label class="for-ride"><input type="checkbox" id="opt-scares" checked> Jumpscares enabled</label>
                 <label class="for-ride"><input type="checkbox" id="opt-cockpit" checked> Cockpit view (sit in the ship, look around)</label>
                 <label><input type="checkbox" id="opt-sound" checked> Sound</label>
+                <label><input type="checkbox" id="opt-voice" checked> AI Mission Control Voice</label>
                 <label class="for-explore"><input type="checkbox" id="opt-labels" checked> Name labels</label>
                 <label class="for-explore"><input type="checkbox" id="opt-orbits" checked> Orbit lines</label>
                 <label class="for-ride">Intensity
@@ -400,18 +487,64 @@
                 <button id="btn-gyro" class="chip">🧭 Gyro look</button>
                 <button id="btn-phone-vr" class="chip">📱 Phone VR (Cardboard)</button>
                 <span id="phone-note"></span>
+                <span>Hands-free Phone VR: look well down (about 55°) to find MENU. Hold the centre pointer on it for 1.4 seconds to open controls. Look forward to hide them. Opening the menu pauses the game; select Resume to continue.</span>
+                <details id="viewer-fit">
+                    <summary>Cardboard lens fit — spacing and view size</summary>
+                    <p>Larger rounded views reduce the black corners. Adjust outside the viewer, then check through the lenses. These are screen percentages, not a measured lens prescription.</p>
+                    <label for="viewer-shape">Lens shape <select id="viewer-shape"><option value="wide">Wide rounded (larger view)</option><option value="circle">Circular</option></select></label>
+                    <label for="viewer-spacing">Eye-centre spacing <output id="viewer-spacing-value" for="viewer-spacing">44%</output><input id="viewer-spacing" type="range" min="34" max="50" step="1" value="44"></label>
+                    <label for="viewer-size">View size <output id="viewer-size-value" for="viewer-size">96%</output><input id="viewer-size" type="range" min="60" max="98" step="1" value="96"></label>
+                    <button id="viewer-reset" type="button" class="chip ghost">Reset lens fit</button>
+                </details>
+            </div>
+            <div class="btn-row">
+                <button id="btn-remote" class="chip" type="button">🎮 Controller test &amp; setup</button>
             </div>
         </div>
     </div>
 
+    <dialog id="remote-dialog" aria-labelledby="remote-title">
+        <div class="remote-header">
+            <h2 id="remote-title">Controller test &amp; setup</h2>
+            <button id="remote-close" class="chip" type="button">Done</button>
+        </div>
+        <p>Keep the phone outside the viewer for setup. Bluetooth pairing alone does not guarantee input support.
+            This panel checks only signals your browser receives; it cannot detect buttons intercepted by Android.</p>
+        <p id="remote-gamepads">Checking browser gamepads…</p>
+        <div id="remote-test-pad" tabindex="0" role="region" aria-label="Remote input test area">
+            <strong>Input test area</strong>
+            <p>Tap here, then press A, the trigger, or move the joystick. For mouse-style remotes, keep the pointer here.
+                Scrolling here is captured for testing. Scroll outside this box to move through the settings.</p>
+            <p id="remote-counts">No inputs detected yet.</p>
+            <pre id="remote-log" aria-label="Recent controller inputs">Waiting for input…</pre>
+        </div>
+        <p id="remote-status" role="status"></p>
+        <div class="remote-tools">
+            <button id="remote-cancel" class="chip" type="button" hidden>Cancel assignment</button>
+            <button id="remote-scroll-preset" class="chip" type="button">Use scroll to move</button>
+            <button id="remote-reset" class="chip ghost" type="button">Clear all mappings</button>
+        </div>
+        <p>Choose Assign, then send one input within 15 seconds. Assigning an input again moves it to the new action.
+            Escape closes this panel. Testing never flies, scans or pauses the ride.</p>
+        <div id="remote-mappings"></div>
+        <p>Mappings are saved only in this browser for this site address. Use the same HTTPS address on your phone.
+            If only scroll is detected, use the scroll preset and the viewer’s touch button or gaze scanning.
+            If no button events appear, check the remote’s manual for another mode.</p>
+    </dialog>
+
     <script>
-        /* Which experience this entry point offers. Read straight from the URL
-           and applied before the module boots, so the launcher never flashes
-           the other mode's copy and never depends on the scene loading. */
         (function () {
+            var dodge = /^\/games\/asteroid-dodge\/?$/i.test(location.pathname);
             var ride = location.pathname.indexOf('vr-ride') !== -1 ||
                 location.search.indexOf('mode=ride') !== -1;
-            document.getElementById('mode-menu').classList.add(ride ? 'only-ride' : 'only-explore');
+            document.getElementById('mode-menu').classList.add(dodge ? 'only-dodge' : ride ? 'only-ride' : 'only-explore');
+            if (dodge) {
+                document.title = 'Asteroid Dodge — SpaceVerse Arcade';
+                document.querySelectorAll('a[href="/"]').forEach(function (link) {
+                    link.href = '/games';
+                    link.textContent = '← Arcade';
+                });
+            }
         })();
     </script>
 
@@ -421,12 +554,22 @@
             <div class="row"><span>NEAREST</span><b id="near-body">—</b></div>
             <div class="row"><span>DISTANCE</span><b id="near-dist">—</b></div>
             <div class="row"><span>SPEED</span><b id="fly-speed">40 u/s</b></div>
+            <div class="explore-quick-actions">
+                <button id="btn-cockpit-fly" class="chip ghost" type="button" title="Toggle 3D Spaceship Cockpit (K)">🛸 Cockpit</button>
+                <button id="btn-next-planet" class="chip ghost" type="button" title="Warp to next planet (N)">🪐 Next World</button>
+                <button id="btn-skim-planet" class="chip ghost" type="button" title="Low-orbit skim over nearest planet (L)">☄️ Low Orbit</button>
+            </div>
             <div class="keys">
                 <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> fly · <kbd>Q</kbd><kbd>E</kbd> up/down ·
-                <kbd>Shift</kbd> boost<br>
+                <kbd>Shift</kbd> boost · <kbd>K</kbd> cockpit · <kbd>L</kbd> low orbit<br>
                 Drag to look · scroll to change speed · click a planet to scan<br>
-                In VR: left stick flies, right stick snap-turns, trigger scans<br>
+                In VR: left stick flies, right stick snap-turns, trigger / pinch scans<br>
                 On a phone: 🧭 Gyro look turns the view with the phone · 📱 Phone VR for a Cardboard viewer
+            </div>
+            <div id="phone-flight">
+                <button id="btn-phone-fly" class="chip" type="button" aria-pressed="false">▶ Fly forward</button>
+                <button id="btn-phone-vr-live" class="chip" type="button">📱 Split-screen VR</button>
+                <span>Point your phone to steer. Tap a planet to scan it.</span>
             </div>
         </div>
     </div>
@@ -434,6 +577,11 @@
     <!-- ride hud -->
     <div id="ride-hud" class="hud">
         <div id="ride-panel">
+            <button id="btn-turret" class="chip ghost" type="button" title="Fire Plasma Deflector Turret (F or Click)">⚡ Turret</button>
+            <button id="btn-pause" class="chip">⏸ Pause</button>
+            <details id="ride-details">
+                <summary class="chip">Ride controls</summary>
+                <div class="ride-expanded">
             <div class="ride-top">
                 <div>
                     <div id="seg-title">STANDBY</div>
@@ -446,10 +594,11 @@
             </div>
             <div id="ride-bar"><div id="ride-bar-fill"></div></div>
             <div class="ride-btns">
-                <button id="btn-pause" class="chip">⏸ Pause</button>
                 <button id="btn-skip" class="chip">⏭ Skip section</button>
                 <button id="btn-restart" class="chip">↻ Restart</button>
             </div>
+                </div>
+            </details>
         </div>
         <div id="narration"></div>
         <div id="warning"></div>
@@ -462,6 +611,10 @@
         <h3 id="info-name">Earth</h3>
         <p id="info-fact"></p>
         <div id="info-stats"></div>
+        <div id="info-actions">
+            <button id="info-skim" class="chip" type="button">🛸 Low-Orbit Skim</button>
+            <button id="info-next" class="chip ghost" type="button">🪐 Next World</button>
+        </div>
     </div>
 
     <div id="toast"></div>
@@ -474,7 +627,7 @@
         }
     }
     </script>
-    <script type="module" src="/public/js/vr/main.js"></script>
+    <script type="module" src="/public/js/vr/main.js?v=20261022-5"></script>
     <script src="/public/js/chat-widget.js" defer></script>
 </body>
 </html>

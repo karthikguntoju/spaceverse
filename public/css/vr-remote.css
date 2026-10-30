@@ -1,0 +1,28 @@
+#remote-dialog {
+    color: #edf5ff; background: #0b1222; border: 1px solid #3a506e; border-radius: 20px;
+    width: min(680px, calc(100vw - 24px)); max-height: calc(100dvh - 32px);
+    box-sizing: border-box; padding: 24px; overflow-y: auto; overscroll-behavior: contain;
+    font-family: Inter, system-ui, sans-serif;
+}
+#remote-dialog::backdrop { background: rgba(0, 4, 12, .85); }
+#remote-dialog h2 { margin: 0; font-size: 22px; }
+#remote-dialog p { color: #b6c5db; line-height: 1.55; font-size: 14px; }
+.remote-header, .remote-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.remote-header { justify-content: space-between; }
+#remote-dialog .chip { min-height: 44px; cursor: pointer; }
+#remote-cancel[hidden] { display: none; }
+#remote-dialog :focus-visible { outline: 2px solid #5eead4; outline-offset: 3px; }
+#remote-test-pad { border: 2px dashed #507799; padding: 20px; border-radius: 12px; margin: 16px 0; background: #12233a; }
+#remote-test-pad:focus { border-color: #5eead4; }
+#remote-log { white-space: pre-wrap; overflow-wrap: anywhere; min-height: 80px; max-height: 160px; overflow-y: auto; font-size: 13px; color: #90eadb; }
+#remote-status { color: #b4f6e5 !important; }
+.remote-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 8px; border-top: 1px solid #293a52; padding: 12px 0; }
+.remote-row strong { font-size: 14px; font-weight: 500; }
+.remote-row small { display: block; color: #94b2cf; margin-top: 5px; overflow-wrap: anywhere; }
+#remote-gamepads { overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+    #remote-dialog { padding: 16px; }
+    .remote-row { grid-template-columns: 1fr 1fr; }
+    .remote-row > div { grid-column: 1 / -1; }
+    #remote-dialog .chip { padding: 9px 12px; }
+}

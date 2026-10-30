@@ -104,7 +104,7 @@
         // black — over the bare aurora they washed out into coloured fog. The
         // wash is not opaque, so the colour behind still tints the sky; it
         // just stops competing with the light sources in front of it.
-        b.fillStyle = 'rgba(4, 6, 18, 0.58)';
+        b.fillStyle = 'rgba(2, 4, 12, 0.82)';
         b.fillRect(0, 0, BW, BH);
         const vig = b.createRadialGradient(BW * 0.5, BH * 0.45, 0, BW * 0.5, BH * 0.45, diag * 0.62);
         vig.addColorStop(0, 'rgba(0,0,0,0)');
@@ -175,8 +175,8 @@
         // through the bright region. This is the subject of the picture, so
         // it is where the budget goes — it all bakes into `base` once, and a
         // frame is still one blit whatever the count.
-        const fieldCount = Math.max(2400, Math.min(7000, Math.round((BW * BH) / 470)));
-        const bandCount = Math.round(fieldCount * 1.3);
+        const fieldCount = Math.max(1100, Math.min(2800, Math.round((BW * BH) / 950)));
+        const bandCount = Math.round(fieldCount * 0.85);
         for (let i = 0; i < fieldCount + bandCount; i++) {
             const inBand = i >= fieldCount;
             let x, y;
@@ -187,8 +187,8 @@
                 x = rand(0, BW); y = rand(0, BH);
             }
             const [r, g, bb] = starColor();
-            const size = inBand ? rand(0.28, 0.8) : Math.pow(Math.random(), 2.2) * 1.45 + 0.32;
-            const alpha = inBand ? rand(0.38, 0.95) : rand(0.45, 1);
+            const size = inBand ? rand(0.24, 0.62) : Math.pow(Math.random(), 2.6) * 0.95 + 0.25;
+            const alpha = inBand ? rand(0.20, 0.58) : rand(0.25, 0.72);
             b.globalAlpha = alpha;
             b.fillStyle = `rgb(${r},${g},${bb})`;
             b.beginPath();
@@ -197,56 +197,35 @@
         }
         b.globalAlpha = 1;
 
-        // The named stars: a soft halo, a white-hot core and faint diffraction
-        // spikes. A field of even dots reads as noise — these give the eye
-        // somewhere to land and set the scale for everything around them.
-        for (let i = 0; i < 26; i++) {
+        // Subtle brighter anchor stars (kept compact and pinpoint — no giant spikes or halos)
+        for (let i = 0; i < 10; i++) {
             const x = rand(0, BW), y = rand(0, BH);
             const [r, g, bb] = starColor();
-            const glow = rand(4, 11);
+            const glow = rand(1.4, 2.2);
             const grd = b.createRadialGradient(x, y, 0, x, y, glow);
-            grd.addColorStop(0, `rgba(255,255,255,0.95)`);
-            grd.addColorStop(0.18, `rgba(${r},${g},${bb},0.6)`);
-            grd.addColorStop(0.45, `rgba(${r},${g},${bb},0.16)`);
+            grd.addColorStop(0, `rgba(255,255,255,0.65)`);
+            grd.addColorStop(0.35, `rgba(${r},${g},${bb},0.22)`);
             grd.addColorStop(1, `rgba(${r},${g},${bb},0)`);
             b.fillStyle = grd;
             b.beginPath();
             b.arc(x, y, glow, 0, Math.PI * 2);
             b.fill();
-            const spike = glow * rand(1.6, 2.4);
-            const sg = b.createLinearGradient(x - spike, y, x + spike, y);
-            sg.addColorStop(0, `rgba(${r},${g},${bb},0)`);
-            sg.addColorStop(0.5, `rgba(${r},${g},${bb},0.3)`);
-            sg.addColorStop(1, `rgba(${r},${g},${bb},0)`);
-            b.strokeStyle = sg;
-            b.lineWidth = 0.9;
-            b.beginPath();
-            b.moveTo(x - spike, y); b.lineTo(x + spike, y);
-            b.stroke();
-            const sv = b.createLinearGradient(x, y - spike, x, y + spike);
-            sv.addColorStop(0, `rgba(${r},${g},${bb},0)`);
-            sv.addColorStop(0.5, `rgba(${r},${g},${bb},0.3)`);
-            sv.addColorStop(1, `rgba(${r},${g},${bb},0)`);
-            b.strokeStyle = sv;
-            b.beginPath();
-            b.moveTo(x, y - spike); b.lineTo(x, y + spike);
-            b.stroke();
         }
     }
 
     /* ── the near stars: the layer that answers ─────────────────────── */
     function buildLive() {
-        const count = Math.max(220, Math.min(520, Math.round((W * H) / 4200)));
+        const count = Math.max(110, Math.min(240, Math.round((W * H) / 8400)));
         live = [];
         for (let i = 0; i < count; i++) {
             const [r, g, b] = starColor();
             live.push({
                 x: rand(-NEAR_AMP, W + NEAR_AMP),
                 y: rand(-NEAR_AMP, H + NEAR_AMP),
-                r: Math.pow(Math.random(), 1.8) * 1.5 + 0.45,
-                alpha: rand(0.45, 1),
+                r: Math.pow(Math.random(), 2.6) * 0.78 + 0.28,
+                alpha: rand(0.28, 0.68),
                 depth: rand(0.55, 1.45),      // how much of the near travel it takes
-                speed: rand(0.4, 1.7),
+                speed: rand(0.18, 0.55),
                 phase: rand(0, Math.PI * 2),
                 color: [r, g, b],
                 sx: 0, sy: 0, near: 0
@@ -376,23 +355,12 @@
                 const dist = Math.abs(Math.hypot(s.sx - rp.x, s.sy - rp.y) - age * RIPPLE_SPEED);
                 if (dist < 52) ring = Math.max(ring, (1 - dist / 52) * (1 - age));
             }
-            const tw = reduceMotion ? 1 : 0.5 + 0.5 * Math.sin(t * s.speed + s.phase);
-            const lift = s.near * 0.6 + ring;
-            const a = Math.min(1, s.alpha * (0.5 + 0.5 * tw) + lift * 0.75);
-            const r = s.r * (1 + s.near * 0.85 + ring * 1.2);
+            const tw = reduceMotion ? 1 : 0.88 + 0.12 * Math.sin(t * s.speed + s.phase);
+            const lift = s.near * 0.25 + ring * 0.5;
+            const a = Math.min(0.92, s.alpha * tw + lift * 0.35);
+            const r = s.r * (1 + s.near * 0.22 + ring * 0.35);
             const [cr, cg, cb] = s.color;
 
-            if (lift > 0.12 || s.r > 1.25) {
-                const gr = r * (3 + lift * 3);
-                const grd = ctx.createRadialGradient(s.sx, s.sy, 0, s.sx, s.sy, gr);
-                grd.addColorStop(0, `rgba(${cr},${cg},${cb},${(a * 0.5).toFixed(3)})`);
-                grd.addColorStop(0.4, `rgba(${cr},${cg},${cb},${(a * 0.13).toFixed(3)})`);
-                grd.addColorStop(1, `rgba(${cr},${cg},${cb},0)`);
-                ctx.fillStyle = grd;
-                ctx.beginPath();
-                ctx.arc(s.sx, s.sy, gr, 0, Math.PI * 2);
-                ctx.fill();
-            }
             ctx.globalAlpha = a;
             ctx.fillStyle = `rgb(${cr},${cg},${cb})`;
             ctx.beginPath();

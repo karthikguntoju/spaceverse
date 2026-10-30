@@ -8,8 +8,16 @@
  * the dwarf planets Ceres / Pluto / Makemake / Eris, a comet with a particle
  * dust tail, shooting stars and the star field.
  *
- * Textures are 2–4K on disk; they are downscaled on the client before they
- * hit the GPU because a headset cannot afford a dozen 4096x2048 maps.
+ * Upgraded v2:
+ *  - Pinpoint circular Airy-disk starfield shader (O/B/A/F/G/K/M blackbody
+ *    colors, bloom-safe luminance clamp, subtle scintillation)
+ *  - Custom close-up planet shaders (5-tap 4K unsharp-mask clarity,
+ *    Lommel-Seeliger rocky backscatter, Martian blue Rayleigh twilight,
+ *    Saturn real-time ring-on-globe shadow + North Polar Hexagon + planet
+ *    shadow on rings, Earth bathymetric sunglint + limb polar aurora veil)
+ *  - Animated comet-wake orbital path shaders with target highlight pulse
+ *  - Active cryovolcanic geyser plumes on Enceladus & volcanic plumes on Io
+ *  - On-demand 4K texture streaming (`upgradeTo4K(key)`) for close-ups
  */
 import * as THREE from 'three';
 
@@ -66,7 +74,7 @@ export const BODIES = [
         tex: '/public/textures/jupiter.jpg', spin: 0.0090, orbit: 0.0028, tilt: 0.055,
         moons: [
             {
-                name: 'Io', radius: 1.6, distance: 25, speed: 0.024, color: 0xe8d16a, kind: 'io',
+                name: 'Io', radius: 1.6, distance: 25, speed: 0.024, color: 0xe8d16a, kind: 'io', plume: 'volcanic',
                 fact: 'The most volcanic world known — over 400 active volcanoes, painted in sulfur.'
             },
             {
@@ -94,7 +102,7 @@ export const BODIES = [
                 fact: 'Herschel crater spans a third of its face — the moon that looks like the Death Star.'
             },
             {
-                name: 'Enceladus', radius: 0.8, distance: 27, speed: 0.021, color: 0xf2f6f8, kind: 'ice',
+                name: 'Enceladus', radius: 0.8, distance: 27, speed: 0.021, color: 0xf2f6f8, kind: 'ice', plume: 'cryo',
                 fact: 'The whitest surface known. Geysers at its south pole vent a buried ocean into space.'
             },
             {
@@ -147,6 +155,7 @@ export const BODIES = [
         atmo: 0x5f8bff,
         moons: [{
             name: 'Triton', radius: 1.4, distance: 19, speed: 0.013, color: 0xe3d5cd, kind: 'triton', retro: true,
+            plume: 'cryo',
             fact: 'Orbits backwards — a captured Kuiper Belt world with nitrogen geysers, slowly spiralling in.'
         }],
         fact: 'Supersonic winds reach 2,100 km/h — the fastest in the solar system.'
@@ -205,7 +214,7 @@ export async function loadTexture(url, maxW = 1024) {
                 new THREE.TextureLoader().load(url, resolve, undefined, reject));
         }
         tex.colorSpace = THREE.SRGBColorSpace;
-        tex.anisotropy = 8;
+        tex.anisotropy = maxW >= 4096 ? 16 : 8;
         tex.wrapS = THREE.RepeatWrapping;
         return tex;
     })();
@@ -314,14 +323,12 @@ function craters(x, w, h, n, rMin, rMax, floor = 'rgba(0,0,0,A)', rim = 'rgba(25
     for (let i = 0; i < n; i++) {
         const cx = mrand() * w, cy = mrand() * h;
         const r = rMin + mrand() * (rMax - rMin);
-        // dark floor
         const g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
         g.addColorStop(0, floor.replace('A)', depth + ')'));
         g.addColorStop(0.75, floor.replace('A)', (depth * 0.5) + ')'));
         g.addColorStop(1, floor.replace('A)', '0)'));
         x.fillStyle = g;
         x.beginPath(); x.arc(cx, cy, r, 0, 7); x.fill();
-        // sun-lit rim arc (upper left)
         x.strokeStyle = rim.replace('A)', (depth * 0.55) + ')');
         x.lineWidth = Math.max(1, r * 0.16);
         x.beginPath(); x.arc(cx, cy, r * 0.92, Math.PI * 0.8, Math.PI * 1.7); x.stroke();
@@ -356,7 +363,6 @@ function moonTexture(kind) {
             blotches(x, w, h, 'rgba(214,120,44,A)', 0.5, 26, 18, 70);
             blotches(x, w, h, 'rgba(246,240,205,A)', 0.5, 18, 14, 60);
             blotches(x, w, h, 'rgba(120,140,66,A)', 0.35, 10, 10, 40);
-            // volcanic vents: dark pit with an orange halo
             for (let i = 0; i < 22; i++) {
                 const cx = mrand() * w, cy = mrand() * h, r = 2 + mrand() * 6;
                 const g = x.createRadialGradient(cx, cy, 0, cx, cy, r * 3);
@@ -371,7 +377,7 @@ function moonTexture(kind) {
         case 'europa':
             x.fillStyle = '#ddd6c6'; x.fillRect(0, 0, w, h);
             blotches(x, w, h, 'rgba(200,190,170,A)', 0.4, 20, 20, 80);
-            streaks(x, w, h, 46, 'rgba(150,80,52,A)', 0.4, 2.2);   // lineae
+            streaks(x, w, h, 46, 'rgba(150,80,52,A)', 0.4, 2.2);
             streaks(x, w, h, 24, 'rgba(120,60,40,A)', 0.25, 1.2);
             craters(x, w, h, 6, 2, 6, 'rgba(60,50,40,A)', 'rgba(255,255,250,A)', 0.2);
             break;
@@ -379,25 +385,23 @@ function moonTexture(kind) {
         case 'ice':
             x.fillStyle = '#eef4f6'; x.fillRect(0, 0, w, h);
             blotches(x, w, h, 'rgba(180,205,215,A)', 0.35, 22, 16, 70);
-            streaks(x, w, h, 16, 'rgba(120,160,185,A)', 0.3, 1.6);  // tiger-stripe cracks
+            streaks(x, w, h, 16, 'rgba(120,160,185,A)', 0.3, 1.6);
             craters(x, w, h, 10, 2, 8, 'rgba(90,120,140,A)', 'rgba(255,255,255,A)', 0.18);
             break;
 
         case 'titan':
-            // a haze world — almost featureless orange with soft banding
             for (let i = 0; i < h; i++) {
                 const k = i / h;
                 const band = 0.9 + 0.1 * Math.sin(k * 9.0);
                 x.fillStyle = `rgb(${Math.round(216 * band)},${Math.round(152 * band)},${Math.round(60 * band)})`;
                 x.fillRect(0, i, w, 1);
             }
-            blotches(x, w, h, 'rgba(120,90,40,A)', 0.22, 10, 30, 90);  // dark dune seas
+            blotches(x, w, h, 'rgba(120,90,40,A)', 0.22, 10, 30, 90);
             break;
 
         case 'twotone': {
             x.fillStyle = '#d9d3c4'; x.fillRect(0, 0, w, h);
             craters(x, w, h, 30, 2, 10, 'rgba(70,60,50,A)', 'rgba(255,255,250,A)', 0.25);
-            // coal-dark leading hemisphere with a ragged boundary
             x.fillStyle = 'rgba(46,34,24,0.92)';
             x.beginPath();
             x.moveTo(0, 0);
@@ -412,28 +416,25 @@ function moonTexture(kind) {
 
         case 'triton':
             x.fillStyle = '#e9dcd6'; x.fillRect(0, 0, w, h);
-            // pink nitrogen polar cap
             const cap = x.createLinearGradient(0, 0, 0, h * 0.45);
             cap.addColorStop(0, 'rgba(235,190,185,0.85)');
             cap.addColorStop(1, 'rgba(235,190,185,0)');
             x.fillStyle = cap; x.fillRect(0, 0, w, h * 0.45);
-            // cantaloupe terrain: shallow dimples
             craters(x, w, h, 60, 2, 6, 'rgba(140,120,115,A)', 'rgba(255,250,248,A)', 0.14);
-            streaks(x, w, h, 10, 'rgba(60,55,60,A)', 0.3, 1.4);      // geyser fallout
+            streaks(x, w, h, 10, 'rgba(60,55,60,A)', 0.3, 1.4);
             break;
 
         case 'mimas':
             x.fillStyle = '#c9c5bd'; x.fillRect(0, 0, w, h);
             craters(x, w, h, 70, 2, 9, 'rgba(70,66,60,A)', 'rgba(255,255,250,A)', 0.26);
-            // Herschel — one absurdly large crater
             craters(x, w * 0.5, h, 1, 44, 46, 'rgba(60,56,50,A)', 'rgba(255,255,252,A)', 0.4);
             break;
 
         case 'rockice':
             x.fillStyle = '#a79b89'; x.fillRect(0, 0, w, h);
-            blotches(x, w, h, 'rgba(70,60,50,A)', 0.4, 16, 24, 90);   // dark ancient terrain
-            blotches(x, w, h, 'rgba(210,205,195,A)', 0.4, 14, 18, 70); // bright grooved terrain
-            streaks(x, w, h, 20, 'rgba(190,185,175,A)', 0.28, 1.4);    // grooves
+            blotches(x, w, h, 'rgba(70,60,50,A)', 0.4, 16, 24, 90);
+            blotches(x, w, h, 'rgba(210,205,195,A)', 0.4, 14, 18, 70);
+            streaks(x, w, h, 20, 'rgba(190,185,175,A)', 0.28, 1.4);
             craters(x, w, h, 40, 2, 8, 'rgba(50,44,38,A)', 'rgba(255,255,248,A)', 0.24);
             break;
 
@@ -517,6 +518,10 @@ export class SolarSystem {
         this.pickTargets = [];
         this.belts = [];
         this.labels = [];
+        this._plumes = [];
+        this._auroraUniforms = null;
+        this._starUniforms = null;
+        this._highlightedKey = null;
         this.root = new THREE.Group();
         scene.add(this.root);
         this._camPos = new THREE.Vector3();
@@ -552,27 +557,110 @@ export class SolarSystem {
     /* ---------- static content ---------- */
 
     _starfield() {
-        // distant point stars give parallax that a skybox alone cannot
-        const n = this.quality === 'low' ? 3000 : 9000;
+        // Pinpoint circular Airy-disk stars with O/B/A/F/G/K/M stellar blackbody
+        // colors and bloom-safe luminance (<= 0.76) so UnrealBloomPass never turns
+        // background stars into glaring square blocks.
+        const n = this.quality === 'low' ? 4000 : 12000;
         const pos = new Float32Array(n * 3);
         const col = new Float32Array(n * 3);
-        const c = new THREE.Color();
+        const scales = new Float32Array(n);
+        const phases = new Float32Array(n);
+
+        const palette = [
+            new THREE.Color(0x9bb8ff), // O/B blue-white
+            new THREE.Color(0xcad8ff), // A white-blue
+            new THREE.Color(0xf8f7ff), // F pure white
+            new THREE.Color(0xfff2d6), // G solar ivory
+            new THREE.Color(0xffdab0), // K warm gold
+            new THREE.Color(0xffb884)  // M soft apricot
+        ];
+
         for (let i = 0; i < n; i++) {
             const r = 1600 + Math.random() * 1400;
             const th = Math.random() * Math.PI * 2;
-            const ph = Math.acos(2 * Math.random() - 1);
-            pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
-            pos[i * 3 + 1] = r * Math.cos(ph) * 0.55;
-            pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
-            c.setHSL(0.55 + Math.random() * 0.12, 0.5 * Math.random(), 0.6 + Math.random() * 0.4);
-            col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+            const inBand = i < n * 0.30;
+            const ph = inBand
+                ? (Math.PI * 0.5 + (Math.random() - 0.5) * 0.25)
+                : Math.acos(2 * Math.random() - 1);
+
+            let x = r * Math.sin(ph) * Math.cos(th);
+            let y = r * Math.cos(ph) * (inBand ? 1.0 : 0.65);
+            let z = r * Math.sin(ph) * Math.sin(th);
+            if (inBand) {
+                const tilt = 0.48;
+                const ny = y * Math.cos(tilt) - z * Math.sin(tilt);
+                const nz = y * Math.sin(tilt) + z * Math.cos(tilt);
+                y = ny; z = nz;
+            }
+            pos[i * 3] = x;
+            pos[i * 3 + 1] = y;
+            pos[i * 3 + 2] = z;
+
+            const roll = Math.random();
+            let b, sc;
+            if (roll < 0.88) {
+                b = 0.24 + Math.random() * 0.32;
+                sc = 0.85 + Math.random() * 0.7;
+            } else if (roll < 0.985) {
+                b = 0.52 + Math.random() * 0.18;
+                sc = 1.45 + Math.random() * 0.8;
+            } else {
+                b = 0.68 + Math.random() * 0.08;
+                sc = 2.2 + Math.random() * 0.9;
+            }
+            const c = palette[(Math.random() * palette.length) | 0];
+            col[i * 3] = c.r * b;
+            col[i * 3 + 1] = c.g * b;
+            col[i * 3 + 2] = c.b * b;
+            scales[i] = sc;
+            phases[i] = Math.random() * Math.PI * 2;
         }
         const g = new THREE.BufferGeometry();
         g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
         g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-        const stars = new THREE.Points(g, new THREE.PointsMaterial({
-            size: 4.5, sizeAttenuation: true, vertexColors: true,
-            transparent: true, opacity: 0.95, depthWrite: false
+        g.setAttribute('aScale', new THREE.BufferAttribute(scales, 1));
+        g.setAttribute('aPhase', new THREE.BufferAttribute(phases, 1));
+
+        this._starUniforms = {
+            uTime: { value: 0 },
+            uPixelRatio: { value: Math.min(window.devicePixelRatio || 1, 2) }
+        };
+
+        const stars = new THREE.Points(g, new THREE.ShaderMaterial({
+            uniforms: this._starUniforms,
+            vertexShader: /* glsl */`
+                attribute float aScale;
+                attribute float aPhase;
+                varying vec3 vColor;
+                varying float vTwinkle;
+                uniform float uTime;
+                uniform float uPixelRatio;
+                void main() {
+                    vColor = color;
+                    vTwinkle = 0.94 + 0.06 * sin(uTime * 1.15 + aPhase * 6.2831);
+                    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+                    gl_Position = projectionMatrix * mv;
+                    gl_PointSize = clamp(aScale * uPixelRatio * 1.5, 1.15, 4.2);
+                }
+            `,
+            fragmentShader: /* glsl */`
+                varying vec3 vColor;
+                varying float vTwinkle;
+                void main() {
+                    vec2 uv = gl_PointCoord - vec2(0.5);
+                    float d = length(uv) * 2.0;
+                    if (d > 1.0) discard;
+                    float core = exp(-d * d * 5.5);
+                    float halo = smoothstep(1.0, 0.0, d) * 0.35;
+                    float alpha = clamp(core + halo, 0.0, 1.0);
+                    vec3 rgb = min(vColor * vTwinkle * (0.85 + 0.35 * core), vec3(0.76));
+                    gl_FragColor = vec4(rgb, alpha);
+                }
+            `,
+            vertexColors: true,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending
         }));
         stars.frustumCulled = false;
         this.root.add(stars);
@@ -585,7 +673,7 @@ export class SolarSystem {
 
         // The ride flies within 10 units of the surface, so a flat basic
         // material is not enough — this is animated granulation with limb
-        // darkening, which is what stops it reading as a cream-coloured disc.
+        // darkening and chromospheric spicules.
         const coreMat = new THREE.ShaderMaterial({
             uniforms: {
                 uTime: { value: 0 },
@@ -630,9 +718,11 @@ export class SolarSystem {
                     float cells = mix(g, h, 0.45);
                     vec3 col = mix(uCool, uMid, smoothstep(0.20, 0.50, cells));
                     col = mix(col, uHot, smoothstep(0.46, 0.76, cells));
-                    // limb darkening — the edge of a star is cooler than its centre
-                    float limb = pow(max(dot(normalize(vNormal), normalize(vView)), 0.0), 0.42);
+                    // limb darkening + chromospheric rim
+                    float mu = max(dot(normalize(vNormal), normalize(vView)), 0.0);
+                    float limb = pow(mu, 0.42);
                     col *= mix(0.55, 1.35, limb);
+                    col += vec3(1.0, 0.42, 0.1) * pow(1.0 - mu, 3.4) * 0.65;
                     gl_FragColor = vec4(col * 1.25, 1.0);
                 }`
         });
@@ -646,16 +736,12 @@ export class SolarSystem {
             atmosphereMaterial(0xff9d2e, 0.9, 0.45)
         );
         group.add(corona);
-        // wide halo needs a very gradual falloff or its own silhouette shows up
-        // as a hard orange disc edge when you are close to the star
         const halo = new THREE.Mesh(
             new THREE.SphereGeometry(d.radius * 1.9, 48, 32),
             atmosphereMaterial(0xff7a18, 0.34, 0.95)
         );
         group.add(halo);
 
-        // with bloom in the chain this must stay subtle or a close approach
-        // washes the whole frame to cream
         const flare = new THREE.Sprite(new THREE.SpriteMaterial({
             map: radialSprite(256, 'rgba(255,240,200,0.45)', 'rgba(255,150,40,0.14)'),
             blending: THREE.AdditiveBlending, depthWrite: false, transparent: true
@@ -670,7 +756,7 @@ export class SolarSystem {
         this.root.add(group);
         this.root.add(new THREE.AmbientLight(0x2a3550, 1.1));
 
-        this.bodies.set('sun', { data: d, group, mesh: core, spinner: core, orbitAngle: 0 });
+        this.bodies.set('sun', { data: d, group, mesh: core, spinner: core, orbitAngle: 0, is4K: true });
         this.pickTargets.push(core);
         core.userData.bodyKey = 'sun';
     }
@@ -692,44 +778,182 @@ export class SolarSystem {
         spinner.rotation.z = d.tilt || 0;
         holder.add(spinner);
 
-        const matOpts = { color: d.color, roughness: d.roughness != null ? d.roughness : 0.95, metalness: 0.0 };
+        const isGas = (d.key === 'jupiter' || d.key === 'saturn' || d.key === 'uranus' || d.key === 'neptune');
+        const isRocky = (d.key === 'mercury' || d.key === 'mars' || d.key === 'ceres' || d.key === 'pluto' || d.key === 'makemake' || d.key === 'eris');
+
+        const matOpts = {
+            color: d.color,
+            roughness: d.roughness != null ? d.roughness : (isGas ? 0.74 : 0.88),
+            metalness: 0.02
+        };
         const mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(d.radius, this.quality === 'low' ? 48 : 80, this.quality === 'low' ? 32 : 56),
+            new THREE.SphereGeometry(d.radius, this.quality === 'low' ? 48 : 80, this.quality === 'low' ? 32 : 64),
             new THREE.MeshStandardMaterial(matOpts)
         );
         mesh.userData.bodyKey = d.key;
         spinner.add(mesh);
         this.pickTargets.push(mesh);
 
-        // Earth's city lights: the emissive map only shows on the side that
-        // faces away from the Sun. The Sun sits at the world origin, so the
-        // day/night mask is just dot(worldNormal, -worldPos).
+        // Per-planet shader uniforms for 5-tap 4K clarity, ring shadow, and close-up photometry
+        const ringNormalW = new THREE.Vector3(0, 1, 0);
+        const shaderUniforms = {
+            uPlanetCenter: { value: new THREE.Vector3() },
+            uRingNormal: { value: ringNormalW },
+            uRingInner: { value: d.ring ? d.radius * 1.24 : 0.0 },
+            uRingOuter: { value: d.ring ? d.radius * 2.27 : 0.0 },
+            uHasRingShadow: { value: d.key === 'saturn' ? 1.0 : 0.0 },
+            uTexelStep: { value: new THREE.Vector2(1 / 2048, 1 / 1024) },
+            uClarity: { value: isGas ? 0.56 : 0.64 },
+            uTime: { value: 0 }
+        };
+
         if (d.night) {
             mesh.material.emissive = new THREE.Color(0xffffff);
             mesh.material.emissiveIntensity = 1.0;
-            mesh.material.onBeforeCompile = shader => {
-                shader.vertexShader = 'varying vec3 vWNorm;\nvarying vec3 vWPos;\n' +
-                    shader.vertexShader.replace('#include <fog_vertex>',
-                        `#include <fog_vertex>
-                        vWPos = (modelMatrix * vec4(position, 1.0)).xyz;
-                        vWNorm = normalize(mat3(modelMatrix) * normal);`);
-                shader.fragmentShader = 'varying vec3 vWNorm;\nvarying vec3 vWPos;\n' +
-                    shader.fragmentShader.replace('#include <emissivemap_fragment>',
+        }
+
+        mesh.material.onBeforeCompile = (shader) => {
+            shader.uniforms.uPlanetCenter = shaderUniforms.uPlanetCenter;
+            shader.uniforms.uRingNormal = shaderUniforms.uRingNormal;
+            shader.uniforms.uRingInner = shaderUniforms.uRingInner;
+            shader.uniforms.uRingOuter = shaderUniforms.uRingOuter;
+            shader.uniforms.uHasRingShadow = shaderUniforms.uHasRingShadow;
+            shader.uniforms.uTexelStep = shaderUniforms.uTexelStep;
+            shader.uniforms.uClarity = shaderUniforms.uClarity;
+            shader.uniforms.uTime = shaderUniforms.uTime;
+
+            shader.vertexShader =
+                'varying vec3 vWNorm;\nvarying vec3 vWPos;\nvarying vec3 vLocPos;\n' +
+                shader.vertexShader.replace(
+                    '#include <fog_vertex>',
+                    `#include <fog_vertex>
+                    vLocPos = position;
+                    vWPos = (modelMatrix * vec4(position, 1.0)).xyz;
+                    vWNorm = normalize(mat3(modelMatrix) * normal);`
+                );
+
+            shader.fragmentShader =
+                `uniform vec3 uPlanetCenter;
+                uniform vec3 uRingNormal;
+                uniform float uRingInner;
+                uniform float uRingOuter;
+                uniform float uHasRingShadow;
+                uniform vec2 uTexelStep;
+                uniform float uClarity;
+                uniform float uTime;
+                varying vec3 vWNorm;
+                varying vec3 vWPos;
+                varying vec3 vLocPos;\n` +
+                shader.fragmentShader
+                    .replace(
+                        '#include <map_fragment>',
+                        `#include <map_fragment>
+                        #ifdef USE_MAP
+                            vec3 cN = texture2D(map, vMapUv + vec2(0.0, uTexelStep.y)).rgb;
+                            vec3 cS = texture2D(map, vMapUv - vec2(0.0, uTexelStep.y)).rgb;
+                            vec3 cE = texture2D(map, vMapUv + vec2(uTexelStep.x, 0.0)).rgb;
+                            vec3 cW = texture2D(map, vMapUv - vec2(uTexelStep.x, 0.0)).rgb;
+                            vec3 blur4 = 0.25 * (cN + cS + cE + cW);
+                            diffuseColor.rgb = max(vec3(0.0), diffuseColor.rgb + (diffuseColor.rgb - blur4) * uClarity);
+                        #endif`
+                    )
+                    .replace(
+                        '#include <emissivemap_fragment>',
                         `#ifdef USE_EMISSIVEMAP
                             vec4 emissiveColor = texture2D( emissiveMap, vEmissiveMapUv );
                             float sunFacing = dot(normalize(vWNorm), normalize(-vWPos));
                             float nightSide = 1.0 - smoothstep(-0.22, 0.12, sunFacing);
-                            totalEmissiveRadiance *= emissiveColor.rgb * nightSide * 1.7;
-                        #endif`);
-            };
-        }
+                            totalEmissiveRadiance *= emissiveColor.rgb * nightSide * 1.75;
+                        #endif`
+                    );
+
+            let postCode = `
+                vec3 sunDirW = normalize(-vWPos);
+                vec3 viewDirW = normalize(cameraPosition - vWPos);
+                vec3 nW = normalize(vWNorm);
+                float ndl = dot(nW, sunDirW);
+                float ndv = max(dot(nW, viewDirW), 0.001);
+            `;
+
+            if (d.key === 'earth') {
+                postCode += `
+                    // Bathymetric ocean mask & dual-lobe Cox-Munk solar sunglint
+                    vec3 baseAlb = diffuseColor.rgb;
+                    float oceanMask = smoothstep(0.015, 0.09, baseAlb.b - max(baseAlb.r * 0.92, baseAlb.g * 0.85));
+                    vec3 H = normalize(sunDirW + viewDirW);
+                    float ndh = max(dot(nW, H), 0.0);
+                    float glint = (pow(ndh, 130.0) * 1.1 + pow(ndh, 22.0) * 0.2) * oceanMask * max(ndl, 0.0);
+                    gl_FragColor.rgb += vec3(1.0, 0.95, 0.84) * glint;
+                    // Golden sunset Rayleigh terminator band
+                    float twilight = smoothstep(-0.18, 0.04, ndl) * smoothstep(0.28, 0.0, ndl);
+                    gl_FragColor.rgb += vec3(0.95, 0.42, 0.14) * twilight * 0.26;
+                `;
+            } else if (d.key === 'mars') {
+                postCode += `
+                    // Lommel-Seeliger rocky backscatter + Martian pale-blue Rayleigh twilight
+                    float ls = max(ndl, 0.0) / max(max(ndl, 0.0) + ndv, 0.08);
+                    gl_FragColor.rgb = mix(gl_FragColor.rgb, diffuseColor.rgb * ls * 2.1, 0.34);
+                    float blueTw = smoothstep(-0.16, 0.05, ndl) * smoothstep(0.28, 0.0, ndl);
+                    float rimM = pow(1.0 - ndv, 2.6);
+                    gl_FragColor.rgb += vec3(0.38, 0.64, 0.96) * blueTw * (0.22 + 0.34 * rimM);
+                `;
+            } else if (isRocky) {
+                postCode += `
+                    float ls = max(ndl, 0.0) / max(max(ndl, 0.0) + ndv, 0.08);
+                    gl_FragColor.rgb = mix(gl_FragColor.rgb, diffuseColor.rgb * ls * 2.0, 0.32);
+                    ${d.key === 'mercury' ? `
+                        float naRim = pow(1.0 - ndv, 3.4) * max(ndl, 0.0);
+                        gl_FragColor.rgb += vec3(1.0, 0.72, 0.32) * naRim * 0.26;
+                    ` : ''}
+                `;
+            } else if (isGas) {
+                postCode += `
+                    float minnaert = pow(max(ndl, 0.0), 0.78) * pow(ndv, 0.18);
+                    gl_FragColor.rgb = mix(gl_FragColor.rgb, diffuseColor.rgb * minnaert * 1.38, 0.30);
+
+                    // Saturn real-time equatorial ring shadow cast onto the globe
+                    if (uHasRingShadow > 0.5 && ndl > -0.05) {
+                        vec3 relP = vWPos - uPlanetCenter;
+                        float denom = dot(sunDirW, uRingNormal);
+                        if (abs(denom) > 0.0005) {
+                            float tHit = -dot(relP, uRingNormal) / denom;
+                            if (tHit > 0.0) {
+                                vec3 hitPt = relP + sunDirW * tHit;
+                                float rDist = length(hitPt);
+                                if (rDist > uRingInner && rDist < uRingOuter) {
+                                    float uR = (rDist - uRingInner) / (uRingOuter - uRingInner);
+                                    float bRing = smoothstep(0.14, 0.24, uR) * (1.0 - smoothstep(0.61, 0.64, uR)) * 0.72;
+                                    float aRing = smoothstep(0.71, 0.74, uR) * (1.0 - smoothstep(0.95, 0.99, uR)) * 0.48;
+                                    float cRing = smoothstep(0.02, 0.14, uR) * (1.0 - smoothstep(0.14, 0.22, uR)) * 0.22;
+                                    float fineWave = 0.88 + 0.12 * sin(uR * 95.0);
+                                    float shadowStrength = clamp((bRing + aRing + cRing) * fineWave, 0.0, 0.76);
+                                    gl_FragColor.rgb *= (1.0 - shadowStrength * smoothstep(-0.05, 0.15, ndl));
+                                }
+                            }
+                        }
+                        // North Polar Hexagon jet-stream wave on Saturn
+                        vec3 nLoc = normalize(vLocPos);
+                        if (nLoc.y > 0.88) {
+                            float ang = atan(nLoc.z, nLoc.x) + uTime * 0.08;
+                            float hexR = length(nLoc.xz) + 0.012 * cos(ang * 6.0);
+                            float hexBand = smoothstep(0.32, 0.27, hexR) * smoothstep(0.16, 0.22, hexR);
+                            gl_FragColor.rgb = mix(gl_FragColor.rgb, gl_FragColor.rgb * vec3(0.84, 0.92, 1.06), hexBand * 0.35);
+                        }
+                    }
+                `;
+            }
+
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <dithering_fragment>',
+                `${postCode}\n#include <dithering_fragment>`
+            );
+        };
 
         let clouds = null;
         if (d.clouds) {
             clouds = new THREE.Mesh(
                 new THREE.SphereGeometry(d.radius * (d.cloudsOpaque ? 1.018 : 1.012), 48, 32),
                 d.cloudsOpaque
-                    // Venus: the cloud deck IS the planet's visible face
                     ? new THREE.MeshStandardMaterial({
                         color: 0xffffff, transparent: true, opacity: 0.94,
                         roughness: 1, depthWrite: false
@@ -739,8 +963,15 @@ export class SolarSystem {
                         blending: THREE.AdditiveBlending, depthWrite: false
                     })
             );
-            clouds.visible = false;               // shown once the map arrives
+            clouds.visible = false;
             spinner.add(clouds);
+        }
+
+        // Limb-grazing Polar Aurora Veil for Earth
+        let aurora = null;
+        if (d.key === 'earth') {
+            aurora = this._earthAurora(d.radius);
+            spinner.add(aurora);
         }
 
         if (d.atmo) {
@@ -753,10 +984,30 @@ export class SolarSystem {
 
         let ring = null;
         if (d.ring) {
-            ring = ringMesh(d.radius * 1.24, d.radius * 2.27, new THREE.MeshBasicMaterial({
+            const ringMat = new THREE.MeshBasicMaterial({
                 color: 0xfff6e2, side: THREE.DoubleSide,
                 transparent: true, opacity: 0.96, depthWrite: false
-            }));
+            });
+            // Cast Saturn's spherical umbra/penumbra shadow across the nightside of the rings
+            ringMat.onBeforeCompile = (shader) => {
+                shader.uniforms.uPlanetCenter = shaderUniforms.uPlanetCenter;
+                shader.uniforms.uPlanetRadius = { value: d.radius };
+                shader.vertexShader = 'varying vec3 vRingWPos;\n' +
+                    shader.vertexShader.replace('#include <fog_vertex>',
+                        `#include <fog_vertex>\nvRingWPos = (modelMatrix * vec4(position, 1.0)).xyz;`);
+                shader.fragmentShader = 'uniform vec3 uPlanetCenter;\nuniform float uPlanetRadius;\nvarying vec3 vRingWPos;\n' +
+                    shader.fragmentShader.replace('#include <dithering_fragment>',
+                        `vec3 sunDirR = normalize(-uPlanetCenter);
+                         vec3 relR = vRingWPos - uPlanetCenter;
+                         float along = dot(relR, -sunDirR);
+                         if (along > 0.0) {
+                             float perp = length(relR - (-sunDirR) * along);
+                             float umbra = smoothstep(uPlanetRadius * 0.92, uPlanetRadius * 1.06, perp);
+                             gl_FragColor.rgb *= mix(0.10, 1.0, umbra);
+                         }
+                         #include <dithering_fragment>`);
+            };
+            ring = ringMesh(d.radius * 1.24, d.radius * 2.27, ringMat);
             spinner.add(ring);
         } else if (d.ringThin) {
             const lines = d.key === 'uranus'
@@ -779,7 +1030,7 @@ export class SolarSystem {
                 );
                 mesh2.scale.setScalar(m.radius);
             } else {
-                const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.97 });
+                const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.94 });
                 if (m.kind) mat.map = moonTexture(m.kind);
                 else mat.color.set(m.color);
                 mesh2 = new THREE.Mesh(new THREE.SphereGeometry(m.radius, 36, 24), mat);
@@ -794,6 +1045,13 @@ export class SolarSystem {
                 );
                 haze.position.x = m.distance;
                 mp.add(haze);
+            }
+
+            // Active cryovolcanic (Enceladus / Triton) or volcanic (Io) geyser plumes
+            if (m.plume) {
+                const plumeObj = this._createMoonPlume(m.radius, m.plume);
+                mesh2.add(plumeObj.group);
+                this._plumes.push(plumeObj);
             }
 
             mp.rotation.x = (Math.random() - 0.5) * 0.35;
@@ -811,17 +1069,62 @@ export class SolarSystem {
             };
         });
 
-        // faint orbit trace (drawn in the inclined plane)
+        // Animated comet-wake orbit ribbon in the inclined plane
+        const angle = Math.random() * Math.PI * 2;
+        pivot.rotation.y = angle;
+
+        const segs = 256;
         const pts = [];
-        for (let i = 0; i <= 200; i++) {
-            const a = (i / 200) * Math.PI * 2;
+        const anglesAttr = new Float32Array(segs + 1);
+        for (let i = 0; i <= segs; i++) {
+            const a = (i / segs) * Math.PI * 2;
             pts.push(new THREE.Vector3(Math.cos(a) * d.distance, 0, Math.sin(a) * d.distance));
+            anglesAttr[i] = a;
         }
+        const orbitGeo = new THREE.BufferGeometry().setFromPoints(pts);
+        orbitGeo.setAttribute('aAngle', new THREE.BufferAttribute(anglesAttr, 1));
+        const orbitUniforms = {
+            uColor: { value: new THREE.Color(d.dwarf ? 0x6c5a8a : d.color).lerp(new THREE.Color(0x5a84b8), 0.45) },
+            uPlanetAngle: { value: angle },
+            uHighlight: { value: 0.0 },
+            uTime: { value: 0.0 },
+            uBaseOpacity: { value: d.dwarf ? 0.24 : 0.36 }
+        };
         const orbitLine = new THREE.Line(
-            new THREE.BufferGeometry().setFromPoints(pts),
-            new THREE.LineBasicMaterial({
-                color: d.dwarf ? 0x574f6b : 0x3d5680,
-                transparent: true, opacity: d.dwarf ? 0.22 : 0.32
+            orbitGeo,
+            new THREE.ShaderMaterial({
+                uniforms: orbitUniforms,
+                vertexShader: /* glsl */`
+                    attribute float aAngle;
+                    varying float vAngle;
+                    void main() {
+                        vAngle = aAngle;
+                        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                    }
+                `,
+                fragmentShader: /* glsl */`
+                    uniform vec3 uColor;
+                    uniform float uPlanetAngle;
+                    uniform float uHighlight;
+                    uniform float uTime;
+                    uniform float uBaseOpacity;
+                    varying float vAngle;
+                    void main() {
+                        float twoPi = 6.2831853;
+                        // pivot.rotation.y = orbitAngle moves the planet to (cos(orbitAngle), 0, -sin(orbitAngle))
+                        float pAng = mod(-uPlanetAngle + twoPi * 4.0, twoPi);
+                        float delta = mod(pAng - vAngle + twoPi * 4.0, twoPi);
+                        float wake = exp(-delta * 1.45);
+                        float head = smoothstep(0.16, 0.0, delta);
+                        float pulse = 0.5 + 0.5 * sin(vAngle * 6.0 - uTime * 4.2);
+                        vec3 col = mix(uColor, vec3(0.45, 0.98, 0.88), uHighlight * (0.45 + 0.35 * pulse) + head * 0.42);
+                        float alpha = clamp(uBaseOpacity * (0.42 + 1.15 * wake) + head * 0.32 + uHighlight * 0.45, 0.08, 0.92);
+                        gl_FragColor = vec4(col, alpha);
+                    }
+                `,
+                transparent: true,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending
             })
         );
         inclined.add(orbitLine);
@@ -832,11 +1135,144 @@ export class SolarSystem {
         holder.add(label);
         this.labels.push({ sprite: label, data: d, holder });
 
-        const angle = Math.random() * Math.PI * 2;
-        pivot.rotation.y = angle;
         this.bodies.set(d.key, {
-            data: d, pivot, holder, spinner, mesh, clouds, ring, moons, orbitLine, label, orbitAngle: angle
+            data: d, inclined, pivot, holder, spinner, mesh, clouds, aurora, ring, moons,
+            orbitLine, orbitUniforms, shaderUniforms, label, orbitAngle: angle, is4K: false
         });
+    }
+
+    _earthAurora(radius) {
+        const uniforms = { uTime: { value: 0 } };
+        this._auroraUniforms = uniforms;
+        const mat = new THREE.ShaderMaterial({
+            uniforms,
+            vertexShader: /* glsl */`
+                varying vec3 vLocalDir;
+                varying vec3 vNormalW;
+                varying vec3 vViewDirW;
+                varying vec3 vWorldPos;
+                void main() {
+                    vLocalDir = normalize(position);
+                    vec4 wp = modelMatrix * vec4(position, 1.0);
+                    vWorldPos = wp.xyz;
+                    vNormalW = normalize(mat3(modelMatrix) * normal);
+                    vViewDirW = normalize(cameraPosition - wp.xyz);
+                    gl_Position = projectionMatrix * viewMatrix * wp;
+                }
+            `,
+            fragmentShader: /* glsl */`
+                uniform float uTime;
+                varying vec3 vLocalDir;
+                varying vec3 vNormalW;
+                varying vec3 vViewDirW;
+                varying vec3 vWorldPos;
+                void main() {
+                    float absLat = abs(vLocalDir.y);
+                    float oval = smoothstep(0.87, 0.92, absLat) * (1.0 - smoothstep(0.96, 0.99, absLat));
+                    if (oval < 0.005) discard;
+                    float ndv = abs(dot(vNormalW, vViewDirW));
+                    float limbMask = pow(1.0 - ndv, 1.65);
+                    vec3 sunDir = normalize(-vWorldPos);
+                    float nightBias = smoothstep(0.42, -0.25, dot(vNormalW, sunDir));
+                    float lon = atan(vLocalDir.z, vLocalDir.x);
+                    float curtain = (sin(lon * 9.0 + uTime * 1.3) * 0.5 + 0.5) * (sin(lon * 21.0 - uTime * 2.1) * 0.5 + 0.5);
+                    vec3 col = mix(vec3(0.12, 0.98, 0.52), vec3(0.68, 0.22, 0.95), smoothstep(0.91, 0.96, absLat));
+                    float alpha = oval * curtain * (0.22 + 0.78 * limbMask) * (0.30 + 0.70 * nightBias) * 0.72;
+                    gl_FragColor = vec4(col * alpha, alpha);
+                }
+            `,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide
+        });
+        return new THREE.Mesh(new THREE.SphereGeometry(radius * 1.03, 56, 40), mat);
+    }
+
+    _createMoonPlume(moonRadius, kind) {
+        const group = new THREE.Group();
+        const isCryo = kind === 'cryo';
+        if (isCryo) {
+            group.position.set(0, -moonRadius * 0.95, 0);
+            group.rotation.x = Math.PI;
+        } else {
+            group.position.set(moonRadius * 0.68, moonRadius * 0.65, 0);
+            group.rotation.z = -0.82;
+        }
+        const uniforms = {
+            uTime: { value: Math.random() * 10 },
+            uColor: { value: new THREE.Color(isCryo ? 0x9be8ff : 0xff9d3b) }
+        };
+        const coneGeo = new THREE.ConeGeometry(moonRadius * (isCryo ? 0.58 : 0.72), moonRadius * (isCryo ? 1.8 : 1.3), 20, 1, true);
+        coneGeo.translate(0, moonRadius * (isCryo ? 0.9 : 0.65), 0);
+        const coneMat = new THREE.ShaderMaterial({
+            uniforms,
+            vertexShader: /* glsl */`
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: /* glsl */`
+                uniform float uTime;
+                uniform vec3 uColor;
+                varying vec2 vUv;
+                void main() {
+                    float jet = sin(vUv.x * 37.699 + uTime * 3.0) * 0.25 + 0.75;
+                    float stream = fract(vUv.y * 2.5 - uTime * 1.4);
+                    float pulse = smoothstep(0.0, 0.3, stream) * (1.0 - smoothstep(0.6, 1.0, stream));
+                    float env = smoothstep(0.0, 0.15, vUv.y) * pow(1.0 - vUv.y, 1.6);
+                    float alpha = env * jet * (0.55 + 0.45 * pulse) * 0.68;
+                    gl_FragColor = vec4(uColor * (1.1 + 0.4 * (1.0 - vUv.y)), alpha);
+                }
+            `,
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            side: THREE.DoubleSide
+        });
+        const jetMesh = new THREE.Mesh(coneGeo, coneMat);
+        group.add(jetMesh);
+        if (isCryo) {
+            const jet2 = jetMesh.clone();
+            jet2.rotation.z = 0.24;
+            jet2.scale.set(0.75, 0.85, 0.75);
+            group.add(jet2);
+        } else {
+            const caldera = new THREE.Mesh(
+                new THREE.SphereGeometry(moonRadius * 0.15, 10, 10),
+                new THREE.MeshBasicMaterial({ color: 0xff5500, blending: THREE.AdditiveBlending })
+            );
+            group.add(caldera);
+        }
+        return { group, uniforms };
+    }
+
+    /** Stream full 4096x2048 texture on demand when a planet is inspected up close */
+    upgradeTo4K(key) {
+        if (!key || this.quality === 'low') return;
+        const planetKey = key.includes('/') ? key.split('/')[0] : key;
+        const b = this.bodies.get(planetKey);
+        if (!b || b.is4K || !b.data || !b.data.tex) return;
+        b.is4K = true;
+        loadTexture(b.data.tex, 4096).then(t => {
+            if (!b.mesh || !b.mesh.material) return;
+            b.mesh.material.map = t;
+            if (b.data.bump) b.mesh.material.bumpMap = t;
+            if (b.shaderUniforms) b.shaderUniforms.uTexelStep.value.set(1 / 4096, 1 / 2048);
+            b.mesh.material.needsUpdate = true;
+        }).catch(() => {});
+    }
+
+    setHighlightedOrbit(key) {
+        const planetKey = key && key.includes('/') ? key.split('/')[0] : key;
+        this._highlightedKey = planetKey || null;
+        for (const [k, b] of this.bodies) {
+            if (b.orbitUniforms) {
+                b.orbitUniforms.uHighlight.value = (k === planetKey) ? 1.0 : 0.0;
+            }
+        }
     }
 
     _belt({ count, rMin, rMax, ySpread, colors, sMin, sMax, spinBase }) {
@@ -902,7 +1338,7 @@ export class SolarSystem {
         this.dustSeeds = [];
         for (let i = 0; i < N; i++) {
             this.dustSeeds.push({
-                d: Math.pow(Math.random(), 1.4),                 // crowd near the head
+                d: Math.pow(Math.random(), 1.4),
                 lat: (Math.random() - 0.5) * 2,
                 lift: (Math.random() - 0.5) * 2,
                 tw: Math.random() * Math.PI * 2
@@ -973,7 +1409,7 @@ export class SolarSystem {
             jobs.push(loadTexture(d.tex, planetRes).then(t => {
                 b.mesh.material.map = t;
                 b.mesh.material.color.set(0xffffff);
-                if (d.bump) {   // luminance-as-height: cheap relief for rocky worlds
+                if (d.bump) {
                     b.mesh.material.bumpMap = t;
                     b.mesh.material.bumpScale = d.bump;
                 }
@@ -1032,6 +1468,9 @@ export class SolarSystem {
         this.elapsed += dt;
         const rate = this.orbitRate;
         if (this.sunMat) this.sunMat.uniforms.uTime.value = this.elapsed;
+        if (this._starUniforms) this._starUniforms.uTime.value = this.elapsed;
+        if (this._auroraUniforms) this._auroraUniforms.uTime.value = this.elapsed;
+        this._plumes.forEach(p => { p.uniforms.uTime.value += dt; });
         if (camPos) this._camPos.copy(camPos);
 
         // the additive flare washes the whole frame to cream when you get
@@ -1040,32 +1479,44 @@ export class SolarSystem {
             this.sunFlare.material.opacity = THREE.MathUtils.smoothstep(camPos.length(), 55, 170);
         }
 
-        for (const [key, b] of this.bodies) {
+        for (const [, b] of this.bodies) {
             const d = b.data;
             if (b.spinner) b.spinner.rotation.y += d.spin * dt * 60;
             else if (b.mesh) b.mesh.rotation.y += d.spin * dt * 60;
             if (b.clouds) b.clouds.rotation.y += d.spin * 0.35 * dt * 60;
+            if (b.aurora) b.aurora.rotation.y -= d.spin * 0.22 * dt * 60;
             if (b.pivot && d.orbit) {
                 b.orbitAngle += d.orbit * rate * dt;
                 b.pivot.rotation.y = b.orbitAngle;
             }
+            if (b.orbitUniforms) {
+                b.orbitUniforms.uPlanetAngle.value = b.orbitAngle;
+                b.orbitUniforms.uTime.value = this.elapsed;
+            }
+            if (b.shaderUniforms && b.holder) {
+                b.holder.getWorldPosition(b.shaderUniforms.uPlanetCenter.value);
+                b.shaderUniforms.uTime.value = this.elapsed;
+                if (d.key === 'saturn' && b.spinner) {
+                    // Transform local +Y (ring plane normal) into world space
+                    _ringN.set(0, 1, 0).transformDirection(b.spinner.matrixWorld);
+                    b.shaderUniforms.uRingNormal.value.copy(_ringN);
+                }
+            }
             if (b.moons) {
-                // moons follow orbitRate too — during the ride they near-freeze,
-                // so the pose set in poseForRide stays true to the track
                 b.moons.forEach(m => {
-                    // 0.07 keeps moons visibly orbiting yet slow enough that a
-                    // 2-second fly-to tween can still land on one
                     m.angle += m.dir * m.data.speed * rate * dt * 60 * 0.07;
                     m.pivot.rotation.y = m.angle;
                     m.mesh.rotation.y += 0.004 * dt * 60;
                 });
             }
-            // labels keep a readable on-screen size at any distance
-            if (b.label) {
-                if (b.label.visible) {
-                    b.holder.getWorldPosition(_lblPos);
-                    const dist = _lblPos.distanceTo(this._camPos);
-                    // constant angular size: readable far away, unobtrusive close up
+            // labels keep a readable on-screen size at any distance + auto-upgrade to 4K when close
+            if (b.holder) {
+                b.holder.getWorldPosition(_lblPos);
+                const dist = _lblPos.distanceTo(this._camPos);
+                if (!b.is4K && dist < d.radius * 8.5) {
+                    this.upgradeTo4K(d.key);
+                }
+                if (b.label && b.label.visible) {
                     const w = Math.min(46, Math.max(3, dist * 0.085));
                     b.label.scale.set(w, w * 0.25, 1);
                     b.label.material.opacity = dist < d.radius * 3.2 ? 0 : 0.9;
@@ -1094,7 +1545,6 @@ export class SolarSystem {
             c.angle += 0.035 * dt * rate;
             const r = 330;
             c.group.position.set(Math.cos(c.angle) * r, 55 + Math.sin(c.angle * 1.7) * 25, Math.sin(c.angle) * r * 0.75);
-            // both tails point away from the Sun
             const away = c.group.position.clone().normalize();
             c.tail.position.copy(away.clone().multiplyScalar(45));
             const side = new THREE.Vector3(-away.z, 0, away.x);
@@ -1103,7 +1553,7 @@ export class SolarSystem {
                 const s = this.dustSeeds[i];
                 const len = s.d * 78;
                 const spread = s.d * 9;
-                const curve = s.d * s.d * 14;           // dust lags behind the orbit
+                const curve = s.d * s.d * 14;
                 _dustV.copy(away).multiplyScalar(6 + len)
                     .addScaledVector(side, s.lat * spread - curve)
                     .addScaledVector(up, s.lift * spread * 0.6)
@@ -1157,8 +1607,6 @@ export class SolarSystem {
         const phase = {
             mercury: 2.6, venus: 1.1, earth: 0.0, mars: 5.3,
             jupiter: 0.62, saturn: 2.05, uranus: 3.6, neptune: 4.35,
-            // dwarfs parked away from the track: Ceres opposite the belt
-            // gauntlet, the Kuiper trio far beyond every waypoint anyway
             ceres: 2.16, pluto: 1.0, makemake: 3.1, eris: 5.0
         };
         for (const [k, a] of Object.entries(phase)) {
@@ -1167,10 +1615,6 @@ export class SolarSystem {
             b.orbitAngle = a;
             b.pivot.rotation.y = a;
         }
-        // park every moon on its planet's anti-Sun side: the flyby corridors
-        // all pass on the Sun side, and with orbitRate near-frozen during the
-        // ride the moons stay parked there. Earth's Moon gets its own angle —
-        // the ignition segment climbs out right through the anti-Sun corridor.
         const parkOffset = { earth: 2.4 };
         for (const [, b] of this.bodies) {
             (b.moons || []).forEach((m, i, arr) => {
@@ -1185,13 +1629,6 @@ export class SolarSystem {
         for (const [, b] of this.bodies) if (b.orbitLine) b.orbitLine.visible = v;
     }
 
-    /**
-     * Every key a player can point at and scan, planets and moons alike.
-     *
-     * Exists so a mission can ask "what is there to find?" without reaching into
-     * the scene graph. Filtered to bodies that actually carry a fact, because a
-     * hunt clue is the fact — a target without one has nothing to ask about.
-     */
     scannableKeys() {
         const keys = [];
         for (const [key, b] of this.bodies) {
@@ -1210,3 +1647,4 @@ export class SolarSystem {
 
 const _lblPos = new THREE.Vector3();
 const _dustV = new THREE.Vector3();
+const _ringN = new THREE.Vector3();
