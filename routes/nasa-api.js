@@ -12,6 +12,7 @@ const { getCelesTrakCounts } = require('./celestrak');
 // NASA API configuration
 const NASA_API_BASE_URL = 'https://api.nasa.gov';
 const NASA_API_KEY = process.env.NASA_API_KEY;
+const NASA_REQUEST_TIMEOUT_MS = 5000;
 
 /**
  * Get satellite positions from NASA API
@@ -27,6 +28,7 @@ async function getSatellitePosition(satId) {
         // For demonstration purposes, we'll use a mock response since the actual API
         // for satellite tracking might require different endpoints or authentication
         const response = await axios.get(`${NASA_API_BASE_URL}/satellites/${satId}`, {
+            signal: AbortSignal.timeout(NASA_REQUEST_TIMEOUT_MS),
             params: {
                 api_key: NASA_API_KEY
             }
@@ -52,6 +54,7 @@ async function getSpaceWeatherData() {
         // NASA Space Weather API endpoint
         // First try with last 7 days
         let response = await axios.get(`${NASA_API_BASE_URL}/DONKI/GST`, {
+            signal: AbortSignal.timeout(NASA_REQUEST_TIMEOUT_MS),
             params: {
                 api_key: NASA_API_KEY,
                 startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 7 days
@@ -62,6 +65,7 @@ async function getSpaceWeatherData() {
         // If no recent data, try with last 30 days
         if (Array.isArray(response.data) && response.data.length === 0) {
             response = await axios.get(`${NASA_API_BASE_URL}/DONKI/GST`, {
+                signal: AbortSignal.timeout(NASA_REQUEST_TIMEOUT_MS),
                 params: {
                     api_key: NASA_API_KEY,
                     startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // Last 30 days
@@ -96,6 +100,7 @@ async function getAsteroidData() {
 
         // NASA Asteroid API endpoint
         const response = await axios.get(`${NASA_API_BASE_URL}/neo/rest/v1/feed`, {
+            signal: AbortSignal.timeout(NASA_REQUEST_TIMEOUT_MS),
             params: {
                 api_key: NASA_API_KEY,
                 start_date: new Date().toISOString().split('T')[0],

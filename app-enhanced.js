@@ -433,7 +433,6 @@ async function initializeDatabase() {
         if (typeof insertEnhancedPlanetData === 'function') {
             try {
                 await insertEnhancedPlanetData();
-                console.log('Enhanced planet data insert completed');
             } catch (err) {
                 if (err.code !== 11000) {
                     console.error('Failed to insert enhanced planet data:', err);
@@ -1151,8 +1150,6 @@ Format:
 
 // Enhanced Planet Data with Quiz Questions
 const insertEnhancedPlanetData = async () => {
-    await Planet.deleteMany({});
-
     const enhancedPlanets = [
         {
             key: "sun",
@@ -1587,8 +1584,15 @@ const insertEnhancedPlanetData = async () => {
         }
     ];
 
-    await Planet.insertMany(enhancedPlanets);
-    console.log('Enhanced planet data with textures and markers inserted!');
+    // Seed missing worlds without clearing or replacing existing records on boot.
+    const result = await Planet.bulkWrite(enhancedPlanets.map(planet => ({
+        updateOne: {
+            filter: { key: planet.key },
+            update: { $setOnInsert: planet },
+            upsert: true
+        }
+    })), { ordered: false });
+    if (result.upsertedCount > 0) console.log(`Seeded ${result.upsertedCount} missing planets.`);
 };
 
 // Enhanced planet data insertion is performed only after a successful DB connection

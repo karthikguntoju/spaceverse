@@ -278,8 +278,12 @@ class VRApp {
     }
 
     applyLook() {
-        const pitch = this.gyroActive ? 0 : this.pitch;
+        const pitch = this.gyroActive || this.stereoFlightLook ? 0 : this.pitch;
         this.dolly.quaternion.setFromEuler(new THREE.Euler(pitch, this.yaw, 0, 'YXZ'));
+    }
+
+    get stereoFlightLook() {
+        return this.stereo && (this.mode === 'explore' || this.mode === 'mission');
     }
 
     get gyroActive() {
@@ -338,6 +342,7 @@ class VRApp {
     recenterView() {
         if (this.mode === 'dodge') this.dodge.run.pause();
         if (this.gyroActive) this.gyro.recenter();
+        else if (this.stereoFlightLook) this.pitch = 0;
         this.lookYaw = 0; this.lookPitch = 0;
         this.updateHead(0);
         if (this.gazeControls) {
@@ -354,6 +359,7 @@ class VRApp {
         this.audio.init();
         const gyroRequest = this.enableGyro(true);
         this.stereo = true;
+        if (this.stereoFlightLook) this.applyLook();
         if (this.mode === 'dodge') this.dodge.run.pause();
         this.screenAwake.start();
         document.body.classList.add('in-cardboard');
@@ -398,7 +404,12 @@ class VRApp {
 
     exitPhoneVR() {
         if (!this.stereo) return;
+        const wasStereoFlight = this.stereoFlightLook;
         this.stereo = false;
+        if (wasStereoFlight) {
+            this.applyLook();
+            this.updateHead(0);
+        }
         this.screenAwake.stop();
         if (this.mode === 'dodge') this.dodge.run.pause();
         this.autoFly = false;
@@ -622,8 +633,14 @@ class VRApp {
             this.gyro.apply(this.camera.quaternion, 0);
             return;
         }
+        if (this.stereoFlightLook) {
+            // Keep the gaze menu on the level cabin while drag tilts the view.
+            this.camera.rotation.set(this.pitch, 0, 0, 'YXZ');
+            return;
+        }
         if (this.mode === 'ride' || this.mode === 'dodge' || this.exploreCockpitOn) {
-            if (!this.dragging && this.mode !== 'dodge') {
+            // A split-screen player must be able to hold aim after releasing a drag.
+            if (!this.dragging && !this.stereo && this.mode !== 'dodge') {
                 this.lookYaw += (0 - this.lookYaw) * Math.min(1, dt * 0.35);
                 this.lookPitch += (0 - this.lookPitch) * Math.min(1, dt * 0.35);
             }
@@ -1797,7 +1814,7 @@ class VRApp {
             const normTarget = clamp((this.flySpeed * boost) / 160, 0.18, 1);
             this._freeSpeedNorm += (normTarget - this._freeSpeedNorm) * Math.min(1, dt * 4);
             v.normalize().multiplyScalar(this.flySpeed * boost * dt);
-            const q = (this.renderer.xr.isPresenting || this.gyroActive)
+            const q = (this.renderer.xr.isPresenting || this.gyroActive || this.stereoFlightLook)
                 ? this.camera.getWorldQuaternion(new THREE.Quaternion())
                 : this.dolly.quaternion;
             v.applyQuaternion(q);

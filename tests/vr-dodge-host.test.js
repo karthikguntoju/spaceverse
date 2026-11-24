@@ -1,16 +1,17 @@
 // Exercise real VRApp mode handlers without creating WebGL or a browser session.
-let VRApp, THREE, DodgeGame, DwellSelector, nodes, core, location;
+let VRApp, THREE, DodgeGame, GazeControls, DwellSelector, nodes, core, location, doc;
 beforeAll(async () => {
     THREE = await import('three');
     ({ DodgeGame } = await import('../public/js/vr/dodge-game.js'));
-    ({ DwellSelector } = await import('../public/js/vr/gaze-controls.js'));
+    ({ DwellSelector, GazeControls } = await import('../public/js/vr/gaze-controls.js'));
+    const { setPhoneUILayer, PHONE_UI_LAYER } = await import('../public/js/vr/phone-stereo.js');
     const { readFileSync } = await import('node:fs');
     const { runInNewContext } = await import('node:vm');
     let source = readFileSync('public/js/vr/main.js', 'utf8');
     expect(source).toContain('const app = new VRApp();');
     source = source.split('const app = new VRApp();')[0].replace(/^import .*;\r?$/gm, '');
     core = { snapshot: () => ({ running: false }) };
-    const doc = { getElementById: id => {
+    doc = { getElementById: id => {
         if (!nodes.has(id)) {
             const classes = new Set();
             nodes.set(id, { textContent: '', checked: true,
@@ -24,7 +25,7 @@ beforeAll(async () => {
     location = { pathname: '/games/asteroid-dodge', search: '' };
     VRApp = runInNewContext(`${source}\nVRApp`, { THREE, MissionCore: core, document: doc, console,
         location, GyroLook: class {}, ScreenAwake: class {}, DwellSelector,
-        setPhoneUILayer: () => {}, PHONE_UI_LAYER: 3,
+        setPhoneUILayer, PHONE_UI_LAYER,
         navigator: { userAgent: '', maxTouchPoints: 0 } });
 });
 
@@ -37,10 +38,11 @@ function host() {
         mode: 'menu', entry: 'dodge', gyroOn: false, stereo: true, baseFov: 62, isTouch: true,
         scene, dolly, camera, dodge: new DodgeGame(scene), gaze: new DwellSelector(),
         gazeControls: { group: new THREE.Group(), anchor: vi.fn() },
-        renderer: { xr: { isPresenting: false } }, vrHud: { visible: false },
+        renderer: { xr: { isPresenting: false } }, vrHud: new THREE.Group(),
         audio: { init: vi.fn(), setEngine: vi.fn(), setPad: vi.fn(), blip: vi.fn() },
         ride: { stop: vi.fn(), playing: false }, cockpit: { setVisible: vi.fn() },
-        system: { root: new THREE.Group(), setOrbitLinesVisible: vi.fn(), setLabelsVisible: vi.fn() },
+        system: { root: new THREE.Group(), setOrbitLinesVisible: vi.fn(), setLabelsVisible: vi.fn(),
+            setHighlightedOrbit: vi.fn(), pickTargets: [] },
         clearWarning: vi.fn(), updateHead: vi.fn(), updatePhoneButtons: vi.fn(), updateHudDom: vi.fn(),
         toast: vi.fn(), setHud: vi.fn(), placeAtEarth: vi.fn()
     });
@@ -99,7 +101,9 @@ describe('Dodge mode wiring', () => {
     });
     it('does not offer or start Dodge from the solar-system entry', () => {
         const app = host(); app.entry = 'explore'; app.mode = 'explore'; app.gazeMenuOpen = true; app.gazeOptionsOpen = true;
-        expect(app.gazeOptions().map(o => o.action)).toEqual(['back', 'scan-hunt', 'exit']);
+        expect(app.gazeOptions().map(o => o.action)).toEqual([
+            'back', 'next-world', 'low-orbit', 'toggle-cockpit', 'scan-hunt', 'exit'
+        ]);
         app.startDodge();
         expect(app.mode).toBe('explore');
     });
@@ -132,8 +136,10 @@ describe('Dodge mode wiring', () => {
         expect(app.dodge.run.state).toBe('paused');
     });
     it.each([
-        ['explore', ['explore', 'scan-hunt']], ['ride', ['ride']], ['dodge', ['dodge']]
-    ])('keeps the %s headset picker scoped to its own experience', (entry, actions) => {
+        ['explore', ['explore', 'scan-hunt', 'next-world', 'toggle-cockpit']],
+        ['ride', ['ride', 'explore']],
+        ['dodge', ['dodge']]
+    ])('offers the matching headset controls for the %s entry', (entry, actions) => {
         const app = host(); app.entry = entry; app.buildVRMenu();
         expect(app.vrMenuItems.map(item => item.userData.action)).toEqual(actions);
     });
@@ -144,5 +150,32 @@ describe('Dodge mode wiring', () => {
     ])('resolves the correct experience for %s %s', (pathname, search, entry) => {
         location.pathname = pathname; location.search = search;
         expect(new VRApp().entry).toBe(entry);
+    });
+});
+
+describe('split-screen menu without a motion sensor', () => {
+    beforeEach(() => vi.stubGlobal('document', doc));
+    afterEach(() => vi.unstubAllGlobals());
+
+    it.each(['explore', 'mission', 'ride'])('opens after a downward drag in %s mode', mode => {
+        const app = host();
+        Object.assign(app, {
+            entry: mode === 'ride' ? 'ride' : 'explore', mode,
+            yaw: 0.6, pitch: 0, lookYaw: 0, lookPitch: 0,
+            ride: { pause: vi.fn() },
+            gazeControls: new GazeControls(app.dolly),
+            reticle: new THREE.Group(),
+            reticleFill: { geometry: new THREE.BufferGeometry() },
+            pointer: new THREE.Vector2(), raycaster: new THREE.Raycaster()
+        });
+        delete app.updateHead;
+        // The head stops moving as soon as the user releases their drag.
+        app.lookDelta(0, 55 * Math.PI / 180);
+        for (let frame = 0; frame < 90; frame++) {
+            app.updateHead(1 / 60);
+            app.scene.updateMatrixWorld(true);
+            app.gazeUpdate(1 / 60);
+        }
+        expect(app.gazeMenuOpen).toBe(true);
     });
 });

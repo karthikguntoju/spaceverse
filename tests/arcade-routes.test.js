@@ -65,7 +65,7 @@ describe('/games/:slug', () => {
         const cookie = await login();
         for (const url of ['/games/asteroid-dodge', '/games/asteroid-dodge/']) {
             const res = await request(app).get(url).set('Cookie', cookie).expect(200);
-            expect(res.text).toContain('/public/js/vr/main.js?v=20261015-4');
+            expect(res.text).toMatch(/<script type="module" src="\/public\/js\/vr\/main\.js(?:\?v=[^"]+)?"><\/script>/);
             expect(res.text).toContain('only-dodge');
         }
     });
