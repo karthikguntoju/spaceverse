@@ -480,8 +480,9 @@
             </div>
 
             <div class="btn-row">
-                <button id="enter-vr" class="chip">🥽 Checking for headset…</button>
-                <span id="vr-ready">Headset detected — enter VR first, then start.</span>
+                <button id="enter-vr" class="chip" disabled>🥽 Checking for headset…</button>
+                <a href="/quest-guide" class="chip ghost">Meta Quest guide</a>
+                <span id="vr-ready">Enter headset VR, then point and pull the trigger to choose an experience.</span>
             </div>
             <div id="phone-row">
                 <button id="btn-gyro" class="chip">🧭 Gyro look</button>
@@ -627,7 +628,7 @@
         }
     }
     </script>
-    <script type="module" src="/public/js/vr/main.js?v=20261123-1"></script>
+    <script type="module" src="/public/js/vr/main.js?v=20261124-1"></script>
     <script src="/public/js/chat-widget.js" defer></script>
 </body>
 </html>

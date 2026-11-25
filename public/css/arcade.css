@@ -264,6 +264,11 @@ body.arcade.a-overlay-open .a-hud { opacity: 0; }
 
 .a-row { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 
+.a-xr-entry { margin-top: 14px; display: grid; justify-items: center; gap: 6px; }
+.a-xr-entry button:disabled { opacity: 0.6; cursor: default; }
+.a-xr-status { color: var(--muted, #a9b7cd); }
+.a-xr-status:empty { display: none; }
+
 .a-final {
     font-family: 'Space Grotesk', 'Inter', system-ui, sans-serif;
     font-size: clamp(24px, 5vw, 38px); font-weight: 600;

@@ -179,3 +179,41 @@ describe('split-screen menu without a motion sensor', () => {
         expect(app.gazeMenuOpen).toBe(true);
     });
 });
+
+describe('immersive headset controls', () => {
+    it('pauses a running ride when opening its menu and ignores missed selections', () => {
+        const app = host();
+        Object.assign(app, {
+            mode: 'ride', entry: 'ride', stereo: false,
+            xrHead: new THREE.Object3D(), raycaster: new THREE.Raycaster(),
+            ride: { playing: true, time: 2, total: 90, pause: vi.fn(), resume: vi.fn(), skipSegment: vi.fn() }
+        });
+        app.renderer.xr.isPresenting = true;
+        app.xrHead.position.set(0.2, 0.1, -0.1);
+        app.buildVRMenu();
+        app.toggleVRMenu();
+        expect(app.ride.pause).toHaveBeenCalledOnce();
+        expect(app.vrMenu.position.toArray()).toEqual([0.2, 0.1, -1.85]);
+        app.onControllerSelect(new THREE.Group().translateX(20));
+        expect(app.ride.skipSegment).not.toHaveBeenCalled();
+        expect(app.vrMenu.visible).toBe(true);
+        const resume = app.vrMenuItems.find(item => item.userData.action === 'ride-resume');
+        const controller = new THREE.PerspectiveCamera();
+        controller.lookAt(resume.getWorldPosition(new THREE.Vector3()));
+        app.onControllerSelect(controller);
+        expect(app.ride.resume).toHaveBeenCalledOnce();
+        expect(app.vrMenu.visible).toBe(false);
+    });
+
+    it('centers Dodge steering on the initial headset heading, including across 180 degrees', () => {
+        const app = host();
+        const quaternion = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -3.13, 0, 'YXZ'));
+        app.dodge.start(app.dolly, quaternion);
+        const steer = vi.spyOn(app.dodge.run, 'update');
+        app.dodge.update(0.016, { quaternion }, app.dolly);
+        expect(steer.mock.calls[0][1]).toBeCloseTo(0);
+        quaternion.setFromEuler(new THREE.Euler(0, 3.13, 0, 'YXZ'));
+        app.dodge.update(0.016, { quaternion }, app.dolly);
+        expect(Math.abs(steer.mock.calls[1][1])).toBeLessThan(0.1);
+    });
+});

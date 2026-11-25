@@ -30,6 +30,15 @@ async function login() {
 }
 
 describe('the arcade hub', () => {
+    it('offers a public Quest setup guide with links to each headset experience', async () => {
+        const guide = await request(app).get('/quest-guide').expect(200);
+        expect(guide.text).toContain('SpaceVerse on Meta Quest');
+        for (const path of ['/vr-solar-system', '/vr-ride', '/games/asteroid-dodge', '/games']) {
+            expect(guide.text).toContain(`href="${path}"`);
+        }
+        await request(app).get('/public/css/quest-guide.css').expect(200);
+    });
+
     it('needs a signed-in pilot', async () => {
         const res = await request(app).get('/games');
         expect(res.status).toBeGreaterThanOrEqual(300);
@@ -51,7 +60,10 @@ describe('the arcade hub', () => {
         // Every card on the hub must resolve; a dead card is a dead end for the
         // player and the hub is the only way most people will find these.
         for (const slug of linked) {
-            await request(app).get(`/games/${slug}`).set('Cookie', cookie).expect(200);
+            const page = await request(app).get(`/games/${slug}`).set('Cookie', cookie).expect(200);
+            if (slug !== 'asteroid-dodge') {
+                expect(page.text).toMatch(/\/public\/js\/arcade\/shell\.js(?:\?v=[^"]+)?"/);
+            }
         }
     });
 });

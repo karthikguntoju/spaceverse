@@ -53,6 +53,20 @@ Open **http://localhost:5000**. In demo mode any callsign / access code signs yo
 
 ## VR controls
 
+### Meta Quest and other WebXR headsets
+
+Open SpaceVerse using trusted HTTPS in the headset browser. The in-app [Meta Quest
+guide](views/quest-guide.html) is served at `/quest-guide`. Quest mode is offered
+when the browser supports an immersive WebXR session. A laptop's HTTP localhost
+address cannot be opened from the headset.
+
+- **Solar System / Scan Hunt:** Enter headset VR, then point and pull the trigger to choose. The left stick moves, the right stick snap-turns or changes height, and the trigger scans. Squeeze the side grip for auto-flight, low orbit, cockpit controls and exit.
+- **Deep Space Ride:** Enter headset VR and select the ride. Squeeze the side grip to pause and access Resume, Skip, Restart and Comfort mode. Pull the trigger during a hazard to fire the turret. Turn off jumpscares before entering if preferred.
+- **Arcade:** Asteroid Dodge is an immersive, head-steered course. The other eleven games share a virtual screen with trigger aiming and dragging, left-stick movement, A for the main keyboard action, and game-specific shortcuts shown at the bottom. Scores still save in the same browser profile.
+- Touch controllers provide the full controls. Runtimes that supply hand-tracked selection also accept pointing and pinching for trigger actions.
+
+### Desktop and phone controls
+
 - **Laptop:** Open `/vr-solar-system`, start free flight, drag the mouse to look, use W/A/S/D to fly, and click a planet to scan it. The same mouse look works in `/vr-ride`.
 - **Phone without a viewer:** Open the site over HTTPS, tap **Gyro look**, then start free flight. Turn the phone to look, use **Fly forward / Stop flying** to move, and tap a planet to scan it. You can switch to **Split-screen VR** without restarting free flight or scan hunt.
 - **Phone in a Cardboard-style viewer:** Tap **Phone VR**, rotate to landscape, and place the phone in the viewer. Turn your head to aim the centre pointer. Look well down (about **55°**) for **MENU**, then hold gaze for **1.4 seconds** to open **Fly/Stop** (or **Resume** in the game/ride), **Options**, **Recentre**, and **Close Menu**. The forward view has no control panels. Looking forward dismisses the menu; opening it stops flight and pauses the game/ride. Resume is always explicit. Look away to cancel or re-arm; menu changes also require looking away before another selection. Options offers Scan Hunt (outside a running mission), game/ride restart, and Exit Phone VR. Gaze at a world to scan it. Screen/viewer-button taps still work. Head aiming needs working gyro permission on a trusted secure origin; gaze does not bypass sensor restrictions. WebXR controllers keep their existing controls.

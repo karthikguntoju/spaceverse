@@ -88,9 +88,15 @@ export class DodgeGame {
         const planet = new THREE.Mesh(planetGeometry, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }));
         planet.position.set(48, 25, -135); planet.rotation.z = -0.3; this.root.add(planet);
     }
-    start(dolly) {
+    start(dolly, headOrientation) {
         this.run.reset(); this.root.visible = true;
         this.origin.copy(dolly.position); this.rotation.copy(dolly.quaternion);
+        this.startHeading = 0;
+        if (headOrientation) {
+            const yaw = new THREE.Euler().setFromQuaternion(headOrientation, 'YXZ').y;
+            this.startHeading = -yaw;
+            this.rotation.multiply(new THREE.Quaternion().setFromAxisAngle(this.offset.set(0, 1, 0), yaw));
+        }
         this.root.position.copy(this.origin); this.root.quaternion.copy(this.rotation);
         this.pool.forEach(rock => { rock.visible = false; });
         this.updateScenery();
@@ -100,7 +106,8 @@ export class DodgeGame {
         if (!this.root.visible) return;
         this.direction.set(0, 0, -1).applyQuaternion(camera.quaternion);
         // Gentle ~17-degree head turns steer full width; no physical dodging needed.
-        const steering = Math.atan2(this.direction.x, -this.direction.z) / 0.3;
+        const angle = Math.atan2(this.direction.x, -this.direction.z) - this.startHeading;
+        const steering = Math.atan2(Math.sin(angle), Math.cos(angle)) / 0.3;
         if (!suspended) this.run.update(dt, steering);
         this.offset.set(this.run.x, 0, 0).applyQuaternion(this.rotation);
         dolly.position.copy(this.origin).add(this.offset);

@@ -91,7 +91,7 @@
                 masterGain.connect(actx.destination);
             }
         }
-        if (actx && actx.state === 'suspended') actx.resume();
+        if (actx && actx.state === 'suspended') actx.resume().catch(function () {});
         return actx;
     }
 
@@ -544,6 +544,7 @@
 
         /* ── pause & mute ─────────────────────────────────────────────── */
         var paused = false;
+        var immersive = false;
 
         /** The HUD lives under the overlays, so while one is open it would
             otherwise show through as a blurred smudge. */
@@ -612,6 +613,10 @@
 
         function loop(t) {
             raf = requestAnimationFrame(loop);
+            drawFrame(t);
+        }
+
+        function drawFrame(t) {
             var dt = lastT ? Math.min(0.034, (t - lastT) / 1000) : 0;
             lastT = t;
             if (paused) dt = 0;
@@ -644,7 +649,7 @@
             if (shake > 0.2) {
                 // Reduced motion keeps the decay (so callers still see shake
                 // settle) but never translates the world.
-                if (!reduceMotion) c.translate(U.rand(-shake, shake), U.rand(-shake, shake));
+                if (!reduceMotion && !immersive) c.translate(U.rand(-shake, shake), U.rand(-shake, shake));
                 shake *= Math.exp(-7 * dt);
             } else shake = 0;
 
@@ -698,7 +703,7 @@
         }
 
         document.addEventListener('visibilitychange', function () {
-            if (document.hidden && g.running && !paused) togglePause();
+            if (!immersive && document.hidden && g.running && !paused) togglePause();
         });
 
         document.getElementById('a-play').onclick = startRun;
@@ -719,8 +724,45 @@
         raf = requestAnimationFrame(loop);
 
         // QA handle, same convention as the mission pages.
-        var api = { start: startRun, g: g, cfg: cfg, pause: togglePause, mute: toggleMute };
+        var api = {
+            start: startRun, g: g, cfg: cfg, pause: togglePause, mute: toggleMute, canvas: canvas,
+            xrFrame: drawFrame, prepareAudio: audio,
+            isPaused: function () { return paused; },
+            setImmersive: function (enabled) {
+                if (immersive === enabled) return;
+                immersive = enabled;
+                lastT = 0;
+                if (enabled) cancelAnimationFrame(raf);
+                else raf = requestAnimationFrame(loop);
+            },
+            snapshot: function () {
+                return {
+                    playing: g.running && !paused, paused: paused, muted: muted,
+                    finished: !over.classList.contains('a-hidden'), score: Math.round(g.score),
+                    stats: extraEl.innerText || '',
+                    result: document.getElementById('a-over-note').textContent,
+                    best: best(slug), medal: medalNote(slug, best(slug))
+                };
+            }
+        };
         window.__arcade = api;
+        if (window.isSecureContext && navigator.xr) {
+            var entry = el('div', 'a-xr-entry');
+            var xrButton = el('button', 'a-chip');
+            var status = el('small', 'a-xr-status');
+            xrButton.type = 'button';
+            xrButton.textContent = 'Checking headset…';
+            xrButton.disabled = true;
+            status.setAttribute('role', 'status');
+            entry.append(xrButton, status);
+            menu.querySelector('.a-card').appendChild(entry);
+            import('/public/js/arcade/quest-screen.js?v=20261124-1')
+                .then(function (module) { return module.attachQuestScreen(api, xrButton, status); })
+                .catch(function () {
+                    xrButton.textContent = 'Headset VR unavailable';
+                    status.textContent = 'Reload to try again, or play on this screen.';
+                });
+        }
         return api;
     }
 

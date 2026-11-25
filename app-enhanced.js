@@ -307,6 +307,10 @@ app.get(['/vr-solar-system', '/vr-working', '/vr-ride'], ensureAuthenticated, (r
     res.sendFile(path.join(__dirname, 'views', 'vr-working.html'));
 });
 
+app.get('/quest-guide', (req, res) => {
+    res.sendFile(path.join(__dirname, 'views', 'quest-guide.html'));
+});
+
 // Kessler Run. Its own page rather than surgery on space-traffic-visualization,
 // whose orbit rendering lives inside a 1600-line inline script with no module
 // boundary and no tests. A small self-contained page is the cheaper trade.

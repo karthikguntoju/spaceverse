@@ -27,7 +27,8 @@ import { RemoteInput } from './remote-input.js?v=20261013-1';
 import { DwellSelector, GazeControls } from './gaze-controls.js?v=20261015-3';
 import { ScreenAwake } from './screen-awake.js?v=20261014-2';
 import { PhoneStereoEffect, PHONE_UI_LAYER, setPhoneUILayer, phoneLensMask } from './phone-stereo.js?v=20261015-1';
-import { DodgeGame } from './dodge-game.js?v=20261015-3';
+import { DodgeGame } from './dodge-game.js?v=20261124-1';
+import { immersiveVRStatus, readThumbstick } from './xr-support.js';
 import MissionCore from '../game/core.js';
 import { createScanHunt } from '../game/missions/scan-hunt.js';
 
@@ -278,7 +279,7 @@ class VRApp {
     }
 
     applyLook() {
-        const pitch = this.gyroActive || this.stereoFlightLook ? 0 : this.pitch;
+        const pitch = this.xrSession || this.gyroActive || this.stereoFlightLook ? 0 : this.pitch;
         this.dolly.quaternion.setFromEuler(new THREE.Euler(pitch, this.yaw, 0, 'YXZ'));
     }
 
@@ -654,54 +655,84 @@ class VRApp {
 
     async checkXR() {
         const btn = $('enter-vr');
-        if (!navigator.xr) {
-            btn.textContent = '🥽 VR not supported on this browser';
-            btn.disabled = true;
-            btn.classList.add('disabled');
-            return;
-        }
-        try {
-            const ok = await navigator.xr.isSessionSupported('immersive-vr');
-            if (!ok) {
-                btn.textContent = '🥽 No headset detected';
-                btn.disabled = true;
-                btn.classList.add('disabled');
-            } else {
-                btn.textContent = '🥽 Enter VR';
-                btn.disabled = false;
-                $('vr-ready').style.display = 'block';
-            }
-        } catch (e) {
-            btn.textContent = '🥽 Try entering VR';
-            btn.title = 'Headset detection failed. Try requesting a VR session directly.';
-            btn.disabled = false;
-        }
+        const { label, available } = await immersiveVRStatus(navigator.xr, window.isSecureContext);
+        btn.textContent = '🥽 ' + label;
+        btn.disabled = !available;
+        btn.classList.toggle('disabled', !available);
+        $('vr-ready').style.display = available ? 'block' : 'none';
     }
 
     async enterVR() {
-        if (!navigator.xr) return;
+        if (!navigator.xr || this.xrSession || this.xrStarting) return;
+        this.xrStarting = true;
+        const button = $('enter-vr');
+        button.disabled = true;
         if (this.stereo) this.exitPhoneVR();
         this.audio.init();
+        let session;
         try {
-            const session = await navigator.xr.requestSession('immersive-vr', {
-                optionalFeatures: ['local-floor', 'bounded-floor', 'hand-tracking', 'layers']
+            session = await navigator.xr.requestSession('immersive-vr', {
+                optionalFeatures: ['hand-tracking']
             });
-            this.renderer.xr.setReferenceSpaceType('local-floor');
-            await this.renderer.xr.setSession(session);
             this.xrSession = session;
+            this.xrHead = new THREE.Object3D();
+            session.addEventListener('end', () => this.endXR(session), { once: true });
+            session.addEventListener('visibilitychange', () => {
+                if (session.visibilityState !== 'visible') this.pauseXRActivity();
+            });
+            // The cockpit and Dodge course use a seated eye-level origin.
+            this.renderer.xr.setReferenceSpaceType('local');
+            this.renderer.xr.setFramebufferScaleFactor(0.85);
+            await this.renderer.xr.setSession(session);
+            if (this.xrSession !== session) return;
             document.body.classList.add('in-vr');
             this.vrHud.visible = true;
-            if (this.mode === 'menu') setTimeout(() => this.toggleVRMenu(), 700);
-            session.addEventListener('end', () => {
-                this.xrSession = null;
-                document.body.classList.remove('in-vr');
-                this.vrHud.visible = false;
-                if (this.vrInfoPanel) this.vrInfoPanel.visible = false;
-            });
+            if (this.mode === 'explore' || this.mode === 'mission') this.applyLook();
+            this.xrShowLauncher = this.mode === 'menu';
             this.audio.init();
         } catch (e) {
+            if (session) {
+                try { await session.end(); } catch { /* session already closed */ }
+                this.endXR(session);
+            }
             console.error('[vr] session request failed', e);
             this.toast('Could not start VR session: ' + e.message);
+        } finally {
+            this.xrStarting = false;
+            button.disabled = false;
+        }
+    }
+
+    pauseXRActivity() {
+        this.autoFly = false;
+        if (this.mode === 'ride') this.ride.pause();
+        if (this.mode === 'dodge') this.dodge.run.pause();
+        this.updateHudDom();
+    }
+
+    endXR(session) {
+        if (this.xrSession !== session) return;
+        this.pauseXRActivity();
+        this.xrSession = null;
+        this.xrHead = null;
+        this.xrShowLauncher = false;
+        this._snapLock = false;
+        document.body.classList.remove('in-vr');
+        this.vrMenu.visible = false;
+        this.vrHud.visible = false;
+        if (this.vrInfoPanel) this.vrInfoPanel.visible = false;
+        if (this.mode === 'explore' || this.mode === 'mission') this.applyLook();
+    }
+
+    updateXRHead(frame) {
+        const reference = this.renderer.xr.getReferenceSpace();
+        const pose = reference && frame?.getViewerPose(reference);
+        if (!pose || !this.xrHead) return;
+        this.xrHead.position.copy(pose.transform.position);
+        this.xrHead.quaternion.copy(pose.transform.orientation);
+        if (this.xrShowLauncher) {
+            this.xrShowLauncher = false;
+            if (!this.vrMenu.visible) this.toggleVRMenu();
         }
     }
 
@@ -711,7 +742,8 @@ class VRApp {
         for (const src of s.inputSources) {
             const g = src.gamepad;
             if (g && g.hapticActuators && g.hapticActuators[0]) {
-                try { g.hapticActuators[0].pulse(clamp(intensity, 0, 1), ms); } catch (e) { /* older runtimes */ }
+                try { Promise.resolve(g.hapticActuators[0].pulse(clamp(intensity, 0, 1), ms)).catch(() => {}); }
+                catch { /* optional controller feedback */ }
             }
         }
     }
@@ -746,17 +778,22 @@ class VRApp {
                     new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.75 })
                 );
                 hand.add(pinchOrb);
-                hand.addEventListener('pinchstart', () => {
-                    this.pulse(0.4, 40);
-                    this.onControllerSelect(c);
-                });
+                // Hand pinches already generate WebXR select events on the target ray.
                 this.dolly.add(hand);
                 this.hands.push(hand);
             }
         }
     }
 
-    buildVRMenu() {
+    buildVRMenu(active = false) {
+        if (this.vrMenu) {
+            this.dolly.remove(this.vrMenu);
+            for (const item of this.vrMenuItems) {
+                item.geometry.dispose();
+                item.material.map.dispose();
+                item.material.dispose();
+            }
+        }
         const label = (text, sub, accent) => {
             const c = document.createElement('canvas');
             c.width = 1024; c.height = 512;
@@ -800,6 +837,28 @@ class VRApp {
             return m;
         };
 
+        if (active) {
+            const options = this.mode === 'ride' ? [
+                [this.ride.time >= this.ride.total ? 'REPLAY RIDE' : 'RESUME RIDE', 'Continue the flight', 'ride-resume'],
+                ['SKIP SECTION', 'Continue from the next leg', 'ride-skip'],
+                ['RESTART RIDE', 'Return to Earth orbit', 'ride'],
+                ['TOGGLE COMFORT', 'Reduce rolls and limit peripheral motion', 'comfort']
+            ] : this.mode === 'dodge' ? [
+                [this.dodgeButtonTitle(), 'Face the course and turn to steer', 'dodge-play'],
+                ['RESTART GAME', 'Reset the course and shields', 'dodge']
+            ] : [
+                ['NEXT WORLD · WARP', 'Fly to the next destination', 'next-world'],
+                ['LOW ORBIT', 'Skim the selected world', 'low-orbit'],
+                ['TOGGLE 3D COCKPIT', 'Show or hide the pilot cabin', 'toggle-cockpit'],
+                [this.autoFly ? 'STOP FLYING' : 'FLY FORWARD', 'Use head direction to steer', 'auto-fly']
+            ];
+            options.push(['RETURN TO VIEW', 'Close these controls', 'close'], ['EXIT HEADSET VR', 'Return to the browser', 'exit']);
+            const rows = Math.ceil(options.length / 2);
+            this.vrMenuItems = options.map(([title, hint, action], i) => mk(
+                label(title, hint, '#64ffda'), i % 2 ? 0.44 : -0.44, (rows / 2 - 0.5 - Math.floor(i / 2)) * 0.31, action, 0.69
+            ));
+            return;
+        }
         this.vrMenuItems = this.entry === 'ride'
             ? [
                 mk(label('VR DEEP SPACE RIDE', '3 min · jumpscares & turret', '#ff8b8b'), 0, 0.22, 'ride'),
@@ -817,21 +876,26 @@ class VRApp {
 
     toggleVRMenu() {
         if (!this.renderer.xr.isPresenting) return;
-        if (this.mode === 'dodge') this.dodge.run.pause();
         const show = !this.vrMenu.visible;
-        this.vrMenu.visible = show;
         this.vrHud.visible = !show;
+        if (!show) { this.vrMenu.visible = false; return; }
+        if (this.mode === 'ride') this.ride.pause();
+        if (this.mode === 'dodge') this.dodge.run.pause();
+        this.buildVRMenu(this.mode !== 'menu');
+        this.vrMenu.visible = true;
         if (show && this.vrInfoPanel) this.vrInfoPanel.visible = false;
-        if (!show) return;
-        const fwd = new THREE.Vector3(0, 0, -1).applyQuaternion(this.camera.quaternion);
-        const p = this.camera.position.clone().addScaledVector(fwd, 1.6);
-        this.vrMenu.position.copy(p);
-        this.vrMenu.quaternion.copy(this.camera.quaternion);
+        const head = this.xrHead || this.camera;
+        const yaw = new THREE.Euler().setFromQuaternion(head.quaternion, 'YXZ').y;
+        this.vrMenu.rotation.set(0, yaw, 0, 'YXZ');
+        const forward = new THREE.Vector3(0, 0, -1).applyQuaternion(this.vrMenu.quaternion);
+        this.vrMenu.position.copy(head.position).addScaledVector(forward, 1.75);
+        this.vrMenu.updateWorldMatrix(true, true);
         this.audio.blip(600);
     }
 
     menuHit(controller) {
-        if (!this.vrMenu.visible) return null;
+        if (!this.vrMenu.visible || !controller.visible) return null;
+        controller.updateWorldMatrix(true, false);
         const m = new THREE.Matrix4().identity().extractRotation(controller.matrixWorld);
         const origin = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld);
         const dir = new THREE.Vector3(0, 0, -1).applyMatrix4(m).normalize();
@@ -1277,7 +1341,8 @@ class VRApp {
 
     onControllerSelect(controller) {
         const item = this.menuHit(controller);
-        if (item) {
+        if (this.vrMenu.visible) {
+            if (!item) return;
             this.vrMenu.visible = false;
             this.vrHud.visible = true;
             const action = item.userData.action;
@@ -1285,10 +1350,26 @@ class VRApp {
             else if (action === 'scan-hunt') this.startMission('scan-hunt');
             else if (action === 'dodge') this.startDodge();
             else if (action === 'next-world') this.cycleBody(1);
+            else if (action === 'low-orbit') this.skimBody(this.activeBodyKey || 'earth');
             else if (action === 'toggle-cockpit') this.toggleExploreCockpit();
-            else this.startRide();
+            else if (action === 'auto-fly') this.toggleAutoFly();
+            else if (action === 'dodge-play') this.onPhoneTap();
+            else if (action === 'ride') this.startRide();
+            else if (action === 'ride-resume') {
+                if (this.ride.time >= this.ride.total) this.startRide();
+                else this.ride.resume();
+            } else if (action === 'ride-skip') {
+                this.clearWarning(); this.ride.resume(); this.ride.skipSegment();
+            } else if (action === 'comfort') {
+                this.setComfort(!this.comfort);
+                this.toggleVRMenu();
+            } else if (action === 'exit') {
+                this.xrSession?.end().catch(() => {});
+            }
+            this.updateHudDom();
             return;
         }
+        if (this.mode === 'menu') return;
         if (this.mode === 'dodge') { this.onPhoneTap(); return; }
         if (this.mode === 'ride') {
             // If an incoming asteroid threat is active, trigger fires the plasma turret!
@@ -1297,6 +1378,7 @@ class VRApp {
             this.audio.blip(760);
             return;
         }
+        controller.updateWorldMatrix(true, false);
         const m = new THREE.Matrix4().identity().extractRotation(controller.matrixWorld);
         const origin = new THREE.Vector3().setFromMatrixPosition(controller.matrixWorld);
         const dir = new THREE.Vector3(0, 0, -1).applyMatrix4(m).normalize();
@@ -1484,7 +1566,7 @@ class VRApp {
         if (this.gyroActive) this.gyro.recenter();
         this.updateHead(0);
         this.camera.fov = this.baseFov; this.camera.updateProjectionMatrix();
-        this.dodge.start(this.dolly);
+        this.dodge.start(this.dolly, this.xrHead?.quaternion);
         this.closeGazeMenu();
         this.gazeControls.anchor(this.camera);
         if (this.gyroActive) this.gazeControls.group.quaternion.identity();
@@ -1742,6 +1824,7 @@ class VRApp {
 
     flyUpdate(dt) {
         if (this.stereo && (this.gazeMenuOpen || this.gaze.key?.startsWith('ui:'))) return;
+        if (this.xrSession && (this.vrMenu.visible || this.xrSession.visibilityState !== 'visible')) return;
         const remoteMove = this.remote.movement();
         if (remoteMove.x || remoteMove.z) this.focusTween = null;
         if (this.focusTween) {
@@ -1786,9 +1869,7 @@ class VRApp {
 
         if (this.xrSession) {
             for (const src of this.xrSession.inputSources) {
-                const g = src.gamepad;
-                if (!g || g.axes.length < 4) continue;
-                const ax = g.axes[2], ay = g.axes[3];
+                const { x: ax, y: ay } = readThumbstick(src.gamepad);
                 if (src.handedness === 'left') {
                     if (Math.abs(ax) > 0.15) v.x += ax;
                     if (Math.abs(ay) > 0.15) v.z += ay;
@@ -1814,7 +1895,9 @@ class VRApp {
             const normTarget = clamp((this.flySpeed * boost) / 160, 0.18, 1);
             this._freeSpeedNorm += (normTarget - this._freeSpeedNorm) * Math.min(1, dt * 4);
             v.normalize().multiplyScalar(this.flySpeed * boost * dt);
-            const q = (this.renderer.xr.isPresenting || this.gyroActive || this.stereoFlightLook)
+            const q = this.xrHead
+                ? this.dolly.quaternion.clone().multiply(this.xrHead.quaternion)
+                : (this.gyroActive || this.stereoFlightLook)
                 ? this.camera.getWorldQuaternion(new THREE.Quaternion())
                 : this.dolly.quaternion;
             v.applyQuaternion(q);
@@ -1929,11 +2012,12 @@ class VRApp {
 
     /* ── frame ──────────────────────────────────────────────────────── */
 
-    loop() {
+    loop(frame) {
         if (document.hidden && !this.renderer.xr.isPresenting) {
             this.clock.getDelta(); this.gaze.reset(); return;
         }
         const dt = Math.min(0.05, this.clock.getDelta());
+        if (this.xrSession) this.updateXRHead(frame);
         this.remote.update();
         const camPos = this.camera.getWorldPosition(this._camPos || (this._camPos = new THREE.Vector3()));
         if (this.mode !== 'dodge') this.system.update(dt, camPos);
@@ -1943,7 +2027,8 @@ class VRApp {
         if (this.mode === 'ride') this.ride.update(dt);
         else if (this.mode === 'dodge') {
             const before = this.dodge.run.hits;
-            this.dodge.update(dt, this.camera, this.dolly, this.gazeMenuOpen ||
+            this.dodge.update(dt, this.xrHead || this.camera, this.dolly, this.gazeMenuOpen ||
+                Boolean(this.xrSession && (this.vrMenu.visible || this.xrSession.visibilityState !== 'visible')) ||
                 (this.stereo && this.gaze.key?.startsWith('ui:')));
             if (this.dodge.run.hits > before) this.audio.blip(180);
             this.updateDodgeHud();
