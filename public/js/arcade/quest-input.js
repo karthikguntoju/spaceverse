@@ -1,4 +1,4 @@
-import { readThumbstick } from '../vr/xr-support.js';
+import { readThumbstick } from '../vr/xr-support.js?v=20261125-xr1';
 
 const SHORTCUTS = {
     'asteroid-miner': { B: ['ShiftLeft', 'Grab'] },

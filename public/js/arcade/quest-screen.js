@@ -1,6 +1,7 @@
-import * as THREE from '/lib/three/three.module.js';
-import { immersiveVRStatus } from '../vr/xr-support.js';
-import { arcadeKeys, arcadeShortcuts } from './quest-input.js';
+import * as THREE from '/lib/three/webxr.module.js?v=20261125-xr1';
+import { immersiveVRStatus } from '../vr/xr-support.js?v=20261125-xr1';
+import { guardXRFrames } from '../vr/xr-frame-guard.js?v=20261125-xr1';
+import { arcadeKeys, arcadeShortcuts } from './quest-input.js?v=20261125-xr1';
 
 const WIDTH = 1280;
 const MAX_GAME_HEIGHT = 780;
@@ -18,32 +19,38 @@ export async function attachQuestScreen(arcade, button, status) {
     button.onclick = async () => {
         button.disabled = true;
         status.textContent = 'Opening headset VR…';
-        let session, theater;
+        let session, theater, launchError = '';
+        function report(error) {
+            console.error('[arcade] headset rendering failed', error);
+            launchError = 'Headset VR could not start or continue. ' + (error?.message || 'Try entering again.');
+            status.textContent = launchError;
+        }
         try {
             arcade.prepareAudio();
             session = await xr.requestSession('immersive-vr', { optionalFeatures: ['hand-tracking'] });
             theater = new QuestScreen(arcade, session, () => {
                 button.disabled = false;
-                status.textContent = '';
-            });
+                status.textContent = launchError;
+            }, report);
             await theater.start();
-            status.textContent = '';
-        } catch {
+            if (!launchError) status.textContent = '';
+        } catch (error) {
+            report(error);
             if (session) {
                 try { await session.end(); } catch { /* already ended */ }
             }
             theater?.dispose();
             button.disabled = false;
-            status.textContent = 'Could not open headset VR. Try again, or play on this screen.';
         }
     };
 }
 
 class QuestScreen {
-    constructor(arcade, session, onEnd) {
+    constructor(arcade, session, onEnd, reportFailure) {
         this.arcade = arcade;
         this.session = session;
         this.onEnd = onEnd;
+        this.reportFailure = reportFailure;
         this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
         this.renderer.xr.enabled = true;
         this.renderer.xr.setReferenceSpaceType('local');
@@ -109,10 +116,20 @@ class QuestScreen {
     }
 
     async start() {
+        this.frameGuard = guardXRFrames(error => {
+            this.reportFailure(error);
+            this.session.end().catch(() => this.dispose());
+        });
+        // Register before setSession so Three can stop its window frame loop
+        // on sessionstart and use only frames from the headset.
+        this.renderer.setAnimationLoop((time, frame) => {
+            if (frame && this.renderer.xr.isPresenting) {
+                this.frameGuard.render(() => this.frame(time, frame));
+            }
+        });
         await this.renderer.xr.setSession(this.session);
         if (this.disposed) return;
         this.arcade.setImmersive(true);
-        this.renderer.setAnimationLoop((time, frame) => this.frame(time, frame));
     }
 
     layout() {
@@ -122,10 +139,7 @@ class QuestScreen {
         return { x: (WIDTH - gameWidth) / 2, y: HEADER + (MAX_GAME_HEIGHT - gameHeight) / 2, width: gameWidth, height: gameHeight };
     }
 
-    center(frame) {
-        const reference = this.renderer.xr.getReferenceSpace();
-        const pose = reference && frame?.getViewerPose(reference);
-        if (!pose) return;
+    center(pose) {
         const { orientation, position } = pose.transform;
         const yaw = new THREE.Euler().setFromQuaternion(new THREE.Quaternion().copy(orientation), 'YXZ').y;
         this.screen.rotation.set(0, yaw, 0, 'YXZ');
@@ -208,8 +222,12 @@ class QuestScreen {
     }
 
     frame(time, frame) {
-        if (this.disposed || this.session.visibilityState === 'hidden') return;
-        if (this.needsCenter) this.center(frame);
+        if (this.disposed || this.session.visibilityState === 'hidden') return false;
+        const reference = this.renderer.xr.getReferenceSpace();
+        const pose = reference && frame.getViewerPose(reference);
+        if (!pose) return false;
+        if (this.renderer.getContext().isContextLost()) throw new Error('The headset graphics context was lost.');
+        if (this.needsCenter) this.center(pose);
         const layout = this.layout();
         this.screen.scale.y = 2.35 * HEIGHT / WIDTH;
         this.screen.updateWorldMatrix(true, false);
@@ -240,6 +258,7 @@ class QuestScreen {
             this.paint(layout);
         }
         this.renderer.render(this.scene, this.camera);
+        return true;
     }
 
     paint(layout) {
@@ -255,13 +274,7 @@ class QuestScreen {
         c.fillText('SCORE ' + s.score.toLocaleString() + '   ·   BEST ' + s.best.toLocaleString(), WIDTH - 28, 43, 570);
         c.textAlign = 'left';
         c.font = '600 22px system-ui';
-        if (s.playing && s.stats) {
-            const lines = s.stats.trim().split(/\n+/).slice(0, 5);
-            c.fillStyle = 'rgba(5, 12, 24, 0.84)';
-            c.fillRect(layout.x + 10, layout.y + 10, Math.min(580, layout.width - 20), lines.length * 27 + 14);
-            c.fillStyle = '#e2efff';
-            lines.forEach((line, i) => c.fillText(line, layout.x + 20, layout.y + 36 + i * 27, Math.min(550, layout.width - 40)));
-        } else if (!s.playing) {
+        if (!s.playing) {
             const y = layout.y + layout.height / 2;
             c.fillStyle = 'rgba(5, 12, 24, 0.9)';
             c.fillRect(110, y - 78, WIDTH - 220, 156);
@@ -290,8 +303,10 @@ class QuestScreen {
         });
         c.font = '22px system-ui';
         c.fillStyle = '#b5cde8';
-        c.fillText('Trigger: point / drag · Left stick: move · A: action · Grip: pause' +
-            (this.shortcutHint ? '  |  ' + this.shortcutHint : ''), WIDTH / 2, HEIGHT - 19, WIDTH - 56);
+        const controls = 'Trigger: point / drag · Left stick: move · A: action · Grip: pause' +
+            (this.shortcutHint ? '  |  ' + this.shortcutHint : '');
+        const stats = s.playing && s.stats.trim();
+        c.fillText(stats ? stats.split(/\s*\n\s*/).join('   ·   ') : controls, WIDTH / 2, HEIGHT - 19, WIDTH - 56);
         c.textAlign = 'left';
         this.texture.needsUpdate = true;
     }
@@ -299,6 +314,7 @@ class QuestScreen {
     dispose() {
         if (this.disposed) return;
         this.disposed = true;
+        this.frameGuard?.stop();
         this.session.removeEventListener('end', this.end);
         this.session.removeEventListener('visibilitychange', this.visibilityChanged);
         this.release();

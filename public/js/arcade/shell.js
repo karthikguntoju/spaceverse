@@ -756,7 +756,7 @@
             status.setAttribute('role', 'status');
             entry.append(xrButton, status);
             menu.querySelector('.a-card').appendChild(entry);
-            import('/public/js/arcade/quest-screen.js?v=20261124-1')
+            import('/public/js/arcade/quest-screen.js?v=20261125-clear-view')
                 .then(function (module) { return module.attachQuestScreen(api, xrButton, status); })
                 .catch(function () {
                     xrButton.textContent = 'Headset VR unavailable';

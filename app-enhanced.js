@@ -331,8 +331,9 @@ app.get('/games', ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'games', 'arcade.html'));
 });
 
-// The hands-free arcade game reuses the VR renderer, not the solar-system menu.
-app.get('/games/asteroid-dodge', ensureAuthenticated, (req, res) => {
+// Immersive Meta Quest 3 VR arcade games share the WebXR headset renderer.
+const VR_ARCADE_GAMES = ['orbital-intercept', 'asteroid-dodge', 'lunar-landing', 'orbital-docking', 'satellite-repair', 'mars-rover', 'space-rescue'];
+app.get(VR_ARCADE_GAMES.map(slug => '/games/' + slug), ensureAuthenticated, (req, res) => {
     res.sendFile(path.join(__dirname, 'views', 'vr-working.html'));
 });
 
@@ -356,6 +357,19 @@ app.use('/models', express.static('models', STATIC_CACHE));
 // Local three.js build + addons, so the VR page has no runtime CDN dependency.
 // Addons must be registered before the build mount so `three/addons/…` resolves.
 app.use('/lib/three/addons', express.static(path.join(__dirname, 'node_modules', 'three', 'examples', 'jsm'), STATIC_CACHE));
+// Three r182 selects projection layers from API presence alone. Use the
+// standard XRWebGLLayer for our VR pages when the browser provides it, so the
+// headset compositor receives the regular eye framebuffer.
+let xrThreeModule;
+app.get('/lib/three/webxr.module.js', (req, res) => {
+    if (!xrThreeModule) {
+        const file = path.join(__dirname, 'node_modules', 'three', 'build', 'three.module.js');
+        const source = require('node:fs').readFileSync(file, 'utf8');
+        const detection = "const supportsLayers = supportsGlBinding && 'createProjectionLayer' in XRWebGLBinding.prototype;";
+        xrThreeModule = source.replace(detection, "const supportsLayers = typeof XRWebGLLayer !== 'function' && supportsGlBinding && 'createProjectionLayer' in XRWebGLBinding.prototype;");
+    }
+    res.type('application/javascript').set('Cache-Control', 'public, max-age=604800').send(xrThreeModule);
+});
 app.use('/lib/three', express.static(path.join(__dirname, 'node_modules', 'three', 'build'), STATIC_CACHE));
 // Vendored three r128 (classic global-`THREE` build + examples/js addons) and
 // the animation libs (GSAP, tween.js, Lenis). The 3D and landing pages load

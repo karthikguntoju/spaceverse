@@ -40,6 +40,24 @@ describe('hands-free Asteroid Dodge practice', () => {
         run.update(0.01); expect(run.dodged).toBe(1);
         expect(run.shields).toBe(3); run.update(0.01); expect(run.dodged).toBe(1);
     });
+    it('awards streak bonuses, clears the streak on hits and applies difficulty to the next run', () => {
+        const run = new DodgeRun();
+        run.state = 'playing'; run.nextSpawn = 100;
+        run.hazards = [{ x: -3.2, z: -1.01, speed: 10 }, { x: 3.2, z: -1.01, speed: 10 }];
+        run.update(0.01);
+        expect(run.score).toBe(220);
+        expect(run.streak).toBe(2);
+        run.hazards = [{ x: 0, z: -1.01, speed: 10 }];
+        run.update(0.01);
+        expect(run.streak).toBe(0);
+        expect(run.bestStreak).toBe(2);
+        run.setDifficulty('practice');
+        expect(run.duration).toBe(60);
+        run.reset();
+        expect(run.duration).toBe(35);
+        expect(run.shields).toBe(5);
+        expect(run.score).toBe(0);
+    });
     it('freezes hazards and the timer while paused, and counts down before resuming', () => {
         const run = new DodgeRun(); run.play(); advance(run, 4);
         run.pause(); const saved = JSON.stringify(run);
@@ -118,5 +136,24 @@ describe('Dodge scene and head controls', () => {
         expect(game.run.countdown).toBe(3); expect(game.run.elapsed).toBe(0);
         game.start(dolly); expect(game.pool).toEqual(meshes);
         expect(game.run.state).toBe('ready');
+    });
+
+    it('supports Quest 3 Left Stick steering, Right Trigger Pulse Blaster, and Left Trigger Phase Shield', () => {
+        const scene = new THREE.Scene(), dolly = new THREE.Group();
+        const camera = new THREE.PerspectiveCamera(); dolly.add(camera); scene.add(dolly);
+        const game = new DodgeGame(scene);
+        game.start(dolly);
+        game.run.state = 'playing';
+        game.run.crystals.push({ id: 99, x: 0, y: 0, z: -12, speed: 5 });
+
+        expect(game.run.triggerPhase()).toBe(true);
+        game.run.hazards.push({ id: 50, x: 0, z: -1.01, speed: 10 });
+        game.update(0.05, camera, dolly, false, {
+            left: { stick: { x: 0.9, y: 0 }, triggerPressed: true, triggerJustPressed: false },
+            right: { triggerJustPressed: true, triggerPressed: true }
+        });
+        expect(game.run.shields).toBe(3);
+        expect(game.run.crystalsShot).toBe(1);
+        expect(dolly.position.x).toBeGreaterThan(0.1);
     });
 });

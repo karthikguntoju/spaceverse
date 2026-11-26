@@ -62,7 +62,7 @@ address cannot be opened from the headset.
 
 - **Solar System / Scan Hunt:** Enter headset VR, then point and pull the trigger to choose. The left stick moves, the right stick snap-turns or changes height, and the trigger scans. Squeeze the side grip for auto-flight, low orbit, cockpit controls and exit.
 - **Deep Space Ride:** Enter headset VR and select the ride. Squeeze the side grip to pause and access Resume, Skip, Restart and Comfort mode. Pull the trigger during a hazard to fire the turret. Turn off jumpscares before entering if preferred.
-- **Arcade:** Asteroid Dodge is an immersive, head-steered course. The other eleven games share a virtual screen with trigger aiming and dragging, left-stick movement, A for the main keyboard action, and game-specific shortcuts shown at the bottom. Scores still save in the same browser profile.
+- **Arcade (Meta Quest 3 Exclusive VR + Virtual Screen):** Seven native Meta Quest 3 VR games built around dual 6DoF **Touch Plus** controllers — **Orbital Intercept**, **Asteroid Dodge**, **Lunar Landing**, **Orbital Docking**, **Satellite Repair**, **Mars Rover Expedition**, and **Space Rescue** — with live animated 3D Touch Plus hand tools, open-canopy cockpits, per-hand haptics, and personal best medals. The eleven classic canvas games also support a virtual screen inside Quest.
 - Touch controllers provide the full controls. Runtimes that supply hand-tracked selection also accept pointing and pinching for trigger actions.
 
 ### Desktop and phone controls
@@ -78,7 +78,9 @@ Phone VR draws matching top-bar controls and warnings in each eye. Floating butt
 
 Cardboard defaults to larger **wide rounded** eye views (96% screen height), reducing the previous circular black corners. The circular shape remains selectable. Scene and UI use each viewport's actual aspect ratio, avoiding stretch. In **Cardboard lens fit**, adjust **Eye-centre spacing**, **View size**, and **Lens shape** outside the viewer. Settings are saved per browser/origin; **Reset lens fit** restores the larger defaults. Old v1 preferences migrate to the larger shape/size while preserving spacing. Values are screen percentages, not IPD millimetres. Width is limited to prevent overlapping eye images. UI textures are doubled in resolution with larger, higher-contrast text and no mipmap softening. This cannot correct optical focus or supply measured lens distortion correction; exit if images remain doubled or uncomfortable.
 
-### Hands-free Asteroid Dodge
+### Hands-free VR arcade
+
+Use **Phone VR** for split-screen play. Look down and hold **MENU**, then select **Start game**. The five space operations games use small head turns to steer where applicable and gaze to operate panels. They can also run in gyro mode without split-screen after enabling **Gyro look**. On a desktop, drag to look, click a game panel and use arrow keys in the games that steer.
 
 Choose **Arcade → Asteroid Dodge** (`/games/asteroid-dodge`), then start the game or choose **Phone VR**. This game is separate from the solar-system menus. Hold gaze on **START DODGE**, face the course during the three-second countdown, then turn your head gently left/right to steer. Stay seated: no physical ducking or walking is needed. Avoid incoming rocks for 60 seconds; three hits end the run. The HUD shows time, shields and rocks dodged. Gaze controls provide Pause/Resume, Replay, Recentre and Exit; Options offers Restart Game. Exit Phone VR and use **← Arcade** to return to the game catalog. A running game pauses when the browser loses focus, the page becomes hidden, the viewer exits, or you recenter. Resume includes another countdown. Simulation also stops while selecting gaze controls. Desktop/touch fallback uses drag-to-look and visible controls (Space pauses/resumes). This is **local practice**, not ranked XP or a leaderboard submission; existing Scan Hunt scoring is unchanged.
 

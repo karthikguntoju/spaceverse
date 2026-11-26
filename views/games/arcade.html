@@ -140,6 +140,10 @@
                 box-shadow 0.16s ease, opacity 0.12s ease;
         }
         .game:hover { transform: translateY(-4px); border-color: var(--c, var(--accent)); box-shadow: 0 12px 40px -18px var(--c, var(--accent)); }
+        .game .vr-mission-preview {
+            display: grid; place-items: center; min-height: 88px; font-size: 2.2rem;
+            background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--c) 32%, #081322), #080d1c 70%);
+        }
         .game::before {
             content: ''; position: absolute; inset: 0 0 auto; height: 3px;
             background: linear-gradient(90deg, transparent, var(--c, var(--accent)), transparent);
@@ -284,8 +288,8 @@
         <div class="hero">
             <div class="hero-copy">
                 <h1>THE ARCADE</h1>
-                <p class="sub">Twelve games set in the SpaceVerse. Play on a virtual screen in Meta Quest
-                    or steer hands-free in Asteroid Dodge with a headset or Phone VR.</p>
+                <p class="sub">Seven Meta Quest 3 exclusive VR games built for dual Touch Plus controllers.
+                    Eleven classic arcade games also support a virtual screen inside Quest.</p>
             </div>
             <div class="stats" id="stats"></div>
         </div>
@@ -295,23 +299,60 @@
         <div class="rank" id="rank"></div>
 
         <div class="grid" id="grid">
-            <a class="game" href="/games/asteroid-dodge" style="--c:#ffb46b" data-slug="asteroid-dodge" data-practice="true">
-                <span class="pvwrap">
-                    <svg class="pv" viewBox="0 0 320 100" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-                        <path d="M0 96L155 22M320 96L165 22M85 100L158 22M235 100L162 22" fill="none" stroke="#22d3ee" stroke-opacity=".45"/>
-                        <g fill="#75685e" stroke="#ffb46b" stroke-width="1.5">
-                            <path d="M68 23L86 15L105 26L110 45L96 61L73 57L60 42Z"/>
-                            <path d="M220 48L237 39L254 45L261 64L250 81L228 77L215 63Z"/>
-                            <path d="M183 13L191 9L198 15L195 23L186 24L181 18Z"/>
-                        </g>
-                        <path d="M147 66L160 54L173 66M160 54V81" fill="none" stroke="#e4fbff" stroke-width="2"/>
-                    </svg>
-                    <span class="icon">☄️</span>
-                </span>
-                <span class="tag">VR</span>
+            <a class="game" href="/games/orbital-intercept" style="--c:#64ffda" data-slug="orbital-intercept">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🛡️</span></span>
+                <span class="tag">Quest 3</span>
+                <h2>ORBITAL INTERCEPT</h2>
+                <p>Dual-wield Touch Plus combat in Earth orbit. Deflect plasma bolts with your Left Aegis Shield and shatter rogue drones with your Twin Plasma Blaster.</p>
+                <span class="foot"><span class="play">LAUNCH VR →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/asteroid-dodge" style="--c:#ffb46b" data-slug="asteroid-dodge">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">☄️</span></span>
+                <span class="tag">Quest 3</span>
                 <h2>ASTEROID DODGE</h2>
-                <p>Turn your head to dodge incoming rocks. Survive 60 seconds with three shields. Hands-free Phone VR, headset or drag-to-look. Stay seated.</p>
-                <span class="foot"><span class="play">PLAY →</span><span class="best">LOCAL PRACTICE</span></span>
+                <p>Bank through a Saturn-ring trench with Touch Plus stick or head lean. Fire your Pulse Blaster at crystals and trigger your Phase Shield.</p>
+                <span class="foot"><span class="play">LAUNCH VR →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/lunar-landing" style="--c:#cfe1ff" data-slug="lunar-landing">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🌕</span></span>
+                <span class="tag">Quest 3</span>
+                <h2>LUNAR LANDING</h2>
+                <p>Pilot an open-canopy lander onto PAD 01. Feather your retro engine with the right trigger and hold precision hover over craters.</p>
+                <span class="foot"><span class="play">LAUNCH VR →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/orbital-docking" style="--c:#80e8ff" data-slug="orbital-docking">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🛰️</span></span>
+                <span class="tag">Quest 3</span>
+                <h2>ORBITAL DOCKING</h2>
+                <p>Thread the ISS docking corridor using dual Touch Plus sticks. Match roll, bleed closing velocity, and lock onto the collar.</p>
+                <span class="foot"><span class="play">LAUNCH VR →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/satellite-repair" style="--c:#ffd196" data-slug="satellite-repair">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🔧</span></span>
+                <span class="tag">Quest 3</span>
+                <h2>SATELLITE REPAIR</h2>
+                <p>Unbolt faulty bays with your Plasma Multi-Tool, grapple replacement spares with your left claw, and weld them online.</p>
+                <span class="foot"><span class="play">LAUNCH VR →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/mars-rover" style="--c:#ffb281" data-slug="mars-rover">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🪨</span></span>
+                <span class="tag">Quest 3</span>
+                <h2>MARS ROVER EXPEDITION</h2>
+                <p>Drive Jezero canyon with analog trigger throttle, harvest solar crystals, dodge boulders, and drill three core samples.</p>
+                <span class="foot"><span class="play">LAUNCH VR →</span><span class="best"></span></span>
+            </a>
+
+            <a class="game" href="/games/space-rescue" style="--c:#8ff2d9" data-slug="space-rescue">
+                <span class="pvwrap"><canvas class="pv" aria-hidden="true"></canvas><span class="icon">🧑‍🚀</span></span>
+                <span class="tag">Quest 3</span>
+                <h2>SPACE RESCUE</h2>
+                <p>Match velocity with a tumbling astronaut in Earth orbit, lock your electromagnetic tether harpoon, and reel them home.</p>
+                <span class="foot"><span class="play">LAUNCH VR →</span><span class="best"></span></span>
             </a>
 
             <a class="game" href="/games/gravity-runner" style="--c:#64ffda" data-slug="gravity-runner">
@@ -436,6 +477,13 @@
            half free. Each triple is roughly [a competent run, a good run, a run
            you had to work for]. */
         var TIERS = {
+            'orbital-intercept': [2500, 7500, 16000],
+            'asteroid-dodge': [1800, 5000, 11000],
+            'lunar-landing': [1800, 2600, 3400],
+            'orbital-docking': [1800, 2800, 3800],
+            'satellite-repair': [1800, 2600, 3500],
+            'mars-rover': [1800, 2600, 3600],
+            'space-rescue': [1600, 2400, 3200],
             'gravity-runner': [1500, 5000, 12000],
             'kessler-reversed': [6000, 18000, 40000],
             'last-station': [2500, 8000, 18000],
@@ -1060,6 +1108,87 @@
                 c.lineTo(0, 4.4 * u); c.lineTo(-3.2 * u, 0);
                 c.closePath(); c.fill();
                 c.restore();
+            },
+
+            'orbital-intercept': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 2.6) % 1;
+                halo(c, w * 0.5, h * 1.15, h * 0.9, 'rgba(56,189,248,0.22)');
+                c.strokeStyle = 'rgba(100,255,218,0.85)'; c.lineWidth = 2.4 * u;
+                c.beginPath(); c.arc(w * 0.34, h * 0.62, 18 * u, -0.9, 0.9); c.stroke();
+                halo(c, w * 0.34, h * 0.62, 16 * u, rgba(A, 0.45));
+                var bx = w * (0.4 + q * 0.38), by = h * (0.58 - q * 0.26);
+                c.strokeStyle = '#64ffda'; c.lineWidth = 2.2 * u;
+                c.beginPath(); c.moveTo(w * 0.36, h * 0.62); c.lineTo(bx, by); c.stroke();
+                c.fillStyle = '#fb7185';
+                c.beginPath(); c.arc(w * 0.78, h * 0.32, 7.5 * u, 0, TAU); c.fill();
+                halo(c, w * 0.78, h * 0.32, 18 * u, 'rgba(251,113,133,0.45)');
+            },
+
+            'asteroid-dodge': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 2.4) % 1;
+                c.strokeStyle = 'rgba(34,211,238,0.35)'; c.lineWidth = 1.1 * u;
+                [-1, -0.35, 0.35, 1].forEach(function (k) {
+                    c.beginPath(); c.moveTo(w * 0.5 + k * 8 * u, h * 0.16); c.lineTo(w * 0.5 + k * 92 * u, h); c.stroke();
+                });
+                rock(c, w * 0.31, h * (0.2 + q * 0.52), 11 * u, 2.3);
+                rock(c, w * 0.71, h * (0.14 + ((q + 0.45) % 1) * 0.6), 10 * u, 6.1);
+                var sx = w * 0.5 + Math.sin(t * 2.2) * 26 * u;
+                halo(c, sx, h * 0.78, 14 * u, rgba(A, 0.55));
+                c.strokeStyle = '#e2f8ff'; c.lineWidth = 2 * u;
+                c.beginPath(); c.moveTo(sx - 9 * u, h * 0.84); c.lineTo(sx, h * 0.71); c.lineTo(sx + 9 * u, h * 0.84); c.stroke();
+            },
+
+            'lunar-landing': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, q = (t / 3.2) % 1;
+                c.fillStyle = '#2b3344'; c.fillRect(0, h * 0.78, w, h * 0.22);
+                c.strokeStyle = '#64ffda'; c.lineWidth = 2 * u;
+                c.beginPath(); c.moveTo(w * 0.32, h * 0.78); c.lineTo(w * 0.68, h * 0.78); c.stroke();
+                var ly = h * (0.22 + q * 0.44);
+                halo(c, w * 0.5, ly + 10 * u, 16 * u, 'rgba(255,180,84,0.55)');
+                c.fillStyle = '#e2e8f0';
+                c.beginPath(); c.moveTo(w * 0.5, ly - 10 * u); c.lineTo(w * 0.5 + 11 * u, ly + 4 * u); c.lineTo(w * 0.5 - 11 * u, ly + 4 * u); c.closePath(); c.fill();
+            },
+
+            'orbital-docking': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, pulse = 0.5 + 0.5 * Math.sin(t * 3);
+                halo(c, w * 0.5, h * 0.48, 28 * u, rgba(A, 0.24));
+                [26, 17, 9].forEach(function (r, idx) {
+                    c.strokeStyle = rgba(A, 0.3 + idx * 0.25 + pulse * 0.12);
+                    c.lineWidth = 1.6 * u;
+                    c.beginPath(); c.arc(w * 0.5, h * 0.48, r * u, 0, TAU); c.stroke();
+                });
+                c.strokeStyle = '#64ffda'; c.lineWidth = 1.4 * u;
+                c.beginPath(); c.moveTo(w * 0.5 - 12 * u, h * 0.48); c.lineTo(w * 0.5 + 12 * u, h * 0.48);
+                c.moveTo(w * 0.5, h * 0.48 - 12 * u); c.lineTo(w * 0.5, h * 0.48 + 12 * u); c.stroke();
+            },
+
+            'satellite-repair': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96;
+                c.fillStyle = '#1e3a8a'; c.fillRect(w * 0.12, h * 0.36, w * 0.24, h * 0.26); c.fillRect(w * 0.64, h * 0.36, w * 0.24, h * 0.26);
+                c.fillStyle = '#d97706'; c.fillRect(w * 0.38, h * 0.28, w * 0.24, h * 0.42);
+                var sx = w * 0.5 + Math.sin(t * 5) * 6 * u, sy = h * 0.49;
+                halo(c, sx, sy, 16 * u, rgba(A, 0.7));
+                c.strokeStyle = '#64ffda'; c.lineWidth = 2 * u;
+                c.beginPath(); c.moveTo(w * 0.72, h * 0.85); c.lineTo(sx, sy); c.stroke();
+            },
+
+            'mars-rover': function (c, w, h, t, p) {
+                var u = h / 96, rx = w * 0.36 + Math.sin(t * 2) * 14 * u;
+                c.fillStyle = '#6b2f1f'; c.fillRect(0, h * 0.72, w, h * 0.28);
+                rock(c, w * 0.72, h * 0.68, 9 * u, 4.1);
+                c.fillStyle = '#f8fafc'; c.fillRect(rx - 14 * u, h * 0.58, 28 * u, 11 * u);
+                c.fillStyle = '#334155';
+                [-10, 0, 10].forEach(function (ox) { c.beginPath(); c.arc(rx + ox * u, h * 0.71, 4.2 * u, 0, TAU); c.fill(); });
+                halo(c, w * 0.54, h * 0.52, 12 * u, 'rgba(100,255,218,0.55)');
+            },
+
+            'space-rescue': function (c, w, h, t, p) {
+                var A = p.rgb, u = h / 96, ax = w * 0.68, ay = h * 0.44 + Math.sin(t * 2.2) * 5 * u;
+                c.strokeStyle = rgba(A, 0.85); c.lineWidth = 2 * u;
+                c.beginPath(); c.moveTo(w * 0.16, h * 0.78); c.lineTo(ax, ay); c.stroke();
+                halo(c, ax, ay, 18 * u, rgba(A, 0.5));
+                c.fillStyle = '#f1f5f9'; c.beginPath(); c.arc(ax, ay - 6 * u, 6 * u, 0, TAU); c.fill();
+                c.fillRect(ax - 5 * u, ay, 10 * u, 13 * u);
             }
         };
 
@@ -1070,6 +1199,8 @@
            each loop: the moment the verb is happening. Nothing animates until
            the card is pointed at; this only decides what it holds. */
         var POSTER = {
+            'orbital-intercept': 1.25, 'asteroid-dodge': 1.35, 'lunar-landing': 1.5,
+            'orbital-docking': 1.1, 'satellite-repair': 1.2, 'mars-rover': 1.4, 'space-rescue': 1.2,
             'gravity-runner': 1.7, 'kessler-reversed': 1.5, 'last-station': 1.32,
             'junk-katamari': 1.3, 're-entry': 1.6, 'asteroid-miner': 0.84,
             'slingshot-golf': 1.86, 'solar-sailor': 1.8, 'planet-defense': 1.72,

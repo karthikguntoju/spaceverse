@@ -8,6 +8,7 @@
  */
 const request = require('supertest');
 const { startTestDb, stopTestDb, clearDb, loadApp } = require('./helpers/server');
+const immersive = ['orbital-intercept', 'asteroid-dodge', 'lunar-landing', 'orbital-docking', 'satellite-repair', 'mars-rover', 'space-rescue'];
 
 let app;
 
@@ -55,13 +56,17 @@ describe('the arcade hub', () => {
         const cookie = await login();
         const hub = await request(app).get('/games').set('Cookie', cookie).expect(200);
         const linked = [...hub.text.matchAll(/href="\/games\/([a-z-]+)"/g)].map((m) => m[1]);
-        expect(linked.length).toBe(12);
-        expect(linked).toContain('asteroid-dodge');
+        expect(new Set(linked).size).toBe(18);
+        expect(linked).toEqual(expect.arrayContaining(immersive));
         // Every card on the hub must resolve; a dead card is a dead end for the
         // player and the hub is the only way most people will find these.
         for (const slug of linked) {
             const page = await request(app).get(`/games/${slug}`).set('Cookie', cookie).expect(200);
-            if (slug !== 'asteroid-dodge') {
+            if (immersive.includes(slug)) {
+                expect(page.text).toContain('/public/js/vr/main.js');
+                expect(page.text).toContain('quest3-deck');
+                expect(page.text).toContain('id="enter-vr"');
+            } else {
                 expect(page.text).toMatch(/\/public\/js\/arcade\/shell\.js(?:\?v=[^"]+)?"/);
             }
         }
@@ -69,6 +74,18 @@ describe('the arcade hub', () => {
 });
 
 describe('/games/:slug', () => {
+    it('serves the XR base-layer renderer used by the solar system, ride and games', async () => {
+        const script = await request(app).get('/lib/three/webxr.module.js').expect(200).expect('Content-Type', /javascript/);
+        expect(script.text).toContain("typeof XRWebGLLayer !== 'function' && supportsGlBinding");
+        const cookie = await login();
+        for (const url of ['/vr-solar-system', '/vr-ride', '/games/asteroid-dodge']) {
+            const page = await request(app).get(url).set('Cookie', cookie).expect(200);
+            expect(page.text).toContain('"three": "/lib/three/webxr.module.js?');
+        }
+        const screen = await request(app).get('/public/js/arcade/quest-screen.js').expect(200);
+        expect(screen.text).toContain('/lib/three/webxr.module.js?');
+    });
+
     it('protects the VR arcade game with the same login requirement', async () => {
         await request(app).get('/games/asteroid-dodge').expect(302);
     });

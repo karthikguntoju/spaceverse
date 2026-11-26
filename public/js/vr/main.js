@@ -27,19 +27,34 @@ import { RemoteInput } from './remote-input.js?v=20261013-1';
 import { DwellSelector, GazeControls } from './gaze-controls.js?v=20261015-3';
 import { ScreenAwake } from './screen-awake.js?v=20261014-2';
 import { PhoneStereoEffect, PHONE_UI_LAYER, setPhoneUILayer, phoneLensMask } from './phone-stereo.js?v=20261015-1';
-import { DodgeGame } from './dodge-game.js?v=20261124-1';
-import { immersiveVRStatus, readThumbstick } from './xr-support.js';
+import { DodgeGame } from './dodge-game.js?v=20261125-clear-view';
+import { ArcadeFlight } from './arcade-flight.js?v=20261125-clear-view';
+import { InterceptGame } from './intercept-game.js?v=20261125-clear-view';
+import { VR_GAMES, VR_ARCADE_META } from './arcade-run.js?v=20261125-q3';
+import { Quest3Rig } from './quest3-rig.js?v=20261125-q3';
+import { immersiveVRStatus, questOnlyVRStatus, readThumbstick, readQuestControllers, pulseQuestController, setRayFromObject } from './xr-support.js?v=20261125-xr1';
+import { guardXRFrames } from './xr-frame-guard.js?v=20261125-xr1';
 import MissionCore from '../game/core.js';
 import { createScanHunt } from '../game/missions/scan-hunt.js';
 
 const $ = id => document.getElementById(id);
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const DODGE_DIFFICULTIES = ['practice', 'normal', 'expert'];
+const DODGE_SENSITIVITIES = { low: 0.72, standard: 1, high: 1.35 };
 
 class VRApp {
     constructor() {
         this.mode = 'menu';
-        this.entry = /^\/games\/asteroid-dodge\/?$/i.test(location.pathname) ? 'dodge' : (location.pathname.indexOf('vr-ride') !== -1 ||
+        const slug = location.pathname.match(/^\/games\/([a-z-]+)\/?$/i)?.[1]?.toLowerCase();
+        this.arcadeMission = Object.hasOwn(VR_GAMES, slug) ? VR_GAMES[slug] : null;
+        this.arcadeMeta = Object.hasOwn(VR_ARCADE_META, slug) ? VR_ARCADE_META[slug] : null;
+        this.arcadeSlug = slug;
+        this.isIntercept = slug === 'orbital-intercept';
+        this.entry = (slug === 'asteroid-dodge' || this.isIntercept || this.arcadeMission) ? 'dodge' : (location.pathname.indexOf('vr-ride') !== -1 ||
             location.search.indexOf('mode=ride') !== -1) ? 'ride' : 'explore';
+        this.questOnly = this.entry === 'dodge';
+        this._prevQuestInput = null;
+        this._savedArcadeRun = null;
         this.clock = new THREE.Clock();
         this.keys = new Set();
         this.flySpeed = 40;
@@ -139,7 +154,9 @@ class VRApp {
         }
 
         this.system = new SolarSystem(this.scene, { quality });
-        await this.system.build(msg => this.setStatus(msg));
+        if (this.arcadeMission || this.isIntercept) this.setStatus('Preparing ' + this.arcadeName + ' for Meta Quest 3…');
+        else if (this.questOnly) this.setStatus('Preparing ' + this.arcadeName + ' for Meta Quest 3…');
+        else await this.system.build(msg => this.setStatus(msg));
         this.system.setLabelsVisible(false);
 
         this.scares = new ScareDirector({
@@ -176,8 +193,14 @@ class VRApp {
             this.stereoEffect.setViewerSettings(saved ? JSON.parse(saved) : { spacing: previous?.spacing, size: 0.96, shape: 'wide' });
         }
         catch (_) { /* missing, unavailable or invalid saved preferences */ }
-        this.dodge = new DodgeGame(this.scene);
-        const pauseDodge = () => { if (this.mode === 'dodge') this.dodge.run.pause(); };
+        if (this.entry === 'dodge') {
+            const gameOpts = { renderer: this.renderer, audio: this.audio, haptics: (h, i, ms) => this.pulseHand(h, i, ms) };
+            if (this.isIntercept) this.interceptGame = new InterceptGame(this.scene, gameOpts);
+            else if (this.arcadeMission) this.flightGame = new ArcadeFlight(this.scene, this.arcadeSlug, gameOpts);
+            else this.dodge = new DodgeGame(this.scene, gameOpts);
+            this.configureArcadeLauncher();
+        }
+        const pauseDodge = () => { if (this.mode === 'dodge') this.arcadeGame.run.pause(); };
         window.addEventListener('blur', pauseDodge);
         document.addEventListener('visibilitychange', () => { if (document.hidden) pauseDodge(); });
         this.buildReticle();
@@ -193,7 +216,6 @@ class VRApp {
         }));
         MissionCore.on('result', (result) => this.onMissionResult(result));
 
-        this.buildVRHud();
         this.buildVRInfoPanel();
         this.buildVRMenu();
         this.buildControllers();
@@ -209,16 +231,23 @@ class VRApp {
         this.raycaster = new THREE.Raycaster();
         this.pointer = new THREE.Vector2();
 
-        this.placeAtEarth();
+        if (!this.arcadeMission && !this.isIntercept) this.placeAtEarth();
         window.addEventListener('resize', () => this.onResize());
 
-        this.renderer.setAnimationLoop((t, frame) => this.loop(frame));
+        this.renderer.setAnimationLoop((_time, frame) => {
+            if (frame && this.xrGuard) this.xrGuard.render(() => this.loop(frame));
+            else this.loop(frame);
+        });
 
         this.checkXR();
         this.checkPhone();
         $('loading').style.display = 'none';
         $('mode-menu').classList.add('show');
         $('mode-menu').classList.add(`only-${this.entry}`);
+        if (this.questOnly) {
+            document.body?.classList?.add('quest-only');
+            $('mode-menu').classList.add('quest-only');
+        }
 
         window.__vr = this;
         this.missionCore = MissionCore;
@@ -291,11 +320,74 @@ class VRApp {
         return this.gyroOn && this.gyro.enabled && this.gyro.hasReading && !this.renderer.xr.isPresenting;
     }
 
+    get arcadeGame() { return this.interceptGame || this.flightGame || this.dodge; }
+    get arcadeName() { return this.arcadeMeta?.title || this.arcadeMission?.title || 'Asteroid Dodge'; }
+
+    configureArcadeLauncher() {
+        const meta = this.arcadeMeta;
+        const name = this.arcadeName;
+        const summary = meta?.description || this.arcadeMission?.description || 'Bank through an asteroid trench with Meta Quest 3 Touch Plus controllers.';
+        document.title = name + ' — Meta Quest 3 · SpaceVerse';
+
+        if ($('arcade-title')) $('arcade-title').textContent = name;
+        if ($('arcade-kicker')) $('arcade-kicker').textContent = meta?.kicker || 'META QUEST 3 EXCLUSIVE';
+        if ($('arcade-launch-name')) $('arcade-launch-name').textContent = 'Start ' + name;
+        if ($('arcade-summary')) $('arcade-summary').textContent = summary;
+        if ($('arcade-controls')) $('arcade-controls').textContent = this.arcadeMission?.controls || this.arcadeGame?.run?.config?.controls || '';
+        if ($('arcade-menu-summary')) $('arcade-menu-summary').textContent = 'Meta Quest 3 Exclusive · Use Touch Plus dual 6DoF controllers.';
+        if ($('dodge-settings')) $('dodge-settings').hidden = true;
+        if ($('dodge-hud')) $('dodge-hud').setAttribute('aria-label', name + ' controls');
+
+        if ($('quest3-title')) $('quest3-title').textContent = name;
+        if ($('quest3-kicker')) $('quest3-kicker').textContent = meta?.kicker || 'META QUEST 3 EXCLUSIVE · TOUCH PLUS';
+        if ($('quest3-summary')) $('quest3-summary').textContent = summary;
+
+        const leftList = $('quest3-left-list');
+        const rightList = $('quest3-right-list');
+        if (leftList && meta?.questControls?.left) {
+            leftList.innerHTML = meta.questControls.left.map(item => `<li>${item}</li>`).join('');
+        }
+        if (rightList && meta?.questControls?.right) {
+            rightList.innerHTML = meta.questControls.right.map(item => `<li>${item}</li>`).join('');
+        }
+        this.refreshArcadeBest();
+    }
+
+    refreshArcadeBest() {
+        const badge = $('quest3-best');
+        if (!badge || !this.arcadeSlug) return;
+        let best = 0;
+        try {
+            best = Number(localStorage.getItem('spaceverse.arcade.' + this.arcadeSlug + '.best') || 0);
+        } catch { best = 0; }
+        if (!Number.isFinite(best) || best < 0) best = 0;
+        const tiers = this.arcadeMeta?.tiers || [1500, 4000, 9000];
+        const medal = best >= tiers[2] ? '🥇 Gold' : best >= tiers[1] ? '🥈 Silver' : best >= tiers[0] ? '🥉 Bronze' : 'No medal yet';
+        badge.textContent = best > 0 ? `Personal Best: ${best.toLocaleString()} pts · ${medal}` : `Personal Best: — · Target ${tiers[0].toLocaleString()} for Bronze`;
+    }
+
+    saveArcadeBest(score) {
+        if (!this.arcadeSlug || !Number.isFinite(score) || score <= 0) return;
+        const rounded = Math.round(score);
+        try {
+            const key = 'spaceverse.arcade.' + this.arcadeSlug + '.best';
+            const prev = Number(localStorage.getItem(key) || 0);
+            if (!Number.isFinite(prev) || rounded > prev) {
+                localStorage.setItem(key, String(rounded));
+            }
+        } catch { /* ignore storage restrictions */ }
+        this.refreshArcadeBest();
+    }
+
     /* ── phone VR: gyro look + Cardboard stereo ─────────────────────── */
 
     checkPhone() {
         const wrap = $('phone-row');
         if (!wrap) return;
+        if (this.questOnly) {
+            if (wrap.style) wrap.style.display = 'none';
+            return;
+        }
         if (!this.isTouch) { wrap.style.display = 'none'; return; }
         wrap.style.display = 'flex';
         const flight = $('phone-flight');
@@ -305,7 +397,7 @@ class VRApp {
         if (note) {
             note.textContent = reason
                 ? '⚠ ' + reason
-                : `Use Gyro look for a normal phone view. Phone VR starts ${this.entry === 'dodge' ? 'Asteroid Dodge' : this.entry === 'ride' ? 'the ride' : 'free flight'} in side-by-side view; rotate to landscape before using a viewer.`;
+                : `Use Gyro look for a normal phone view. Phone VR starts ${this.entry === 'dodge' ? this.arcadeName : this.entry === 'ride' ? 'the ride' : 'free flight'} in side-by-side view; rotate to landscape before using a viewer.`;
             note.classList.toggle('warn', !!reason);
         }
     }
@@ -341,11 +433,12 @@ class VRApp {
     }
 
     recenterView() {
-        if (this.mode === 'dodge') this.dodge.run.pause();
+        if (this.mode === 'dodge') this.arcadeGame.run.pause();
         if (this.gyroActive) this.gyro.recenter();
         else if (this.stereoFlightLook) this.pitch = 0;
         this.lookYaw = 0; this.lookPitch = 0;
         this.updateHead(0);
+        if (this.mode === 'dodge') this.arcadeGame.recenter(this.xrHead?.quaternion || this.camera.quaternion);
         if (this.gazeControls) {
             this.gazeControls.anchor(this.camera);
             if (this.gyroActive) this.gazeControls.group.quaternion.identity();
@@ -356,12 +449,16 @@ class VRApp {
     }
 
     async enterPhoneVR() {
+        if (this.questOnly) {
+            this.toast('Phone VR is disabled — this game is exclusive to Meta Quest 3 with Touch Plus controllers.');
+            return;
+        }
         if (this.renderer.xr.isPresenting) return;
         this.audio.init();
         const gyroRequest = this.enableGyro(true);
         this.stereo = true;
         if (this.stereoFlightLook) this.applyLook();
-        if (this.mode === 'dodge') this.dodge.run.pause();
+        if (this.mode === 'dodge') this.arcadeGame.run.pause();
         this.screenAwake.start();
         document.body.classList.add('in-cardboard');
         this.updateCardboardLayout();
@@ -387,7 +484,6 @@ class VRApp {
         this.gaze.reset();
         this.updateHead(0);
         this.gazeControls.anchor(this.camera);
-        this.vrHud.visible = this.mode !== 'ride';
         this.audio.init();
         this.onResize();
         this.updatePhoneButtons();
@@ -412,12 +508,12 @@ class VRApp {
             this.updateHead(0);
         }
         this.screenAwake.stop();
-        if (this.mode === 'dodge') this.dodge.run.pause();
+        if (this.mode === 'dodge') this.arcadeGame.run.pause();
         this.autoFly = false;
         this.gazeOptionsOpen = false;
         this.gazeMenuOpen = false;
         this.gazeControls.group.visible = false;
-        for (const ui of [this.reticle, this.vrHud, this.vrInfoPanel, this.gazeControls.group]) {
+        for (const ui of [this.reticle, this.gazeControls.group]) {
             if (ui) setPhoneUILayer(ui, false);
         }
         this.gaze.reset();
@@ -432,7 +528,6 @@ class VRApp {
                 Promise.resolve(screen.orientation.unlock()).catch(() => {});
         } catch (e) { /* ignore */ }
         this.reticle.visible = false;
-        this.vrHud.visible = false;
         if (this.vrInfoPanel) this.vrInfoPanel.visible = false;
         this.renderer.setScissorTest(false);
         this.renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
@@ -488,6 +583,7 @@ class VRApp {
                 options.push({ action: 'skip-seg', title: 'SKIP SECTION' });
             } else if (this.entry === 'dodge') {
                 options.push({ action: 'dodge', title: 'RESTART GAME' });
+                if (this.dodge) options.push(...this.dodgeOptions());
             } else {
                 options.push({ action: 'next-world', title: 'NEXT WORLD', hint: 'Warp to next planet' });
                 options.push({ action: 'low-orbit', title: 'LOW ORBIT SKIM', hint: 'Close terminator pass' });
@@ -516,9 +612,10 @@ class VRApp {
         if (action === 'menu') {
             this.gazeMenuOpen = true;
             this.gazeOptionsOpen = false;
+            this.showMenuInfo(this.gazeControls.group, true);
             this.autoFly = false;
             this.focusTween = null;
-            if (this.mode === 'dodge') this.dodge.run.pause();
+            if (this.mode === 'dodge') this.arcadeGame.run.pause();
             if (this.mode === 'ride') this.ride.pause();
             this.gaze.reset(true);
             return;
@@ -536,10 +633,11 @@ class VRApp {
         if (action === 'low-orbit') { this.closeGazeMenu(); this.skimBody(this.activeBodyKey || 'earth'); return; }
         if (action === 'toggle-cockpit') { this.closeGazeMenu(); this.toggleExploreCockpit(); return; }
         if (action === 'skip-seg') { this.closeGazeMenu(); this.ride.skipSegment(); this.ride.resume(); return; }
+        if (this.changeDodgeOption(action)) { this.gaze.reset(true); return; }
         this.autoFly = false;
         this.focusTween = null;
         if (action === 'options' && this.mode === 'ride') this.ride.pause();
-        if (action === 'options' && this.mode === 'dodge') this.dodge.run.pause();
+        if (action === 'options' && this.mode === 'dodge') this.arcadeGame.run.pause();
         this.gazeOptionsOpen = action === 'options';
         if (action === 'restart') this.startRide();
         if (action === 'explore') this.startExplore();
@@ -551,15 +649,18 @@ class VRApp {
     }
 
     closeGazeMenu() {
+        if (this.vrInfoPanel?.parent === this.gazeControls.group) this.vrInfoPanel.visible = false;
         this.gazeMenuOpen = false;
         this.gazeOptionsOpen = false;
         this.gaze.reset(true);
     }
 
     gazeUpdate(dt) {
-        const active = this.stereo && !this.renderer.xr.isPresenting && this.mode !== 'menu';
-        for (const ui of [this.reticle, this.vrHud, this.vrInfoPanel, this.gazeControls.group]) {
-            if (ui) setPhoneUILayer(ui, active);
+        const stereo = this.stereo && !this.renderer.xr.isPresenting && this.mode !== 'menu';
+        const gameGyro = this.mode === 'dodge' && this.flightGame && this.gyroActive;
+        const active = stereo || gameGyro;
+        for (const ui of [this.reticle, this.gazeControls.group]) {
+            if (ui) setPhoneUILayer(ui, stereo);
         }
         this.gazeControls.group.visible = active;
         this.reticle.visible = active;
@@ -569,36 +670,44 @@ class VRApp {
             this.reticleFill.geometry.setDrawRange(0, 0);
             return;
         }
-        if (this.gazeMenuOpen && this.gazeControls.lookPitch(this.camera) > -20 * Math.PI / 180) this.closeGazeMenu();
-        this.gazeControls.updateDock(this.camera, this.gazeMenuOpen);
-        this.gazeControls.setOptions(this.gazeOptions());
-        setPhoneUILayer(this.gazeControls.group, true);
+        if (stereo) {
+            if (this.gazeMenuOpen && this.gazeControls.lookPitch(this.camera) > -20 * Math.PI / 180) this.closeGazeMenu();
+            this.gazeControls.updateDock(this.camera, this.gazeMenuOpen);
+            this.gazeControls.setOptions(this.gazeOptions());
+            setPhoneUILayer(this.gazeControls.group, true);
+        } else this.gazeControls.group.visible = false;
         this.pointer.set(0, 0);
         this.raycaster.setFromCamera(this.pointer, this.camera);
-        const control = this.gazeControls.hit(this.raycaster, PHONE_UI_LAYER);
-        const world = !control && !this.gazeMenuOpen && this.mode !== 'ride' && this.mode !== 'dodge'
+        const control = stereo ? this.gazeControls.hit(this.raycaster, PHONE_UI_LAYER) : null;
+        const pointAtWorld = !control && !this.gazeMenuOpen;
+        const gameHit = pointAtWorld && this.mode === 'dodge' ? this.flightGame?.pick(this.raycaster) : null;
+        const world = pointAtWorld && this.mode !== 'ride' && this.mode !== 'dodge'
             ? this.raycaster.intersectObjects(this.system.pickTargets, false)[0] : null;
         const action = control?.object.userData.action;
+        const playAction = gameHit?.object.userData.arcadeAction;
         const body = world?.object.userData.bodyKey;
-        setPhoneUILayer(this.reticle, !world);
-        const key = action ? `ui:${action}` : body ? `body:${body}` : null;
+        setPhoneUILayer(this.reticle, stereo && !world && !gameHit);
+        const key = action ? `ui:${action}` : playAction ? `game:${playAction}` : body ? `body:${body}` : null;
         const { progress, activate } = this.gaze.update(key, dt);
         this.gazeControls.highlight(control?.object);
-        this.vrHud.visible = this.mode !== 'ride' && !control && !this.gazeMenuOpen;
+        if (this.mode === 'dodge') this.flightGame?.highlight(gameHit?.object);
         this.reticleFill.geometry.setDrawRange(0, Math.floor(progress * 64) * 6);
-        const distance = clamp(control?.distance || world?.distance || 1.6, 0.2, 1000);
+        const distance = clamp(control?.distance || gameHit?.distance || world?.distance || 1.6, 0.2, 1000);
         this.reticle.position.z = -distance;
         this.reticle.scale.setScalar(distance / 0.6);
         if (activate) {
-            this.audio.blip(920);
-            if (action) this.gazeAction(action);
-            else this.showBody(body, this.mode === 'explore');
+            if (playAction) this.arcadeAction(playAction);
+            else {
+                this.audio.blip(920);
+                if (action) this.gazeAction(action);
+                else this.showBody(body, this.mode === 'explore');
+            }
         }
     }
 
     onPhoneTap() {
         if (this.mode === 'dodge') {
-            const run = this.dodge.run;
+            const run = this.arcadeGame.run;
             ['playing', 'countdown'].includes(run.state) ? run.pause() : run.play();
             this.updateDodgeHud();
         } else if (this.mode === 'ride') {
@@ -655,122 +764,177 @@ class VRApp {
 
     async checkXR() {
         const btn = $('enter-vr');
-        const { label, available } = await immersiveVRStatus(navigator.xr, window.isSecureContext);
-        btn.textContent = '🥽 ' + label;
-        btn.disabled = !available;
-        btn.classList.toggle('disabled', !available);
-        $('vr-ready').style.display = available ? 'block' : 'none';
+        const qBtn = $('quest3-launch');
+        const status = this.questOnly
+            ? await questOnlyVRStatus(navigator.xr, window.isSecureContext)
+            : await immersiveVRStatus(navigator.xr, window.isSecureContext);
+        const { label, available, reason } = status;
+        if (btn) {
+            btn.textContent = '🥽 ' + label;
+            btn.disabled = !available;
+            btn.classList.toggle('disabled', !available);
+        }
+        if (qBtn) {
+            qBtn.textContent = '🥽 ' + label;
+            qBtn.disabled = !available;
+            qBtn.classList.toggle('disabled', !available);
+        }
+        if ($('vr-ready')?.style) $('vr-ready').style.display = available ? 'block' : 'none';
+        const req = $('quest3-requirement');
+        if (req) {
+            req.textContent = available ? 'Meta Quest 3 WebXR Ready · Put on your headset and pick up both Touch Plus controllers.' : (reason || 'Open in Meta Quest 3 Browser over HTTPS.');
+            req.classList?.toggle?.('ready', Boolean(available));
+        }
     }
 
     async enterVR() {
+        if (this.xrReloadNeeded) {
+            location.reload();
+            return;
+        }
         if (!navigator.xr || this.xrSession || this.xrStarting) return;
         this.xrStarting = true;
         const button = $('enter-vr');
-        button.disabled = true;
-        if (this.stereo) this.exitPhoneVR();
-        this.audio.init();
+        const qBtn = $('quest3-launch');
+        if (button) button.disabled = true;
+        if (qBtn) qBtn.disabled = true;
         let session;
         try {
+            if ($('xr-launch-status')) $('xr-launch-status').textContent = '';
+            if (this.stereo) this.exitPhoneVR();
+            this.audio.init();
             session = await navigator.xr.requestSession('immersive-vr', {
                 optionalFeatures: ['hand-tracking']
             });
             this.xrSession = session;
             this.xrHead = new THREE.Object3D();
-            session.addEventListener('end', () => this.endXR(session), { once: true });
+            this._prevQuestInput = null;
+            this.xrShowLauncher = this.mode === 'menu';
+            this.xrGuard = guardXRFrames(error => this.failXR(session, error));
+            // Three restores its own framebuffer in its native end handler.
+            session.addEventListener('end', () => queueMicrotask(() => this.endXR(session)), { once: true });
             session.addEventListener('visibilitychange', () => {
                 if (session.visibilityState !== 'visible') this.pauseXRActivity();
             });
-            // The cockpit and Dodge course use a seated eye-level origin.
+            // The cockpit and Quest 3 arcade courses use a seated eye-level origin.
             this.renderer.xr.setReferenceSpaceType('local');
             this.renderer.xr.setFramebufferScaleFactor(0.85);
-            await this.renderer.xr.setSession(session);
-            if (this.xrSession !== session) return;
-            document.body.classList.add('in-vr');
-            this.vrHud.visible = true;
-            if (this.mode === 'explore' || this.mode === 'mission') this.applyLook();
-            this.xrShowLauncher = this.mode === 'menu';
-            this.audio.init();
-        } catch (e) {
-            if (session) {
-                try { await session.end(); } catch { /* session already closed */ }
-                this.endXR(session);
+            this.renderer.xr.setFoveation?.(0.65);
+            this.xrAttaching = session;
+            try {
+                await this.renderer.xr.setSession(session);
+            } finally {
+                this.xrAttaching = null;
             }
-            console.error('[vr] session request failed', e);
-            this.toast('Could not start VR session: ' + e.message);
+            if (this.xrSession !== session || this.xrFailed) return;
+            document.body.classList.add('in-vr');
+            if (this.mode !== 'menu') $('mode-menu').classList.remove('show');
+            if (this.mode === 'explore' || this.mode === 'mission') this.applyLook();
+        } catch (e) {
+            if (session && this.xrSession === session) this.xrGuard.fail(e);
+            else if (!session) this.reportXRFailure(e);
         } finally {
             this.xrStarting = false;
-            button.disabled = false;
+            if (button) button.disabled = false;
+            if (qBtn) qBtn.disabled = false;
         }
+    }
+
+    reportXRFailure(error) {
+        console.error('[vr] headset rendering failed', error);
+        const message = 'Headset VR could not start or continue. ' + (error?.message || 'Try entering VR again.');
+        const status = $('xr-launch-status');
+        if (status) status.textContent = message;
+        this.toast(message);
+    }
+
+    failXR(session, error) {
+        if (this.xrSession !== session) return;
+        this.xrFailed = true;
+        this.reportXRFailure(error);
+        session.end().catch(() => this.endXR(session));
     }
 
     pauseXRActivity() {
         this.autoFly = false;
         if (this.mode === 'ride') this.ride.pause();
-        if (this.mode === 'dodge') this.dodge.run.pause();
+        if (this.mode === 'dodge') this.arcadeGame.run.pause();
         this.updateHudDom();
     }
 
     endXR(session) {
         if (this.xrSession !== session) return;
+        const showLauncher = this.questOnly || this.xrFailed || this.xrAttaching === session;
+        if (this.xrAttaching === session) {
+            // Three is still attaching the old session. Retry with a fresh renderer.
+            this.xrReloadNeeded = true;
+            for (const id of ['enter-vr', 'quest3-launch']) {
+                const button = $(id);
+                if (button) {
+                    button.textContent = 'Reload to retry headset VR';
+                    button.disabled = false;
+                }
+            }
+        }
+        this.xrGuard?.stop();
+        this.xrGuard = null;
+        this.xrFailed = false;
         this.pauseXRActivity();
         this.xrSession = null;
         this.xrHead = null;
         this.xrShowLauncher = false;
         this._snapLock = false;
         document.body.classList.remove('in-vr');
+        if (showLauncher) $('mode-menu').classList.add('show');
         this.vrMenu.visible = false;
-        this.vrHud.visible = false;
         if (this.vrInfoPanel) this.vrInfoPanel.visible = false;
         if (this.mode === 'explore' || this.mode === 'mission') this.applyLook();
+        this.onResize();
     }
 
     updateXRHead(frame) {
         const reference = this.renderer.xr.getReferenceSpace();
         const pose = reference && frame?.getViewerPose(reference);
-        if (!pose || !this.xrHead) return;
+        if (!pose || !this.xrHead) return false;
         this.xrHead.position.copy(pose.transform.position);
         this.xrHead.quaternion.copy(pose.transform.orientation);
         if (this.xrShowLauncher) {
             this.xrShowLauncher = false;
-            if (!this.vrMenu.visible) this.toggleVRMenu();
+            if (this.questOnly) this.startDodge();
+            else if (!this.vrMenu.visible) this.toggleVRMenu();
         }
+        return true;
     }
 
     pulse(intensity, ms) {
-        const s = this.xrSession;
-        if (!s) return;
-        for (const src of s.inputSources) {
-            const g = src.gamepad;
-            if (g && g.hapticActuators && g.hapticActuators[0]) {
-                try { Promise.resolve(g.hapticActuators[0].pulse(clamp(intensity, 0, 1), ms)).catch(() => {}); }
-                catch { /* optional controller feedback */ }
-            }
-        }
+        this.pulseHand('both', intensity, ms);
+    }
+
+    pulseHand(handedness, intensity, ms) {
+        pulseQuestController(this.xrSession, handedness, intensity, ms);
     }
 
     buildControllers() {
-        this.controllers = [];
-        this.hands = [];
-        const rayGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]);
-        for (let i = 0; i < 2; i++) {
-            const c = this.renderer.xr.getController(i);
-            const line = new THREE.Line(rayGeo, new THREE.LineBasicMaterial({
-                color: 0x64ffda, transparent: true, opacity: 0.7
-            }));
-            line.scale.z = 6;
-            c.add(line);
-            const grip = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.012, 0.02, 0.12, 12),
-                new THREE.MeshStandardMaterial({ color: 0x223044, roughness: 0.5, emissive: 0x0b1b26 })
-            );
-            grip.rotation.x = -Math.PI / 3;
-            c.add(grip);
-            c.addEventListener('selectstart', () => this.onControllerSelect(c));
-            c.addEventListener('squeezestart', () => this.toggleVRMenu());
-            this.dolly.add(c);
-            this.controllers.push(c);
+        this.questRig = new Quest3Rig({
+            renderer: this.renderer,
+            dolly: this.dolly,
+            envMap: this.cockpit?.env || null,
+            onSelect: c => this.onControllerSelect(c),
+            onSqueeze: (_c, slot) => {
+                if (this.isIntercept && this.mode === 'dodge' && !this.vrMenu?.visible && this.interceptGame?.run.state === 'playing') {
+                    return;
+                }
+                if (this.questOnly && this.mode === 'dodge' && slot?.handedness === 'right' && !this.vrMenu?.visible && this.arcadeGame?.run.state === 'playing') {
+                    return;
+                }
+                this.toggleVRMenu();
+            }
+        });
+        this.controllers = this.questRig.controllers;
+        if (this.questOnly) this.questRig.setToolProfile(this.arcadeSlug);
 
-            // WebXR Hand-Tracking support (Quest / Vision Pro / Pico pinch gestures)
+        this.hands = [];
+        for (let i = 0; i < 2; i++) {
             if (this.renderer.xr.getHand) {
                 const hand = this.renderer.xr.getHand(i);
                 const pinchOrb = new THREE.Mesh(
@@ -778,7 +942,6 @@ class VRApp {
                     new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.75 })
                 );
                 hand.add(pinchOrb);
-                // Hand pinches already generate WebXR select events on the target ray.
                 this.dolly.add(hand);
                 this.hands.push(hand);
             }
@@ -844,8 +1007,10 @@ class VRApp {
                 ['RESTART RIDE', 'Return to Earth orbit', 'ride'],
                 ['TOGGLE COMFORT', 'Reduce rolls and limit peripheral motion', 'comfort']
             ] : this.mode === 'dodge' ? [
-                [this.dodgeButtonTitle(), 'Face the course and turn to steer', 'dodge-play'],
-                ['RESTART GAME', 'Reset the course and shields', 'dodge']
+                [this.dodgeButtonTitle(), 'Begin or resume the current run', 'dodge-play'],
+                ['RESTART GAME', 'Reset the current run', 'dodge'],
+                ['RECENTER VIEW', 'Set forward direction', 'recenter-arcade'],
+                ...(this.dodge ? this.dodgeOptions().map(({ title, hint, action }) => [title, hint, action]) : [])
             ] : [
                 ['NEXT WORLD · WARP', 'Fly to the next destination', 'next-world'],
                 ['LOW ORBIT', 'Skim the selected world', 'low-orbit'],
@@ -865,7 +1030,7 @@ class VRApp {
                 mk(label('SWITCH TO FREE FLIGHT', 'Explore all 13 worlds freely', '#64ffda'), 0, -0.24, 'explore', 0.88)
             ]
             : this.entry === 'dodge'
-                ? [mk(label('ASTEROID DODGE', '60 sec · head-steered practice', '#ffb46b'), 0, 0, 'dodge')]
+                ? [mk(label(this.arcadeName.toUpperCase(), 'Select to enter Meta Quest 3 cockpit', this.arcadeMeta?.accent || this.arcadeMission?.accent || '#ffb46b'), 0, 0, 'dodge')]
                 : [
                     mk(label('EXPLORE', 'Free flight · left stick to fly', '#64ffda'), -0.46, 0.25, 'explore', 0.95),
                     mk(label('SCAN HUNT', '90 sec · find 5 worlds', '#c4b5fd'), 0.46, 0.25, 'scan-hunt', 0.95),
@@ -877,13 +1042,12 @@ class VRApp {
     toggleVRMenu() {
         if (!this.renderer.xr.isPresenting) return;
         const show = !this.vrMenu.visible;
-        this.vrHud.visible = !show;
         if (!show) { this.vrMenu.visible = false; return; }
         if (this.mode === 'ride') this.ride.pause();
-        if (this.mode === 'dodge') this.dodge.run.pause();
+        if (this.mode === 'dodge') this.arcadeGame.run.pause();
         this.buildVRMenu(this.mode !== 'menu');
         this.vrMenu.visible = true;
-        if (show && this.vrInfoPanel) this.vrInfoPanel.visible = false;
+        this.showMenuInfo(this.vrMenu, false);
         const head = this.xrHead || this.camera;
         const yaw = new THREE.Euler().setFromQuaternion(head.quaternion, 'YXZ').y;
         this.vrMenu.rotation.set(0, yaw, 0, 'YXZ');
@@ -923,13 +1087,22 @@ class VRApp {
                 map: tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false
             })
         );
-        // Positioned comfortably in the upper-right peripheral HUD zone
-        mesh.position.set(0.32, 0.08, -1.12);
-        mesh.rotation.y = -0.22;
         mesh.renderOrder = 996;
         mesh.visible = false;
-        this.camera.add(mesh);
         this.vrInfoPanel = mesh;
+    }
+
+    showMenuInfo(menu, phone) {
+        const panel = this.vrInfoPanel;
+        if (!panel) return;
+        const clue = this.mode === 'mission' && this.missionObjective;
+        const body = this.mode === 'explore' && this.activeBodyKey && this.system.getInfo(this.activeBodyKey);
+        panel.visible = Boolean(clue || body);
+        if (!panel.visible) return;
+        this.drawVRInfoPanel(clue ? { name: 'Scan Hunt', kind: 'MISSION CLUE', fact: clue } : body);
+        menu.add(panel);
+        panel.position.set(0, phone ? 0.52 : 0.72, phone ? -1.6 : 0);
+        setPhoneUILayer(panel, phone);
     }
 
     drawVRInfoPanel(info) {
@@ -964,20 +1137,21 @@ class VRApp {
         x.fillStyle = '#c8dcf4';
         x.font = '30px Inter, sans-serif';
         const words = String(info.fact || '').split(' ');
+        const maxRows = info.radius == null ? 9 : 3;
         let line = '', row = 0;
         for (const word of words) {
             if (x.measureText(`${line} ${word}`).width > w - 72 && line) {
                 x.fillText(line, 36, 194 + row * 42);
                 row++;
                 line = '';
-                if (row === 3) break;
+                if (row === maxRows) break;
             }
             line += (line ? ' ' : '') + word;
         }
-        if (row < 3 && line) x.fillText(line, 36, 194 + row * 42);
+        if (row < maxRows && line) x.fillText(line, 36, 194 + row * 42);
 
         // Telemetry grid
-        const stats = [
+        const stats = info.radius == null ? [] : [
             ['RADIUS', `${info.radius.toFixed(1)} u`],
             ['ORBIT', String(info.distance)],
             ['AXIAL TILT', String(info.tiltDeg)],
@@ -999,88 +1173,13 @@ class VRApp {
         // Footer hint
         x.fillStyle = '#64ffda';
         x.font = '600 22px Inter, sans-serif';
-        x.fillText('🛸 4K SURFACE STREAMED  ·  MENU → LOW ORBIT SKIM / NEXT WORLD', 36, 594);
+        if (stats.length) x.fillText('LOW ORBIT SKIM  ·  NEXT WORLD', 36, 594);
 
         this.vrInfoTex.needsUpdate = true;
-        if (this.renderer.xr.isPresenting || this.stereo) {
-            this.vrInfoPanel.visible = true;
-            clearTimeout(this._vrInfoTimer);
-            this._vrInfoTimer = setTimeout(() => {
-                if (this.vrInfoPanel) this.vrInfoPanel.visible = false;
-            }, 9000);
-        }
-    }
-
-    /* in-headset HUD: a canvas panel pinned below the line of sight */
-    buildVRHud() {
-        const c = document.createElement('canvas');
-        c.width = 2048; c.height = 512;
-        this.hudCanvas = c;
-        this.hudCtx = c.getContext('2d');
-        this.hudCtx.scale(2, 2);
-        const tex = new THREE.CanvasTexture(c);
-        tex.colorSpace = THREE.SRGBColorSpace;
-        tex.generateMipmaps = false; tex.minFilter = THREE.LinearFilter;
-        this.hudTex = tex;
-        const mesh = new THREE.Mesh(
-            new THREE.PlaneGeometry(0.72, 0.18),
-            new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false })
-        );
-        mesh.position.set(0, -0.26, -0.85);
-        mesh.renderOrder = 998;
-        mesh.visible = false;
-        this.camera.add(mesh);
-        this.vrHud = mesh;
-        this.drawVRHud();
-    }
-
-    drawVRHud() {
-        const x = this.hudCtx, w = 1024, h = 256;
-        x.clearRect(0, 0, w, h);
-        x.fillStyle = 'rgba(6,12,22,0.96)';
-        x.strokeStyle = 'rgba(100,255,218,0.55)';
-        x.lineWidth = 3;
-        const r = 22;
-        x.beginPath();
-        x.moveTo(r, 0); x.lineTo(w - r, 0); x.quadraticCurveTo(w, 0, w, r);
-        x.lineTo(w, h - r); x.quadraticCurveTo(w, h, w - r, h);
-        x.lineTo(r, h); x.quadraticCurveTo(0, h, 0, h - r);
-        x.lineTo(0, r); x.quadraticCurveTo(0, 0, r, 0);
-        x.fill(); x.stroke();
-
-        x.fillStyle = '#64ffda';
-        x.font = 'bold 62px Inter, Segoe UI, sans-serif';
-        x.fillText(this.hudText.title, 34, 74, w - 68);
-        x.fillStyle = '#cfe3ff';
-        x.font = '40px Inter, Segoe UI, sans-serif';
-        const words = this.hudText.sub.split(' ');
-        let line = '', row = 0;
-        for (const word of words) {
-            if (x.measureText(`${line} ${word}`).width > w - 68 && line) {
-                x.fillText(line, 34, 126 + row * 44); row++; line = '';
-                if (row === 2) break;
-            }
-            line += (line ? ' ' : '') + word;
-        }
-        if (row < 2) x.fillText(line, 34, 126 + row * 44, w - 68);
-
-        if (this.hudText.warn) {
-            x.fillStyle = '#ff5a5a';
-            x.font = 'bold 44px Inter, Segoe UI, sans-serif';
-            x.fillText(this.hudText.warn, 34, 224, w - 68);
-        } else if (this.mode === 'ride') {
-            const p = clamp(this.ride.time / this.ride.total, 0, 1);
-            x.fillStyle = 'rgba(255,255,255,0.16)';
-            x.fillRect(34, 168, w - 68, 14);
-            x.fillStyle = '#64ffda';
-            x.fillRect(34, 168, (w - 68) * p, 14);
-        }
-        this.hudTex.needsUpdate = true;
     }
 
     setHud(title, sub, warn = '') {
         this.hudText = { title, sub, warn };
-        this.drawVRHud();
     }
 
     /* ── input ──────────────────────────────────────────────────────── */
@@ -1139,7 +1238,13 @@ class VRApp {
             this.dragging = false;
             if (!wasDrag) return;
             if (this.touchMoved < 8) {
-                if (this.stereo) this.onPhoneTap();
+                if (this.stereo) {
+                    if (this.mode === 'dodge' && this.flightGame?.run.state === 'playing') {
+                        this.pointer.set(0, 0);
+                        this.raycaster.setFromCamera(this.pointer, this.camera);
+                        this.selectArcadeTarget();
+                    } else this.onPhoneTap();
+                }
                 else if (e.changedTouches && e.changedTouches[0]) this.pickAt(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
             }
         });
@@ -1149,6 +1254,7 @@ class VRApp {
             const control = e.target.closest?.('input,textarea,select,button,a,[contenteditable="true"]');
             if (control && control.getClientRects().length) return;
             this.keys.add(e.code);
+            if (this.mode === 'dodge' && e.code.startsWith('Arrow')) e.preventDefault();
             if (e.repeat) return;
             if (e.code === 'Space' && this.mode === 'dodge') { e.preventDefault(); this.onPhoneTap(); }
             if (e.code === 'Space' && this.mode === 'ride') {
@@ -1208,7 +1314,11 @@ class VRApp {
         $('dodge-restart').onclick = () => this.startDodge();
         $('dodge-exit').onclick = () => this.toMenu();
         $('dodge-phone-vr').onclick = () => this.enterPhoneVR();
+        $('dodge-difficulty').onchange = event => this.setDodgeDifficulty(event.target.value);
+        $('dodge-sensitivity').onchange = event => this.setDodgeSensitivity(event.target.value);
         $('enter-vr').onclick = () => this.enterVR();
+        const qLaunch = $('quest3-launch');
+        if (qLaunch) qLaunch.onclick = () => this.enterVR();
         $('btn-menu').onclick = () => this.toMenu();
         $('btn-restart').onclick = () => this.startRide();
         $('btn-skip').onclick = () => { this.clearWarning(); this.ride.skipSegment(); };
@@ -1344,7 +1454,6 @@ class VRApp {
         if (this.vrMenu.visible) {
             if (!item) return;
             this.vrMenu.visible = false;
-            this.vrHud.visible = true;
             const action = item.userData.action;
             if (action === 'explore') this.startExplore();
             else if (action === 'scan-hunt') this.startMission('scan-hunt');
@@ -1354,6 +1463,8 @@ class VRApp {
             else if (action === 'toggle-cockpit') this.toggleExploreCockpit();
             else if (action === 'auto-fly') this.toggleAutoFly();
             else if (action === 'dodge-play') this.onPhoneTap();
+            else if (action === 'recenter-arcade') this.recenterView();
+            else if (this.changeDodgeOption(action)) this.toggleVRMenu();
             else if (action === 'ride') this.startRide();
             else if (action === 'ride-resume') {
                 if (this.ride.time >= this.ride.total) this.startRide();
@@ -1370,7 +1481,15 @@ class VRApp {
             return;
         }
         if (this.mode === 'menu') return;
-        if (this.mode === 'dodge') { this.onPhoneTap(); return; }
+        if (this.mode === 'dodge') {
+            if (this.flightGame?.run.state === 'playing') {
+                setRayFromObject(this.raycaster, controller);
+                this.selectArcadeTarget();
+            } else if (this.arcadeGame?.run.state !== 'playing') {
+                this.onPhoneTap();
+            }
+            return;
+        }
         if (this.mode === 'ride') {
             // If an incoming asteroid threat is active, trigger fires the plasma turret!
             if (this.scares && this.scares.actors.length > 0 && this.fireTurret()) return;
@@ -1388,7 +1507,7 @@ class VRApp {
     }
 
     pickAt(cx, cy) {
-        if (this.mode === 'dodge' || this.stereo) return;
+        if (this.stereo || (this.mode === 'dodge' && !this.flightGame)) return;
         if (this.mode === 'ride') {
             // Clicking during an incoming asteroid hazard fires the deflector turret
             if (this.scares && this.scares.actors.length > 0) this.fireTurret();
@@ -1396,7 +1515,9 @@ class VRApp {
         }
         this.pointer.x = (cx / window.innerWidth) * 2 - 1;
         this.pointer.y = -(cy / window.innerHeight) * 2 + 1;
+        this.camera.updateWorldMatrix(true, false);
         this.raycaster.setFromCamera(this.pointer, this.camera);
+        if (this.mode === 'dodge') { this.selectArcadeTarget(); return; }
         const hits = this.raycaster.intersectObjects(this.system.pickTargets, false);
         if (hits.length) this.showBody(hits[0].object.userData.bodyKey, true);
     }
@@ -1430,7 +1551,6 @@ class VRApp {
         if (d.moons.length) stats += `<span>MOONS <b>${d.moons.join(' · ')}</b></span>`;
         $('info-stats').innerHTML = stats;
         $('info-card').classList.add('show');
-        this.drawVRInfoPanel(d);
         this.audio.blip(880);
         this.setHud(d.name.toUpperCase(), d.fact.slice(0, 64));
         this.speak(`${d.name}. ${d.fact}`);
@@ -1511,7 +1631,7 @@ class VRApp {
         $('mode-menu').classList.add('show');
         $('ride-hud').classList.remove('show');
         $('explore-hud').classList.remove('show');
-        this.setHud('SPACEVERSE', this.entry === 'dodge' ? 'Asteroid Dodge — ready' : this.entry === 'ride' ? 'Deep Space Ride — ready' : 'Free flight — ready');
+        this.setHud('SPACEVERSE', this.entry === 'dodge' ? this.arcadeName + ' — ready' : this.entry === 'ride' ? 'Deep Space Ride — ready' : 'Free flight — ready');
         this.audio.setPad(0.0);
         this.audio.setEngine(0);
         if (this.renderer.xr.isPresenting && !this.vrMenu.visible) this.toggleVRMenu();
@@ -1552,7 +1672,7 @@ class VRApp {
     startDodge() {
         if (this.entry !== 'dodge') return;
         if (MissionCore.snapshot().running) {
-            this.toast('Finish or leave the current mission before starting Asteroid Dodge.');
+            this.toast('Finish or leave the current mission before starting ' + this.arcadeName + '.');
             return;
         }
         this.stopSpeech();
@@ -1566,7 +1686,7 @@ class VRApp {
         if (this.gyroActive) this.gyro.recenter();
         this.updateHead(0);
         this.camera.fov = this.baseFov; this.camera.updateProjectionMatrix();
-        this.dodge.start(this.dolly, this.xrHead?.quaternion);
+        this.arcadeGame.start(this.dolly, this.xrHead?.quaternion, this.xrHead?.position);
         this.closeGazeMenu();
         this.gazeControls.anchor(this.camera);
         if (this.gyroActive) this.gazeControls.group.quaternion.identity();
@@ -1574,35 +1694,117 @@ class VRApp {
         $('explore-hud').classList.remove('show'); $('ride-hud').classList.remove('show');
         $('info-card').classList.remove('show'); $('ride-done').classList.remove('show');
         $('dodge-hud').classList.add('show');
-        this.vrHud.visible = this.stereo || this.renderer.xr.isPresenting;
         this.audio.setEngine(0); this.audio.setPad(0.25);
-        this._dodgeHudKey = ''; this.updateDodgeHud(); this.updatePhoneButtons();
+        this._dodgeHudKey = ''; this._arcadeHudDelay = 0; this._savedArcadeRun = null;
+        this.updateDodgeHud(); this.updatePhoneButtons();
     }
 
     leaveDodge() {
-        if (!this.dodge) return;
-        this.dodge.stop(); this.system.root.visible = true;
+        if (!this.arcadeGame) return;
+        this.arcadeGame.stop(); this.system.root.visible = true;
         $('dodge-hud').classList.remove('show');
     }
 
+    selectArcadeTarget() {
+        const action = this.flightGame?.pick(this.raycaster)?.object.userData.arcadeAction;
+        if (action) this.arcadeAction(action);
+    }
+
+    arcadeAction(action) {
+        const accepted = this.flightGame.run.action(action);
+        this.flightGame.syncScene();
+        this.audio.blip(accepted ? 860 : 320);
+        if (accepted) this.pulse(0.23, 38);
+        this.updateDodgeHud();
+    }
+
+    dodgeOptions() {
+        return [
+            { action: 'dodge-level', title: 'LEVEL · ' + this.dodge.run.difficulty.toUpperCase(), hint: 'Applies to the next run' },
+            { action: 'dodge-sense', title: 'STEERING · ' + (this.dodgeSensitivity || 'standard').toUpperCase(), hint: 'Adjust head steering' }
+        ];
+    }
+
+    setDodgeDifficulty(name) {
+        if (!this.dodge || !DODGE_DIFFICULTIES.includes(name)) return;
+        this.dodge.run.setDifficulty(name);
+        if (this.dodge.run.state === 'ready') this.dodge.run.reset();
+        $('dodge-difficulty').value = name;
+        if (this.mode === 'dodge') this.updateDodgeHud();
+    }
+
+    setDodgeSensitivity(name) {
+        if (!this.dodge || !Object.hasOwn(DODGE_SENSITIVITIES, name)) return;
+        this.dodgeSensitivity = name;
+        this.dodge.sensitivity = DODGE_SENSITIVITIES[name];
+        $('dodge-sensitivity').value = name;
+    }
+
+    changeDodgeOption(action) {
+        if (!this.dodge) return false;
+        if (action === 'dodge-level') {
+            const index = DODGE_DIFFICULTIES.indexOf(this.dodge.run.difficulty);
+            this.setDodgeDifficulty(DODGE_DIFFICULTIES[(index + 1) % DODGE_DIFFICULTIES.length]);
+            return true;
+        }
+        if (action === 'dodge-sense') {
+            const names = Object.keys(DODGE_SENSITIVITIES);
+            const index = names.indexOf(this.dodgeSensitivity || 'standard');
+            this.setDodgeSensitivity(names[(index + 1) % names.length]);
+            return true;
+        }
+        return false;
+    }
+
+    arcadeInput() {
+        if (this.xrSession) {
+            const sources = Array.from(this.xrSession.inputSources);
+            const source = sources.find(item => item.handedness === 'left' && item.gamepad) ||
+                sources.find(item => item.gamepad);
+            if (!source) return null;
+            const stick = readThumbstick(source.gamepad);
+            return { x: stick.x, y: -stick.y };
+        }
+        if (this.gaze.key?.startsWith('game:')) {
+            return { x: 0, y: 0, brake: this.gaze.done && this.gaze.key === 'game:brake' };
+        }
+        const x = Number(this.keys.has('ArrowRight') || this.keys.has('KeyD')) - Number(this.keys.has('ArrowLeft') || this.keys.has('KeyA'));
+        const y = Number(this.keys.has('ArrowUp') || this.keys.has('KeyW')) - Number(this.keys.has('ArrowDown') || this.keys.has('KeyS'));
+        return x || y ? { x, y } : null;
+    }
+
     dodgeButtonTitle() {
-        return ({ ready: 'START DODGE', countdown: 'PAUSE GAME', playing: 'PAUSE GAME',
-            paused: 'RESUME GAME', won: 'PLAY AGAIN', lost: 'TRY AGAIN' })[this.dodge.run.state];
+        return ({ ready: (this.arcadeMission || this.isIntercept) ? 'START GAME' : 'START DODGE', countdown: 'PAUSE GAME', playing: 'PAUSE GAME',
+            paused: 'RESUME GAME', won: 'PLAY AGAIN', lost: 'TRY AGAIN' })[this.arcadeGame.run.state];
     }
 
     updateDodgeHud() {
-        const run = this.dodge.run;
-        const title = ({ ready: 'ASTEROID DODGE', countdown: `READY · ${Math.ceil(run.countdown)}`,
-            playing: 'ASTEROID DODGE', paused: 'GAME PAUSED', won: 'RUN COMPLETE', lost: 'OUT OF SHIELDS' })[run.state];
-        const stats = `${Math.ceil(60 - run.elapsed)}s · ${run.shields} shields · ${run.dodged} dodged`;
-        const sub = run.state === 'ready' ? (this.stereo ? 'Look well down: MENU → START DODGE.' : 'Turn head or drag gently left/right. Select START to play.')
+        const run = this.arcadeGame.run;
+        const name = this.arcadeName.toUpperCase();
+        const isMissionOrIntercept = Boolean(this.flightGame || this.interceptGame);
+        const title = ({ ready: name, countdown: `READY · ${Math.ceil(run.countdown)}`,
+            playing: name, paused: 'GAME PAUSED', won: 'RUN COMPLETE', lost: isMissionOrIntercept ? 'RUN ENDED' : 'OUT OF SHIELDS' })[run.state];
+        const stats = isMissionOrIntercept ? run.status()
+            : `${Math.ceil(run.duration - run.elapsed)}s · ${run.shields} shields · ${run.score} points · ${run.dodged} dodged · ${run.state === 'won' || run.state === 'lost' ? 'best ' + run.bestStreak : 'streak ' + run.streak}×`;
+        const readyHint = this.stereo ? 'Look well down: MENU → ' + this.dodgeButtonTitle()
+            : this.xrSession ? 'Press A or pull trigger to start. B to recenter.' : 'Select START to play.';
+        const sub = run.state === 'ready' ? readyHint
             : run.state === 'paused' && this.stereo ? `${stats} · Look down: MENU → RESUME`
-            : run.state === 'countdown' ? 'Face the course. Stay seated. Get ready.' : stats;
-        const key = title + sub;
+            : run.state === 'countdown' ? 'Hold Touch Plus controllers · Stand by' : stats;
+        const threat = this.dodge?.run.threat;
+        const warning = run.state === 'playing' && threat && (-1 - threat.z) / threat.speed <= 2.2
+            ? ['LEFT LANE', 'CENTER LANE', 'RIGHT LANE'][Math.round(threat.x / 3.2) + 1] : '';
+
+        if ((run.state === 'won' || (run.state === 'lost' && !this.flightGame && run.score > 0)) && this._savedArcadeRun !== run.state) {
+            this._savedArcadeRun = run.state;
+            this.saveArcadeBest(run.score);
+        }
+
+        const key = title + sub + warning;
         if (key === this._dodgeHudKey) return;
         this._dodgeHudKey = key;
-        this.setHud(title, sub);
-        $('dodge-status').textContent = `${title} — ${sub}`;
+        this.setHud(title, sub, warning);
+        $('dodge-status').textContent = `${title} — ${sub}${warning ? ' · ' + warning : ''}`;
         $('dodge-play').textContent = this.dodgeButtonTitle();
     }
 
@@ -1643,11 +1845,11 @@ class VRApp {
 
     setMissionObjective(text) {
         this.missionObjective = text;
-        const el = $('narration');
-        if (!el) return;
-        if (!text) { el.classList.remove('show'); return; }
-        el.textContent = text;
-        el.classList.add('show');
+        if (this.gazeMenuOpen) this.showMenuInfo(this.gazeControls.group, true);
+        else if (this.vrMenu?.visible) this.showMenuInfo(this.vrMenu, false);
+        $('scan-clue').textContent = text;
+        $('scan-clue-details').hidden = !text;
+        if (!text) return;
         this.setHud('SCAN HUNT', text.slice(0, 72));
         if (this.cockpit && this.cockpit.visible) this.cockpit.setNarration(text);
         this.speak(text);
@@ -1724,7 +1926,6 @@ class VRApp {
             this.ride.segments.map(s => ({ title: s.title, dur: s.dur })));
         this.cockpit.setVisible(this.cockpitOn);
         document.body.classList.toggle('cockpit-on', this.cockpitOn);
-        if (this.stereo) this.vrHud.visible = false;
         this.toast('VR DEEP SPACE RIDE — you are in the pilot seat. Click / F / Trigger during collision alerts to fire the plasma turret!');
     }
 
@@ -1744,7 +1945,6 @@ class VRApp {
         $('ride-bar-fill').style.width = (p * 100).toFixed(1) + '%';
         const speed = Math.round(this.ride.speedNorm * 42000 + 1800);
         $('ride-speed').textContent = speed.toLocaleString() + ' km/h';
-        if (this.renderer.xr.isPresenting && (this.hudTick = (this.hudTick || 0) + 1) % 12 === 0) this.drawVRHud();
     }
 
     onRideFinish() {
@@ -1758,11 +1958,7 @@ class VRApp {
 
     narrate(text) {
         if (this.cockpit) this.cockpit.setNarration(text);
-        const el = $('narration');
-        el.textContent = text;
-        el.classList.add('show');
-        clearTimeout(this._narrT);
-        this._narrT = setTimeout(() => el.classList.remove('show'), 5200);
+        $('narration').textContent = text;
         this.setHud(this.hudText.title, text.slice(0, 72));
         this.speak(text);
     }
@@ -1944,6 +2140,8 @@ class VRApp {
     }
 
     onResize() {
+        // The XR manager owns the eye-buffer size until the session ends.
+        if (this.xrSession || this.renderer.xr.isPresenting) return;
         this.camera.aspect = window.innerWidth / window.innerHeight;
         this.camera.updateProjectionMatrix();
         const ratio = this.renderPixelRatio();
@@ -2017,25 +2215,61 @@ class VRApp {
             this.clock.getDelta(); this.gaze.reset(); return;
         }
         const dt = Math.min(0.05, this.clock.getDelta());
-        if (this.xrSession) this.updateXRHead(frame);
+        const tracking = !this.xrSession || this.updateXRHead(frame);
+        if (frame && !tracking) return false;
+        if (frame && this.renderer.getContext().isContextLost()) throw new Error('The headset graphics context was lost.');
         this.remote.update();
         const camPos = this.camera.getWorldPosition(this._camPos || (this._camPos = new THREE.Vector3()));
-        if (this.mode !== 'dodge') this.system.update(dt, camPos);
+        if (!this.arcadeMission && !this.isIntercept && this.mode !== 'dodge') this.system.update(dt, camPos);
+
+        const questInput = this.xrSession
+            ? readQuestControllers(this.xrSession, this._prevQuestInput)
+            : (this._qaQuestInput || null);
+        this._prevQuestInput = questInput;
 
         this.updateHead(dt);
         this.camera.updateWorldMatrix(true, false);
         if (this.mode === 'ride') this.ride.update(dt);
         else if (this.mode === 'dodge') {
-            const before = this.dodge.run.hits;
-            this.dodge.update(dt, this.xrHead || this.camera, this.dolly, this.gazeMenuOpen ||
+            if (questInput && !this.vrMenu?.visible) {
+                if (questInput.right.primaryJustPressed) this.onPhoneTap();
+                if (questInput.right.secondaryJustPressed) this.recenterView();
+                if (questInput.left.secondaryJustPressed || questInput.left.stickJustPressed) this.toggleVRMenu();
+            }
+            const before = this.dodge?.run.hits ?? this.flightGame?.run.rocksHit ?? 0;
+            const suspended = !tracking || this.gazeMenuOpen ||
                 Boolean(this.xrSession && (this.vrMenu.visible || this.xrSession.visibilityState !== 'visible')) ||
-                (this.stereo && this.gaze.key?.startsWith('ui:')));
-            if (this.dodge.run.hits > before) this.audio.blip(180);
-            this.updateDodgeHud();
+                (this.stereo && this.gaze.key?.startsWith('ui:'));
+            const inputPayload = questInput || (this.flightGame ? this.arcadeInput() : null);
+            this.arcadeGame.update(dt, this.xrHead || this.camera, this.dolly, suspended, inputPayload, this.questRig);
+
+            const strikes = this.dodge?.run.hits ?? this.flightGame?.run.rocksHit ?? 0;
+            if (strikes > before) { this.audio.blip(180); this.pulse(0.45, 90); }
+            this._arcadeHudDelay -= dt;
+            if (this._arcadeHudDelay <= 0) {
+                this._arcadeHudDelay = 0.12;
+                this.updateDodgeHud();
+            }
         }
-        else this.flyUpdate(dt);
+        else if (this.entry !== 'dodge') this.flyUpdate(dt);
         this.camera.updateWorldMatrix(true, false);
         this.gazeUpdate(dt);
+
+        if (this.questRig) {
+            this.questRig.update(dt, questInput, {
+                hudTitle: this.mode === 'dodge' ? this.arcadeName.toUpperCase() : this.hudText.title,
+                hudStatus: this.mode === 'dodge' ? (this.arcadeGame?.run?.status?.() || '') : this.hudText.sub,
+                hudHint: this.isIntercept ? 'L-Trig: Shield · R-Trig: Blaster · Y: Menu' : 'A: Start/Pause · B: Recenter · Grip: Menu',
+                slug: this.arcadeSlug,
+                run: this.arcadeGame?.run
+            });
+            if (this.flightGame && this.questRig.rightHand?.controller) {
+                setRayFromObject(this.raycaster, this.questRig.rightHand.controller);
+                const hover = this.flightGame.pick(this.raycaster);
+                this.flightGame.highlight(hover?.object);
+                this.questRig.setRayDistance('right', hover ? hover.distance : 5.5);
+            }
+        }
 
         if (this.cockpit.visible) {
             const isRide = this.mode === 'ride';
@@ -2072,7 +2306,10 @@ class VRApp {
             });
         }
 
-        if (this.renderer.xr.isPresenting) this.renderer.render(this.scene, this.camera);
+        if (this.renderer.xr.isPresenting) {
+            this.renderer.render(this.scene, this.camera);
+            return Boolean(frame && tracking);
+        }
         else if (this.stereo) this.stereoEffect.render(this.scene, this.camera);
         else if (this.composer) this.composer.render();
         else this.renderer.render(this.scene, this.camera);
@@ -2080,9 +2317,57 @@ class VRApp {
 
     /* ── QA helpers (window.__vr) ───────────────────────────────────── */
     qaSeek(sec) { if (this.mode !== 'ride') this.startRide(); this.clearWarning(); this.ride.seek(sec); }
+    qaPreviewQuestGame(seconds = 4, fakeInput = null) {
+        if (this.entry !== 'dodge' || !this.arcadeGame) return null;
+        if (this.mode !== 'dodge') this.startDodge();
+        this.arcadeGame.run.play();
+        if (this.questRig?.leftHand && this.questRig?.rightHand) {
+            for (const [hand, x] of [[this.questRig.leftHand, -0.34], [this.questRig.rightHand, 0.34]]) {
+                hand.mount.visible = true;
+                hand.controller.visible = true;
+                hand.mount.position.set(x, -0.14, -0.52);
+                hand.controller.position.set(x, -0.14, -0.52);
+                hand.mount.updateMatrix();
+                hand.controller.updateMatrix();
+                hand.mount.updateMatrixWorld(true);
+                hand.controller.updateMatrixWorld(true);
+            }
+            this.questRig.setToolProfile(this.arcadeSlug);
+        }
+        this._qaQuestInput = fakeInput || {
+            left: { connected: true, stick: { x: 0, y: 0 }, trigger: 0.9, triggerPressed: true, grip: 0, gripPressed: false },
+            right: { connected: true, stick: { x: 0, y: 0 }, trigger: 0.5, triggerPressed: true, grip: 0, gripPressed: false }
+        };
+        const steps = Math.ceil((3.1 + seconds) / 0.05);
+        for (let i = 0; i < steps; i++) {
+            this.arcadeGame.update(0.05, this.camera, this.dolly, false, fakeInput || {
+                left: { connected: true, stick: { x: 0, y: 0 }, trigger: 0.9, triggerPressed: true, grip: 0, gripPressed: false },
+                right: { connected: true, stick: { x: 0, y: 0 }, trigger: i === steps - 2 ? 0.9 : 0, triggerPressed: i === steps - 2, triggerJustPressed: i === steps - 2, grip: 0, gripPressed: false }
+            }, this.questRig);
+        }
+        this.questRig?.update(0.05, fakeInput || {
+            left: { connected: true, stick: { x: 0, y: 0 }, trigger: 0.9, triggerPressed: true },
+            right: { connected: true, stick: { x: 0, y: 0 }, trigger: 0.5, triggerPressed: true }
+        }, {
+            hudTitle: this.arcadeName.toUpperCase(),
+            hudStatus: this.arcadeGame.run.status(),
+            hudHint: 'Meta Quest 3 Touch Plus',
+            slug: this.arcadeSlug,
+            run: this.arcadeGame.run
+        });
+        this.updateDodgeHud();
+        return {
+            slug: this.arcadeSlug,
+            state: this.arcadeGame.run.state,
+            status: this.arcadeGame.run.status(),
+            shaderErrors: this.renderer.info.programs.filter(p => p.diagnostics?.runnable === false).length
+        };
+    }
     qaState() {
         return {
             mode: this.mode,
+            questOnly: this.questOnly,
+            slug: this.arcadeSlug || null,
             seg: this.ride.segments ? (this.ride.segments[this.ride.segIndex] || {}).id : null,
             time: +this.ride.time.toFixed(2),
             total: this.ride.total,

@@ -148,6 +148,8 @@
             border-top: 1px dashed rgba(255, 180, 107, 0.25); padding-top: 10px;
         }
         #vr-ready { display: none; margin-top: 12px; font-size: 12px; color: var(--accent); }
+        #xr-launch-status { margin: 12px 0 0; color: #ffbf86; }
+        #xr-launch-status:empty { display: none; }
         .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; align-items: center; }
         button.chip.disabled, button.chip:disabled { opacity: 0.45; cursor: not-allowed; }
 
@@ -212,14 +214,8 @@
         .ride-btns { display: flex; gap: 8px; flex-wrap: wrap; }
         .ride-btns .chip { padding: 7px 13px; font-size: 12px; min-height: 34px; }
 
-        #narration {
-            position: fixed; left: 50%; transform: translateX(-50%) translateY(8px); bottom: 150px; z-index: 21;
-            max-width: min(680px, calc(100% - 40px)); text-align: center;
-            background: rgba(4, 8, 16, 0.72); border-left: 2px solid var(--accent);
-            padding: 10px 18px; border-radius: 8px; font-size: 14px; line-height: 1.5;
-            opacity: 0; transition: opacity 0.4s, transform 0.4s; pointer-events: none;
-        }
-        #narration.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        #narration { margin: 8px 0; color: var(--muted); font-size: 13px; }
+        #narration:empty { display: none; }
 
         #warning {
             position: fixed; top: 84px; left: 50%; transform: translateX(-50%) scale(0.94); z-index: 22;
@@ -285,6 +281,11 @@
         #dodge-hud.show { display: block; }
         #dodge-hud p { margin: 0 0 10px; line-height: 1.5; }
         #dodge-hud .btn-row { flex-wrap: wrap; }
+        @media (max-height: 520px) { #arcade-controls { display: none; } }
+        #dodge-settings { display: flex; flex-wrap: wrap; gap: 12px 24px; margin: 16px 0; }
+        #dodge-settings[hidden] { display: none; }
+        #dodge-settings label { display: flex; align-items: center; gap: 8px; }
+        #dodge-settings select { color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px; }
         body.in-cardboard #dodge-hud, body.in-vr #dodge-hud { display: none !important; }
         #cardboard-lens-mask { display: none; position: fixed; inset: 0; width: 100%; height: 100%; z-index: 64; pointer-events: none; }
         body.in-cardboard { background: #000; }
@@ -322,7 +323,6 @@
         body.cockpit-on #seg-sub { font-size: 11.5px; }
         body.cockpit-on #ride-bar { margin: 8px 0 10px; }
         body.cockpit-on .ride-btns .chip { padding: 5px 10px; font-size: 11.5px; min-height: 44px; }
-        body.cockpit-on #narration { bottom: auto; top: 128px; }
         body.cockpit-on #toast { bottom: auto; top: 180px; }
         body.in-vr #sv-chat-btn, body.in-vr #sv-chat-modal,
         body.in-cardboard #sv-chat-btn, body.in-cardboard #sv-chat-modal { display: none !important; }
@@ -338,7 +338,6 @@
         @media (max-width: 640px) {
             #explore-panel { left: 10px; right: 10px; bottom: 10px; max-width: none; }
             #ride-panel { bottom: 10px; }
-            #narration { bottom: 150px; }
         }
         @media (max-width: 900px) {
             #explore-panel { width: min(330px, calc(100% - 20px)); max-height: calc(100vh - 88px); overflow-y: auto; padding: 12px; }
@@ -349,6 +348,72 @@
         @media (max-width: 640px) {
             #explore-panel { width: auto; }
         }
+
+        /* ── Meta Quest 3 Exclusive Arcade Deck ─────────────────────── */
+        #quest3-deck { display: none; }
+        .quest-only #quest3-deck {
+            display: block;
+            padding: 24px;
+            border-radius: 20px;
+            background: linear-gradient(155deg, rgba(14, 24, 46, 0.92), rgba(6, 11, 22, 0.95));
+            border: 1px solid rgba(100, 255, 218, 0.34);
+            box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+        }
+        .quest-only .menu-title,
+        .quest-only .menu-sub,
+        .quest-only .cards,
+        .quest-only #dodge-settings,
+        .quest-only #dodge-hud,
+        .quest-only #phone-row,
+        .quest-only #dodge-phone-vr,
+        .quest-only #btn-remote,
+        .quest-only .menu-inner > .btn-row { display: none !important; }
+        .quest3-kicker {
+            display: inline-flex; align-items: center; gap: 8px;
+            padding: 5px 12px; border-radius: 999px; margin-bottom: 12px;
+            font-size: 11px; font-weight: 700; letter-spacing: 0.12em;
+            color: #64ffda; background: rgba(100, 255, 218, 0.14);
+            border: 1px solid rgba(100, 255, 218, 0.36);
+        }
+        #quest3-title {
+            font-family: 'Orbitron', sans-serif;
+            font-size: clamp(26px, 4.2vw, 42px);
+            margin: 0 0 10px;
+            letter-spacing: 1px;
+        }
+        #quest3-summary { color: var(--muted); font-size: 14.5px; line-height: 1.6; margin: 0 0 14px; max-width: 68ch; }
+        #quest3-best {
+            display: inline-block; margin-bottom: 18px; padding: 6px 13px; border-radius: 999px;
+            font-size: 12.5px; font-weight: 600; color: #fde68a;
+            background: rgba(251, 191, 36, 0.12); border: 1px solid rgba(251, 191, 36, 0.32);
+        }
+        #quest3-controller-map {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;
+            margin: 0 0 18px;
+        }
+        .quest3-hand {
+            padding: 14px 16px; border-radius: 14px;
+            background: rgba(6, 12, 24, 0.78);
+            border: 1px solid rgba(122, 162, 255, 0.22);
+        }
+        .quest3-hand h4 {
+            margin: 0 0 10px; font-family: 'Orbitron', sans-serif;
+            font-size: 12.5px; letter-spacing: 1.4px; color: var(--accent);
+        }
+        .quest3-hand ul { margin: 0; padding-left: 18px; color: #cfe3ff; font-size: 13px; line-height: 1.65; }
+        .quest3-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        #quest3-launch {
+            background: linear-gradient(100deg, #22d3ee, #64ffda);
+            color: #03141c; border-color: transparent; font-weight: 700;
+            padding: 12px 22px; min-height: 46px; font-size: 14px;
+        }
+        #quest3-launch.disabled, #quest3-launch:disabled {
+            background: rgba(34, 211, 238, 0.16); color: #9fb3cc; border: 1px solid var(--line);
+        }
+        #quest3-requirement {
+            margin: 12px 0 0; font-size: 12.5px; color: #fbbf24; line-height: 1.5;
+        }
+        #quest3-requirement.ready { color: #64ffda; }
     </style>
 
     <!-- ═══ Liquid Glass ═══════════════════════════════════════════════ -->
@@ -407,7 +472,7 @@
     <div id="cardboard-sensor-warning" role="status"><span>Motion tracking unavailable. Remove the viewer to drag and look, or exit Phone VR.</span><span aria-hidden="true">Motion tracking unavailable. Remove the viewer to drag and look, or exit Phone VR.</span></div>
     <section id="dodge-hud" aria-label="Asteroid Dodge controls">
         <p id="dodge-status" role="status">Asteroid Dodge — ready</p>
-        <p>Stay seated. Turn your head gently left/right to steer (or drag on screen). Avoid rocks for 60 seconds; three hits end the run. Local practice, no ranked score.</p>
+        <p id="arcade-controls">Turn your head gently left/right to steer, or drag on screen. Watch for lit lanes and chain clean dodges for a higher score.</p>
         <div class="btn-row">
             <button id="dodge-play" type="button" class="chip">START DODGE</button>
             <button id="dodge-restart" type="button" class="chip ghost">Restart</button>
@@ -423,13 +488,13 @@
             <h1 class="menu-title">
                 <span class="for-explore">Explore the <em>solar system</em></span>
                 <span class="for-ride">VR <em>Deep Space Ride</em></span>
-                <span class="for-dodge">Asteroid <em>Dodge</em></span>
+                <span id="arcade-title" class="for-dodge">Asteroid Dodge</span>
             </h1>
             <p class="menu-sub for-explore">Free flight, on a normal screen or inside a VR headset
                (Quest, Vive, Index, WMR).</p>
             <p class="menu-sub for-ride">Three minutes on rails, on a normal screen or inside a VR
                headset (Quest, Vive, Index, WMR).</p>
-            <p class="menu-sub for-dodge">An Arcade game for Phone VR, a headset or a normal screen. Turn your head to dodge; hold your gaze on controls to select them. Stay seated.</p>
+            <p id="arcade-menu-summary" class="menu-sub for-dodge">An Arcade game for Phone VR, a headset or a normal screen. Turn your head to dodge; hold your gaze on controls to select them. Stay seated.</p>
 
             <div class="cards">
                 <button class="card" id="start-explore">
@@ -454,10 +519,19 @@
                        far too close. Look around the cockpit — drag, move your phone, or turn your head.</p>
                 </button>
                 <button class="card dodge" id="start-dodge">
-                    <span class="tag">HANDS-FREE · 60 SEC</span>
-                    <h3>☄️ Asteroid Dodge</h3>
-                    <p>Turn your head gently left or right to steer past incoming rocks. Three shields, a 60-second run, and gaze-operated pause and replay. Stay seated. Local practice — no ranked score.</p>
+                    <span id="arcade-kicker" class="tag">IMMERSIVE VR</span>
+                    <h3 id="arcade-launch-name">Start Asteroid Dodge</h3>
+                    <p id="arcade-summary">Dodge incoming rocks with head steering. Start with Practice, survive 60 seconds in Normal, or try faster rocks in Expert.</p>
                 </button>
+            </div>
+
+            <div id="dodge-settings" class="for-dodge">
+                <label>Difficulty <select id="dodge-difficulty">
+                    <option value="practice">Practice · 35 sec</option><option value="normal" selected>Normal · 60 sec</option><option value="expert">Expert · 75 sec</option>
+                </select></label>
+                <label>Steering <select id="dodge-sensitivity">
+                    <option value="low">Gentle</option><option value="standard" selected>Standard</option><option value="high">Sensitive</option>
+                </select></label>
             </div>
 
             <div class="settings">
@@ -484,6 +558,7 @@
                 <a href="/quest-guide" class="chip ghost">Meta Quest guide</a>
                 <span id="vr-ready">Enter headset VR, then point and pull the trigger to choose an experience.</span>
             </div>
+            <p id="xr-launch-status" role="status"></p>
             <div id="phone-row">
                 <button id="btn-gyro" class="chip">🧭 Gyro look</button>
                 <button id="btn-phone-vr" class="chip">📱 Phone VR (Cardboard)</button>
@@ -501,6 +576,29 @@
             <div class="btn-row">
                 <button id="btn-remote" class="chip" type="button">🎮 Controller test &amp; setup</button>
             </div>
+
+            <section id="quest3-deck" aria-labelledby="quest3-title">
+                <span id="quest3-kicker" class="quest3-kicker">META QUEST 3 EXCLUSIVE · TOUCH PLUS CONTROLLERS</span>
+                <h2 id="quest3-title">Meta Quest 3 Experience</h2>
+                <p id="quest3-summary">Put on your Meta Quest 3 and grip both Touch Plus controllers.</p>
+                <div id="quest3-best">Personal Best: —</div>
+                <div id="quest3-controller-map">
+                    <div class="quest3-hand">
+                        <h4>LEFT TOUCH PLUS</h4>
+                        <ul id="quest3-left-list"></ul>
+                    </div>
+                    <div class="quest3-hand">
+                        <h4>RIGHT TOUCH PLUS</h4>
+                        <ul id="quest3-right-list"></ul>
+                    </div>
+                </div>
+                <div class="quest3-actions">
+                    <button id="quest3-launch" class="chip" type="button" disabled>🥽 Checking Meta Quest 3…</button>
+                    <a href="/quest-guide" class="chip ghost">Meta Quest 3 setup</a>
+                    <a href="/games" class="chip ghost">← Back to Arcade</a>
+                </div>
+                <p id="quest3-requirement" role="status">Checking for Meta Quest 3 WebXR support…</p>
+            </section>
         </div>
     </div>
 
@@ -535,12 +633,15 @@
 
     <script>
         (function () {
-            var dodge = /^\/games\/asteroid-dodge\/?$/i.test(location.pathname);
+            var dodge = /^\/games\//i.test(location.pathname);
             var ride = location.pathname.indexOf('vr-ride') !== -1 ||
                 location.search.indexOf('mode=ride') !== -1;
-            document.getElementById('mode-menu').classList.add(dodge ? 'only-dodge' : ride ? 'only-ride' : 'only-explore');
+            var menu = document.getElementById('mode-menu');
+            menu.classList.add(dodge ? 'only-dodge' : ride ? 'only-ride' : 'only-explore');
             if (dodge) {
-                document.title = 'Asteroid Dodge — SpaceVerse Arcade';
+                document.body.classList.add('quest-only');
+                menu.classList.add('quest-only');
+                document.title = 'Meta Quest 3 VR — SpaceVerse Arcade';
                 document.querySelectorAll('a[href="/"]').forEach(function (link) {
                     link.href = '/games';
                     link.textContent = '← Arcade';
@@ -552,6 +653,7 @@
     <!-- explore hud -->
     <div id="explore-hud" class="hud">
         <div id="explore-panel">
+            <details id="scan-clue-details" hidden><summary>Scan Hunt clue</summary><p id="scan-clue"></p></details>
             <div class="row"><span>NEAREST</span><b id="near-body">—</b></div>
             <div class="row"><span>DISTANCE</span><b id="near-dist">—</b></div>
             <div class="row"><span>SPEED</span><b id="fly-speed">40 u/s</b></div>
@@ -593,6 +695,7 @@
                     <div id="ride-speed">0 km/h</div>
                 </div>
             </div>
+            <div id="narration"></div>
             <div id="ride-bar"><div id="ride-bar-fill"></div></div>
             <div class="ride-btns">
                 <button id="btn-skip" class="chip">⏭ Skip section</button>
@@ -601,7 +704,6 @@
                 </div>
             </details>
         </div>
-        <div id="narration"></div>
         <div id="warning"></div>
         <div id="ride-done"><div>MISSION COMPLETE</div></div>
     </div>
@@ -623,12 +725,12 @@
     <script type="importmap">
     {
         "imports": {
-            "three": "/lib/three/three.module.js",
+            "three": "/lib/three/webxr.module.js?v=20261125-xr1",
             "three/addons/": "/lib/three/addons/"
         }
     }
     </script>
-    <script type="module" src="/public/js/vr/main.js?v=20261124-1"></script>
+    <script type="module" src="/public/js/vr/main.js?v=20261125-clear-view"></script>
     <script src="/public/js/chat-widget.js" defer></script>
 </body>
 </html>
