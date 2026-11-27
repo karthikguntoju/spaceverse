@@ -88,7 +88,15 @@ function buildLunarSurface(parent, envMap) {
         const bx = Math.cos(angle) * rad;
         const bz = -18 + Math.sin(angle) * rad;
         const s = 0.25 + (i % 4) * 0.18;
-        const rock = makePart(parent, new THREE.DodecahedronGeometry(s, 1), boulderMat, bx, s * 0.4, bz, i * 0.5, i * 0.9, 0);
+        const lunarRockGeo = new THREE.IcosahedronGeometry(s, 1);
+        const lPos = lunarRockGeo.attributes.position;
+        for (let k = 0; k < lPos.count; k++) {
+            const vx = lPos.getX(k), vy = lPos.getY(k), vz = lPos.getZ(k);
+            const j = 0.78 + 0.32 * Math.abs(Math.sin(vx * 8.1 + vy * 6.3 - vz * 5.9 + i));
+            lPos.setXYZ(k, vx * j, vy * j, vz * j);
+        }
+        lunarRockGeo.computeVertexNormals();
+        const rock = makePart(parent, lunarRockGeo, boulderMat, bx, s * 0.4, bz, i * 0.5, i * 0.9, 0);
         rock.scale.set(1.2, 0.72, 0.95);
     }
     return ground;
@@ -258,16 +266,16 @@ function buildObservatorySatellite(parent, envMap) {
         makePart(bayGroup, new RoundedBoxGeometry(0.44, 0.64, 0.14, 2, 0.02), mDark, 0, 0, -0.04);
         const coreMesh = makePart(
             bayGroup,
-            new RoundedBoxGeometry(0.28, 0.36, 0.09, 2, 0.015),
+            new RoundedBoxGeometry(0.28, 0.36, 0.06, 2, 0.015),
             new THREE.MeshStandardMaterial({ color: spec.color, emissive: spec.color, emissiveIntensity: 0.35, metalness: 0.5, roughness: 0.35 }),
-            0, -0.04, 0.02
+            0, -0.04, -0.015
         );
 
-        // Hinged door panel that swings open during repair
+        // Hinged door panel that swings open during repair (clear of recessed coreMesh)
         const doorPivot = new THREE.Group();
-        doorPivot.position.set(-0.21, 0, 0.045);
+        doorPivot.position.set(-0.21, 0, 0.048);
         bayGroup.add(doorPivot);
-        const doorMesh = makePart(doorPivot, new RoundedBoxGeometry(0.42, 0.56, 0.03, 2, 0.01), mHull, 0.21, 0, 0);
+        const doorMesh = makePart(doorPivot, new RoundedBoxGeometry(0.42, 0.56, 0.024, 2, 0.008), mHull, 0.21, 0, 0);
 
         // Bay header plate + label
         const labelSurface = safeCanvas(256, 96);
@@ -294,22 +302,23 @@ function buildObservatorySatellite(parent, envMap) {
             0, 0.39, 0.05
         );
 
-        // Status dome LED
+        // Status dome LED (proud of bay door bevel)
         const led = makePart(
             bayGroup,
-            new THREE.SphereGeometry(0.05, 12, 10),
-            new THREE.MeshBasicMaterial({ color: 0xfb7185 }),
-            0, 0.24, 0.06
+            new THREE.SphereGeometry(0.048, 12, 10),
+            new THREE.MeshBasicMaterial({ color: 0xfb7185, toneMapped: false }),
+            0, 0.24, 0.072
         );
 
         // Animated fault electrical spark arc
-        const arcGeo = new THREE.BufferGeometry().setFromPoints([
-            new THREE.Vector3(-0.1, 0.12, 0.07),
-            new THREE.Vector3(0.04, 0.02, 0.11),
-            new THREE.Vector3(-0.05, -0.08, 0.08),
-            new THREE.Vector3(0.11, -0.14, 0.07)
-        ]);
-        const arcLine = new THREE.Line(arcGeo, new THREE.LineBasicMaterial({ color: 0xffb454 }));
+        const arcPositions = new Float32Array([-0.1, 0.12, 0.08, 0.04, 0.02, 0.12, -0.05, -0.08, 0.09, 0.11, -0.14, 0.08]);
+        const arcGeo = new THREE.BufferGeometry();
+        arcGeo.setAttribute('position', new THREE.BufferAttribute(arcPositions, 3).setUsage(THREE.DynamicDrawUsage));
+        const arcLine = new THREE.Line(
+            arcGeo,
+            new THREE.LineBasicMaterial({ color: 0xffb454, transparent: true, opacity: 0.9, depthWrite: false, toneMapped: false })
+        );
+        arcLine.renderOrder = 25;
         bayGroup.add(arcLine);
 
         // Generous raycast hitbox for controller aiming
@@ -382,6 +391,9 @@ export class ArcadeFlight {
         this.forward = new THREE.Euler(0, 0, 0, 'YXZ');
         this.cabin = new THREE.Group();
         this.root.add(this.cabin);
+        this.scene = scene;
+        this._marsFog = null;
+        this._savedSceneFog = undefined;
         scene.add(this.root);
 
         this.particles = new ParticlePool(this.root, 320, 0.26);
@@ -467,7 +479,8 @@ export class ArcadeFlight {
             blending: THREE.AdditiveBlending,
             depthWrite: false
         });
-        makePart(pad, new THREE.CylinderGeometry(2.4, 2.4, 22, 32, 1, true), this.padBeamMat, 0, 11, 0);
+        const padBeam = makePart(pad, new THREE.CylinderGeometry(2.4, 2.4, 22, 32, 1, true), this.padBeamMat, 0, 11, 0);
+        padBeam.renderOrder = 12;
 
         // Engine flare point light underneath lander
         this.engineLight = new THREE.PointLight(0xffb454, 0, 18);
@@ -485,9 +498,10 @@ export class ArcadeFlight {
         const aim = makePart(
             this.cabin,
             new THREE.RingGeometry(0.08, 0.095, 36),
-            new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.72, side: THREE.DoubleSide }),
+            new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.72, side: THREE.DoubleSide, depthWrite: false, depthTest: false, toneMapped: false }),
             0, 0, -2.1
         );
+        aim.renderOrder = 30;
         this.aimReticle = aim;
 
         // Docking corridor guide rings turning emerald when aligned
@@ -496,9 +510,10 @@ export class ArcadeFlight {
             const r = makePart(
                 this.craft,
                 new THREE.TorusGeometry(0.86 + i * 0.24, 0.025, 6, 36),
-                new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45 }),
+                new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.45, depthWrite: false }),
                 0, 0, 1.4 + i * 2.2
             );
+            r.renderOrder = 12;
             this.corridorRings.push(r);
         }
 
@@ -557,16 +572,24 @@ export class ArcadeFlight {
     }
 
     _buildMarsRover() {
-        this.root.fog = new THREE.FogExp2(0x361912, 0.011);
+        this._marsFog = new THREE.FogExp2(0x361912, 0.011);
         this.ground = new THREE.Group();
         this.root.add(this.ground);
         buildMarsTerrain(this.ground, this.envMap);
 
-        // Basalt rocks on track
+        // Basalt rocks on track (faceted craggy boulders)
         this.rocks = [];
-        const stone = new THREE.MeshStandardMaterial({ color: 0x7c4632, roughness: 0.92, envMap: this.envMap });
+        const stone = new THREE.MeshStandardMaterial({ color: 0x7c4632, roughness: 0.92, flatShading: true, envMap: this.envMap });
+        const rockGeo = new THREE.IcosahedronGeometry(1.0, 1);
+        const rPos = rockGeo.attributes.position;
+        for (let k = 0; k < rPos.count; k++) {
+            const vx = rPos.getX(k), vy = rPos.getY(k), vz = rPos.getZ(k);
+            const j = 0.78 + 0.34 * Math.abs(Math.sin(vx * 7.3 + vy * 5.1 - vz * 6.7));
+            rPos.setXYZ(k, vx * j, vy * j, vz * j);
+        }
+        rockGeo.computeVertexNormals();
         for (let i = 0; i < 6; i++) {
-            const rock = makePart(this.root, new THREE.DodecahedronGeometry(1.02, 2), stone, 0, -1.5, -10, 0.3 + i, 1.2 + i * 0.6, 0.6);
+            const rock = makePart(this.root, rockGeo, stone, 0, -1.5, -10, 0.3 + i, 1.2 + i * 0.6, 0.6);
             rock.scale.set(1.28, 0.68, 0.88);
             this.rocks.push(rock);
         }
@@ -583,10 +606,16 @@ export class ArcadeFlight {
         // Sample Site Beacon + Crystalline Outcrop
         this.sample = new THREE.Group();
         this.root.add(this.sample);
-        makePart(this.sample, new THREE.DodecahedronGeometry(0.45, 1), new THREE.MeshStandardMaterial({ color: 0xa16244, roughness: 0.8 }), 0, 0.15, 0);
+        makePart(this.sample, rockGeo, new THREE.MeshStandardMaterial({ color: 0xa16244, roughness: 0.82, flatShading: true }), 0, 0.22, 0).scale.setScalar(0.45);
         makePart(this.sample, new THREE.CylinderGeometry(0.05, 0.05, 1.5, 10), new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.7 }), 0, 0.75, 0);
-        this.sampleCrystal = makePart(this.sample, new THREE.OctahedronGeometry(0.24), new THREE.MeshBasicMaterial({ color: 0x64ffda }), 0, 1.56, 0);
-        makePart(this.sample, new THREE.RingGeometry(0.95, 1.15, 32), new THREE.MeshBasicMaterial({ color: 0x64ffda, side: THREE.DoubleSide }), 0, 0.06, 0, -Math.PI / 2);
+        this.sampleCrystal = makePart(this.sample, new THREE.OctahedronGeometry(0.24), new THREE.MeshBasicMaterial({ color: 0x64ffda, toneMapped: false }), 0, 1.56, 0);
+        const sampleRing = makePart(
+            this.sample,
+            new THREE.RingGeometry(0.95, 1.15, 32),
+            new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.88, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
+            0, 0.22, 0, -Math.PI / 2
+        );
+        sampleRing.renderOrder = 11;
 
         // Animated 3D Robotic Core Drill Arm extending from rover hood
         this.drillArm = new THREE.Group();
@@ -627,7 +656,11 @@ export class ArcadeFlight {
 
         const lineGeo = new THREE.BufferGeometry();
         lineGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([0, -0.45, -1.6, 0, 0, -12]), 3));
-        this.tether = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0x8ff2d9 }));
+        this.tether = new THREE.Line(
+            lineGeo,
+            new THREE.LineBasicMaterial({ color: 0x8ff2d9, transparent: true, opacity: 0.92, depthWrite: false, toneMapped: false })
+        );
+        this.tether.renderOrder = 25;
         this.tether.frustumCulled = false;
         this.root.add(this.tether);
 
@@ -680,6 +713,10 @@ export class ArcadeFlight {
     start(dolly, orientation, position) {
         this.run.reset();
         this.haul = 0;
+        if (this._marsFog) {
+            this._savedSceneFog = this.scene.fog;
+            this.scene.fog = this._marsFog;
+        }
         this.root.position.copy(dolly.position);
         if (position) this.root.position.add(position);
         this.recenter(orientation);
@@ -696,12 +733,22 @@ export class ArcadeFlight {
     stop() {
         this.run.pause();
         this.root.visible = false;
+        if (this._marsFog && this._savedSceneFog !== undefined) {
+            this.scene.fog = this._savedSceneFog;
+            this._savedSceneFog = undefined;
+        }
     }
 
     pick(raycaster) {
         if (!this.root.visible || this.run.state !== 'playing') return null;
         this.root.updateWorldMatrix(true, true);
-        return raycaster.intersectObjects(this.targets, false).find(hit => hit.object.visible) || null;
+        return raycaster.intersectObjects(this.targets, false).find(hit => {
+            if (!hit.object.visible) return false;
+            if (this.slug === 'satellite-repair' && hit.object.userData?.repairRole === 'spare') {
+                return this.run.repairStep === 1;
+            }
+            return true;
+        }) || null;
     }
 
     highlight(target) {
@@ -772,7 +819,8 @@ export class ArcadeFlight {
                 } else if (this.run.repairStep === 2 && role === 'bay') {
                     this.run.weldStep(dt, sysName);
                     if (hit.point) {
-                        this.particles.burst(hit.point.x - this.root.position.x, hit.point.y - this.root.position.y, hit.point.z - this.root.position.z, 3, 2.2, 0x70f8ff, 0.28);
+                        const localPt = this.root.worldToLocal(hit.point.clone());
+                        this.particles.burst(localPt.x, localPt.y, localPt.z, 3, 2.2, 0x70f8ff, 0.28);
                     }
                 }
             }
@@ -935,9 +983,18 @@ export class ArcadeFlight {
                 const wantRot = doorOpen ? -1.45 : 0;
                 bay.doorPivot.rotation.y += (wantRot - bay.doorPivot.rotation.y) * Math.min(1, dt * 8);
                 bay.led.material.color.setHex(isRestored ? 0x34d399 : isActive ? 0xfbbf24 : 0xfb7185);
-                bay.arcLine.visible = isActive && run.repairStep < 2 && Math.sin(run.elapsed * 28) > -0.2;
+                bay.arcLine.visible = isActive && (run.repairStep < 2 || run.weldProgress > 0);
+                if (bay.arcLine.visible) {
+                    const posAttr = bay.arcLine.geometry.attributes.position;
+                    const t = run.elapsed * 26;
+                    posAttr.setXYZ(1, 0.04 + Math.sin(t) * 0.04, 0.02 + Math.cos(t * 1.3) * 0.04, 0.12);
+                    posAttr.setXYZ(2, -0.05 + Math.cos(t * 1.7) * 0.04, -0.08 + Math.sin(t * 1.1) * 0.04, 0.09);
+                    posAttr.needsUpdate = true;
+                    bay.arcLine.material.color.setHex(run.repairStep === 2 ? 0x70f8ff : 0xffb454);
+                    bay.arcLine.material.opacity = 0.55 + 0.45 * (0.5 + 0.5 * Math.sin(t * 1.9));
+                }
                 bay.coreMesh.visible = !isActive || run.repairStep !== 1;
-                bay.hitbox.visible = run.repairStep === 0 || run.repairStep === 2;
+                bay.hitbox.visible = run.repairStep === 0 || (run.repairStep === 2 && isActive);
             }
             for (const name of SYSTEMS) {
                 const mod = this.spareModules[name];
@@ -999,7 +1056,8 @@ export class ArcadeFlight {
             this.astronaut.rotation.z = Math.sin(run.elapsed * 0.46) * 0.22 * (1 - t);
             this.astronaut.rotation.x = Math.cos(run.elapsed * 0.34) * 0.12 * (1 - t);
             if (this.astronaut.userData.distress) {
-                this.astronaut.userData.distress.visible = Math.sin(run.elapsed * 7) > 0;
+                const pulse = 0.55 + 0.45 * Math.sin(run.elapsed * 6);
+                this.astronaut.userData.distress.scale.setScalar(0.85 + pulse * 0.45);
             }
             this.lockMarker.visible = !hauling && run.matched && run.closing <= 0.22;
             this.lockMarker.rotation.z += dt * 1.4;

@@ -122,9 +122,11 @@ function buildToolAttachments(side, envMap = null) {
                 opacity: 0.84,
                 side: THREE.DoubleSide,
                 blending: THREE.AdditiveBlending,
-                depthWrite: false
+                depthWrite: false,
+                toneMapped: false
             })
         );
+        shieldDisc.renderOrder = 55;
         shieldGroup.add(shieldDisc);
         const emitter = new THREE.Mesh(new THREE.TorusGeometry(0.034, 0.007, 8, 24), mGunMetal);
         emitter.position.z = 0.06;
@@ -187,9 +189,10 @@ function buildToolAttachments(side, envMap = null) {
         blasterGroup.add(chargeStrip);
         const muzzleFlash = new THREE.Mesh(
             new THREE.SphereGeometry(0.028, 10, 8),
-            new THREE.MeshBasicMaterial({ color: 0x99f6ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending })
+            new THREE.MeshBasicMaterial({ color: 0x99f6ff, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false })
         );
         muzzleFlash.position.set(0, 0.006, -0.22);
+        muzzleFlash.renderOrder = 62;
         muzzleFlash.visible = false;
         blasterGroup.add(muzzleFlash);
         const muzzleAnchor = new THREE.Object3D();
@@ -258,6 +261,7 @@ function buildWristHUD() {
     // Positioned ergonomically like a holographic smartwatch above the left Touch Plus grip
     mesh.position.set(0.03, 0.062, 0.025);
     mesh.rotation.set(-0.55, 0.32, 0.14);
+    mesh.renderOrder = 70;
     mesh.visible = false;
 
     let lastKey = '';
@@ -327,10 +331,13 @@ export class Quest3Rig {
             const lineMat = new THREE.LineBasicMaterial({
                 color: 0x64ffda,
                 transparent: true,
-                opacity: 0.72
+                opacity: 0.72,
+                depthWrite: false,
+                toneMapped: false
             });
             const rayLine = new THREE.Line(rayGeo, lineMat);
             rayLine.scale.z = 5.5;
+            rayLine.renderOrder = 60;
             controller.add(rayLine);
 
             const hitDot = new THREE.Mesh(
@@ -340,10 +347,12 @@ export class Quest3Rig {
                     map: dotTex || null,
                     transparent: true,
                     opacity: 0.9,
+                    depthWrite: false,
                     toneMapped: false
                 })
             );
             hitDot.position.z = -5.5;
+            hitDot.renderOrder = 61;
             controller.add(hitDot);
 
             const leftRig = buildTouchPlusModel('left', this.envMap);
@@ -374,6 +383,7 @@ export class Quest3Rig {
                 grip,
                 mount,
                 handedness: defaultHand,
+                connected: true,
                 rayLine,
                 hitDot,
                 models: { left: leftRig, right: rightRig },
@@ -382,12 +392,22 @@ export class Quest3Rig {
 
             if (typeof controller.addEventListener === 'function') {
                 controller.addEventListener('connected', ev => {
+                    slot.connected = true;
                     const h = ev?.data?.handedness === 'left' || ev?.data?.handedness === 'right'
                         ? ev.data.handedness
                         : defaultHand;
                     this._assignSlotHand(slot, h);
+                    this.setToolProfile(this.profile);
                 });
                 controller.addEventListener('disconnected', () => {
+                    slot.connected = false;
+                    slot.handedness = null;
+                    slot.models.left.root.visible = false;
+                    slot.models.right.root.visible = false;
+                    slot.tools.left.group.visible = false;
+                    slot.tools.right.group.visible = false;
+                    slot.rayLine.visible = false;
+                    slot.hitDot.visible = false;
                     if (this.leftHand === slot) this.leftHand = null;
                     if (this.rightHand === slot) this.rightHand = null;
                 });
@@ -410,7 +430,21 @@ export class Quest3Rig {
     }
 
     _assignSlotHand(slot, handedness) {
+        for (const other of this.slots) {
+            if (other !== slot && other.handedness === handedness) {
+                other.handedness = null;
+                other.models.left.root.visible = false;
+                other.models.right.root.visible = false;
+                other.tools.left.group.visible = false;
+                other.tools.right.group.visible = false;
+                if (handedness === 'left' && this.leftHand === other) this.leftHand = null;
+                if (handedness === 'right' && this.rightHand === other) this.rightHand = null;
+            }
+        }
         slot.handedness = handedness;
+        slot.connected = true;
+        slot.rayLine.visible = true;
+        slot.hitDot.visible = true;
         slot.models.left.root.visible = handedness === 'left';
         slot.models.right.root.visible = handedness === 'right';
         slot.tools.left.group.visible = handedness === 'left';
@@ -467,8 +501,14 @@ export class Quest3Rig {
         const controller = slot?.controller;
         if (!controller) return null;
         controller.updateWorldMatrix(true, false);
-        const anchor = slot.tools?.right?.tools?.blaster?.muzzleAnchor;
-        if (anchor && slot.tools.right.tools.blaster.group.visible) {
+        slot.mount.updateWorldMatrix(true, false);
+        const rt = slot.tools?.right?.tools;
+        const anchor = rt?.blaster?.group.visible
+            ? rt.blaster.muzzleAnchor
+            : rt?.harpoon?.group.visible
+                ? rt.harpoon.muzzleAnchor
+                : null;
+        if (anchor) {
             anchor.updateWorldMatrix(true, false);
             anchor.getWorldPosition(this._tmpVec);
         } else {
@@ -506,6 +546,7 @@ export class Quest3Rig {
         const rightInput = questInput?.right;
 
         for (const slot of this.slots) {
+            if (!slot.handedness || !slot.connected) continue;
             const isLeft = slot.handedness === 'left';
             const handData = isLeft ? leftInput : rightInput;
             const model = isLeft ? slot.models.left : slot.models.right;
@@ -526,7 +567,7 @@ export class Quest3Rig {
             model.mBtnB.emissive.setHex(handData?.secondary ? 0xfbbf24 : 0x062029);
 
             if (isLeft && tools.shield?.group.visible) {
-                const wantScale = handData?.triggerPressed ? 1.35 : 0.28;
+                const wantScale = handData?.triggerPressed ? 1.15 : 0.28;
                 const s = tools.shield.group.scale.x + (wantScale - tools.shield.group.scale.x) * Math.min(1, dt * 14);
                 tools.shield.group.scale.setScalar(s);
                 tools.shield.disc.rotation.z += dt * (handData?.triggerPressed ? 0.85 : 0.2);
@@ -556,7 +597,7 @@ export class Quest3Rig {
                 tools.blaster.group.position.z = -0.05 + tools.blaster.recoil;
                 tools.blaster.muzzleFlash.visible = tools.blaster.flashT > 0;
                 if (tools.blaster.flashT > 0) {
-                    tools.blaster.muzzleFlash.scale.setScalar(0.8 + Math.random() * 0.5);
+                    tools.blaster.muzzleFlash.scale.setScalar(0.65 + (tools.blaster.flashT / 0.14) * 0.55);
                 }
                 const charged = grip > 0.3;
                 tools.blaster.chargeStrip.material.color.setHex(charged ? 0x64ffda : 0xc084fc);

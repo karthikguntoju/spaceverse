@@ -49,6 +49,7 @@ export class DodgeGame {
         scene.add(this.root);
 
         this.origin = new THREE.Vector3();
+        this.headOffset = new THREE.Vector3();
         this.rotation = new THREE.Quaternion();
         this.direction = new THREE.Vector3();
         this.offset = new THREE.Vector3();
@@ -119,9 +120,11 @@ export class DodgeGame {
                 opacity: 0.35,
                 blending: THREE.AdditiveBlending,
                 side: THREE.BackSide,
-                depthWrite: false
+                depthWrite: false,
+                toneMapped: false
             })
         );
+        this.phaseDome.renderOrder = 16;
         this.phaseDome.visible = false;
         this.cabinGroup.add(this.phaseDome);
 
@@ -129,29 +132,33 @@ export class DodgeGame {
         this.warningLanes = [-3.2, 0, 3.2].map(x => {
             const lane = new THREE.Mesh(
                 new THREE.RingGeometry(0.65, 0.78, 32),
-                new THREE.MeshBasicMaterial({ color: 0xffad67, transparent: true, opacity: 0.85, side: THREE.DoubleSide })
+                new THREE.MeshBasicMaterial({ color: 0xffad67, transparent: true, opacity: 0.85, side: THREE.DoubleSide, depthWrite: false, toneMapped: false })
             );
             lane.position.set(x, -0.85, -9);
             lane.rotation.x = -Math.PI / 2;
+            lane.renderOrder = 11;
             lane.visible = false;
             this.root.add(lane);
             return lane;
         });
 
-        const guideMaterial = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.55 });
+        const guideMaterial = new THREE.LineBasicMaterial({ color: 0x22d3ee, transparent: true, opacity: 0.55, depthWrite: false });
         for (const x of [-4.8, -1.6, 1.6, 4.8]) {
             const g = new THREE.BufferGeometry().setFromPoints([
                 new THREE.Vector3(x, -1.5, 3), new THREE.Vector3(x, -1.5, -90)
             ]);
-            this.root.add(new THREE.Line(g, guideMaterial));
+            const guideLine = new THREE.Line(g, guideMaterial);
+            guideLine.renderOrder = 9;
+            this.root.add(guideLine);
         }
 
         this.rings = [];
         const ringGeometry = new THREE.TorusGeometry(6.4, 0.032, 6, 64);
-        const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x2c83a6, transparent: true, opacity: 0.7 });
+        const ringMaterial = new THREE.MeshBasicMaterial({ color: 0x2c83a6, transparent: true, opacity: 0.7, depthWrite: false });
         for (let z = -12; z >= -84; z -= 12) {
             const ring = new THREE.Mesh(ringGeometry, ringMaterial);
             ring.position.z = z;
+            ring.renderOrder = 8;
             this.root.add(ring);
             this.rings.push(ring);
         }
@@ -164,25 +171,28 @@ export class DodgeGame {
             streakGeometry,
             new THREE.LineBasicMaterial({ color: 0x80d4ff, transparent: true, opacity: 0.5, depthWrite: false })
         );
+        this.streaks.renderOrder = 18;
         this.streaks.frustumCulled = false;
         this.root.add(this.streaks);
 
         // Plasma bolt visuals pool
         const boltGeo = new THREE.CylinderGeometry(0.03, 0.03, 1.1, 8);
         boltGeo.rotateX(Math.PI / 2);
-        const boltMat = new THREE.MeshBasicMaterial({ color: 0x64ffda });
+        const boltMat = new THREE.MeshBasicMaterial({ color: 0x64ffda, toneMapped: false });
         for (let i = 0; i < 6; i++) {
             const mesh = new THREE.Mesh(boltGeo, boltMat);
+            mesh.renderOrder = 24;
             mesh.visible = false;
             this.root.add(mesh);
             this.bolts.push({ mesh, vel: new THREE.Vector3(), life: 0 });
         }
     }
 
-    start(dolly, headOrientation) {
+    start(dolly, headOrientation, headPosition = null) {
         this.run.reset();
         this.root.visible = true;
         this.origin.copy(dolly.position);
+        this.headOffset.set(headPosition?.x || 0, headPosition?.y || 0, headPosition?.z || 0);
         this.rotation.copy(dolly.quaternion);
         this.startHeading = 0;
         if (headOrientation) {
@@ -190,7 +200,7 @@ export class DodgeGame {
             this.startHeading = -yaw;
             this.rotation.multiply(new THREE.Quaternion().setFromAxisAngle(this.offset.set(0, 1, 0), yaw));
         }
-        this.root.position.copy(this.origin);
+        this.root.position.copy(this.origin).add(this.headOffset);
         this.root.quaternion.copy(this.rotation);
         this.pool.forEach(rock => { rock.visible = false; });
         this.crystalMeshes.forEach(cry => { cry.visible = false; });
@@ -203,10 +213,17 @@ export class DodgeGame {
         this.root.visible = false;
     }
 
-    recenter(orientation) {
+    recenter(orientation, headPosition = null) {
+        if (headPosition) {
+            this.headOffset.set(headPosition.x || 0, headPosition.y || 0, headPosition.z || 0);
+            this.root.position.copy(this.origin).add(this.headOffset);
+        }
         if (!orientation) return;
         this.direction.set(0, 0, -1).applyQuaternion(orientation);
         this.startHeading = Math.atan2(this.direction.x, -this.direction.z);
+        const yaw = new THREE.Euler().setFromQuaternion(orientation, 'YXZ').y;
+        this.rotation.setFromAxisAngle(this.offset.set(0, 1, 0), yaw);
+        this.root.quaternion.copy(this.rotation);
     }
 
     _spawnBolt(originLocal, dirLocal) {

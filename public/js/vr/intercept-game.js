@@ -82,6 +82,7 @@ export class InterceptGame {
         scene.add(this.root);
 
         this.origin = new THREE.Vector3();
+        this.headOffset = new THREE.Vector3();
         this.rotation = new THREE.Quaternion();
         this.offset = new THREE.Vector3();
         this.particles = new ParticlePool(this.root, 360, 0.28);
@@ -161,9 +162,11 @@ export class InterceptGame {
                 transparent: true,
                 opacity: 0,
                 blending: THREE.AdditiveBlending,
-                depthWrite: false
+                depthWrite: false,
+                toneMapped: false
             })
         );
+        this.empSphere.renderOrder = 22;
         this.empSphere.visible = false;
         this.root.add(this.empSphere);
 
@@ -185,24 +188,33 @@ export class InterceptGame {
 
         // Pool of glowing blaster/rail-lance tracer beams
         for (let i = 0; i < 10; i++) {
-            const mat = new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.9 });
+            const mat = new THREE.MeshBasicMaterial({
+                color: 0x64ffda,
+                transparent: true,
+                opacity: 0.9,
+                blending: THREE.AdditiveBlending,
+                depthWrite: false,
+                toneMapped: false
+            });
             const cyl = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 1, 8), mat);
+            cyl.renderOrder = 26;
             cyl.visible = false;
             this.root.add(cyl);
             this.beamLines.push(cyl);
         }
     }
 
-    start(dolly, headOrientation) {
+    start(dolly, headOrientation, headPosition = null) {
         this.run.reset();
         this.root.visible = true;
         this.origin.copy(dolly.position);
+        this.headOffset.set(headPosition?.x || 0, headPosition?.y || 0, headPosition?.z || 0);
         this.rotation.copy(dolly.quaternion);
         if (headOrientation) {
             const yaw = new THREE.Euler().setFromQuaternion(headOrientation, 'YXZ').y;
             this.rotation.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw));
         }
-        this.root.position.copy(this.origin);
+        this.root.position.copy(this.origin).add(this.headOffset);
         this.root.quaternion.copy(this.rotation);
         this._clearDynamicMeshes();
         this.syncScene(0);
@@ -222,7 +234,11 @@ export class InterceptGame {
         this.root.visible = false;
     }
 
-    recenter(orientation) {
+    recenter(orientation, headPosition = null) {
+        if (headPosition) {
+            this.headOffset.set(headPosition.x || 0, headPosition.y || 0, headPosition.z || 0);
+            this.root.position.copy(this.origin).add(this.headOffset);
+        }
         if (!orientation) return;
         const yaw = new THREE.Euler().setFromQuaternion(orientation, 'YXZ').y;
         this.rotation.setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
@@ -402,9 +418,11 @@ export class InterceptGame {
                         color: 0xff4d6d,
                         transparent: true,
                         blending: THREE.AdditiveBlending,
-                        depthWrite: false
+                        depthWrite: false,
+                        toneMapped: false
                     }));
                     sprite.scale.set(0.9, 0.9, 1);
+                    sprite.renderOrder = 24;
                     mesh.add(sprite);
                 }
                 this.shotMeshes.set(s.id, mesh);

@@ -253,8 +253,10 @@ export class InterceptRun {
                 this.score += 200;
                 this.empCharge = Math.min(100, this.empCharge + 22);
                 this.emit('shield-block', { x: shot.x, y: shot.y, z: shot.z });
-                // Deflected plasma bolt snaps back at the nearest active target!
-                const nearest = this.targets.find(t => t.hp > 0);
+                // Deflected plasma bolt snaps back at the nearest vulnerable target (never waste on a shielded boss)
+                const hasPylons = this.targets.some(t => t.kind === 'pylon' && t.hp > 0);
+                const nearest = this.targets.find(t => t.hp > 0 && !(t.kind === 'boss' && hasPylons))
+                    || this.targets.find(t => t.hp > 0);
                 if (nearest) {
                     this._damageTarget(nearest, 3, true);
                     this.playerShots.push({
@@ -283,7 +285,9 @@ export class InterceptRun {
         const clearedShots = this.enemyShots.length;
         this.enemyShots = [];
         this.score += clearedShots * 60 + 350;
-        for (const t of this.targets) {
+        // Damage pylons/escorts before the boss so stripping the last pylon exposes the boss to EMP
+        const ordered = [...this.targets].sort((a, b) => (a.kind === 'boss' ? 1 : 0) - (b.kind === 'boss' ? 1 : 0));
+        for (const t of ordered) {
             this._damageTarget(t, 2, true);
         }
         this.targets = this.targets.filter(t => t.hp > 0);

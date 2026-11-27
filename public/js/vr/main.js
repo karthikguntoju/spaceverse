@@ -27,11 +27,11 @@ import { RemoteInput } from './remote-input.js?v=20261013-1';
 import { DwellSelector, GazeControls } from './gaze-controls.js?v=20261015-3';
 import { ScreenAwake } from './screen-awake.js?v=20261014-2';
 import { PhoneStereoEffect, PHONE_UI_LAYER, setPhoneUILayer, phoneLensMask } from './phone-stereo.js?v=20261015-1';
-import { DodgeGame } from './dodge-game.js?v=20261125-clear-view';
-import { ArcadeFlight } from './arcade-flight.js?v=20261125-clear-view';
-import { InterceptGame } from './intercept-game.js?v=20261125-clear-view';
-import { VR_GAMES, VR_ARCADE_META } from './arcade-run.js?v=20261125-q3';
-import { Quest3Rig } from './quest3-rig.js?v=20261125-q3';
+import { DodgeGame } from './dodge-game.js?v=20261127-q3bugfix';
+import { ArcadeFlight } from './arcade-flight.js?v=20261127-q3bugfix';
+import { InterceptGame } from './intercept-game.js?v=20261127-q3bugfix';
+import { VR_GAMES, VR_ARCADE_META } from './arcade-run.js?v=20261127-q3bugfix';
+import { Quest3Rig } from './quest3-rig.js?v=20261127-q3bugfix';
 import { immersiveVRStatus, questOnlyVRStatus, readThumbstick, readQuestControllers, pulseQuestController, setRayFromObject } from './xr-support.js?v=20261125-xr1';
 import { guardXRFrames } from './xr-frame-guard.js?v=20261125-xr1';
 import MissionCore from '../game/core.js';
@@ -54,6 +54,7 @@ class VRApp {
             location.search.indexOf('mode=ride') !== -1) ? 'ride' : 'explore';
         this.questOnly = this.entry === 'dodge';
         this._prevQuestInput = null;
+        this._xrRightSelectConsumed = false;
         this._savedArcadeRun = null;
         this.clock = new THREE.Clock();
         this.keys = new Set();
@@ -438,7 +439,7 @@ class VRApp {
         else if (this.stereoFlightLook) this.pitch = 0;
         this.lookYaw = 0; this.lookPitch = 0;
         this.updateHead(0);
-        if (this.mode === 'dodge') this.arcadeGame.recenter(this.xrHead?.quaternion || this.camera.quaternion);
+        if (this.mode === 'dodge') this.arcadeGame.recenter(this.xrHead?.quaternion || this.camera.quaternion, this.xrHead?.position);
         if (this.gazeControls) {
             this.gazeControls.anchor(this.camera);
             if (this.gyroActive) this.gazeControls.group.quaternion.identity();
@@ -818,8 +819,8 @@ class VRApp {
             });
             // The cockpit and Quest 3 arcade courses use a seated eye-level origin.
             this.renderer.xr.setReferenceSpaceType('local');
-            this.renderer.xr.setFramebufferScaleFactor(0.85);
-            this.renderer.xr.setFoveation?.(0.65);
+            this.renderer.xr.setFramebufferScaleFactor(1.0);
+            this.renderer.xr.setFoveation?.(0.45);
             this.xrAttaching = session;
             try {
                 await this.renderer.xr.setSession(session);
@@ -939,8 +940,9 @@ class VRApp {
                 const hand = this.renderer.xr.getHand(i);
                 const pinchOrb = new THREE.Mesh(
                     new THREE.SphereGeometry(0.012, 12, 12),
-                    new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.75 })
+                    new THREE.MeshBasicMaterial({ color: 0x64ffda, transparent: true, opacity: 0.75, depthWrite: false, toneMapped: false })
                 );
+                pinchOrb.renderOrder = 990;
                 hand.add(pinchOrb);
                 this.dolly.add(hand);
                 this.hands.push(hand);
@@ -991,7 +993,7 @@ class VRApp {
         const mk = (tex, xPos, yPos, action, scale = 1) => {
             const m = new THREE.Mesh(
                 new THREE.PlaneGeometry(0.84 * scale, 0.42 * scale),
-                new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false })
+                new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthTest: false, depthWrite: false, toneMapped: false })
             );
             m.position.set(xPos, yPos, 0);
             m.renderOrder = 997;
@@ -1482,11 +1484,15 @@ class VRApp {
         }
         if (this.mode === 'menu') return;
         if (this.mode === 'dodge') {
+            const slot = this.questRig?.slots?.find(s => s.controller === controller);
+            if (slot?.handedness === 'left') return;
+            const state = this.arcadeGame?.run.state;
             if (this.flightGame?.run.state === 'playing') {
                 setRayFromObject(this.raycaster, controller);
-                this.selectArcadeTarget();
-            } else if (this.arcadeGame?.run.state !== 'playing') {
+                if (this.selectArcadeTarget() && slot) this._xrRightSelectConsumed = true;
+            } else if (state !== 'playing' && state !== 'countdown') {
                 this.onPhoneTap();
+                if (slot) this._xrRightSelectConsumed = true;
             }
             return;
         }
@@ -1707,7 +1713,11 @@ class VRApp {
 
     selectArcadeTarget() {
         const action = this.flightGame?.pick(this.raycaster)?.object.userData.arcadeAction;
-        if (action) this.arcadeAction(action);
+        if (action) {
+            this.arcadeAction(action);
+            return true;
+        }
+        return false;
     }
 
     arcadeAction(action) {
@@ -2229,18 +2239,37 @@ class VRApp {
 
         this.updateHead(dt);
         this.camera.updateWorldMatrix(true, false);
+        const hudTitle = this.mode === 'dodge' ? this.arcadeName.toUpperCase() : this.hudText.title;
+        const hudHint = this.isIntercept ? 'L-Trig: Shield · R-Trig: Blaster · Y: Menu' : 'A: Start/Pause · B: Recenter · Grip: Menu';
+
+        if (this.questRig) {
+            this.questRig.update(dt, questInput, {
+                hudTitle,
+                hudStatus: this.mode === 'dodge' ? (this.arcadeGame?.run?.status?.() || '') : this.hudText.sub,
+                hudHint,
+                slug: this.arcadeSlug,
+                run: this.arcadeGame?.run
+            });
+        }
+
         if (this.mode === 'ride') this.ride.update(dt);
         else if (this.mode === 'dodge') {
             if (questInput && !this.vrMenu?.visible) {
                 if (questInput.right.primaryJustPressed) this.onPhoneTap();
                 if (questInput.right.secondaryJustPressed) this.recenterView();
-                if (questInput.left.secondaryJustPressed || questInput.left.stickJustPressed) this.toggleVRMenu();
+                if (questInput.left.secondaryJustPressed) this.toggleVRMenu();
             }
             const before = this.dodge?.run.hits ?? this.flightGame?.run.rocksHit ?? 0;
             const suspended = !tracking || this.gazeMenuOpen ||
                 Boolean(this.xrSession && (this.vrMenu.visible || this.xrSession.visibilityState !== 'visible')) ||
                 (this.stereo && this.gaze.key?.startsWith('ui:'));
-            const inputPayload = questInput || (this.flightGame ? this.arcadeInput() : null);
+            let inputPayload = questInput || (this.flightGame ? this.arcadeInput() : null);
+            if (this._xrRightSelectConsumed) {
+                if (questInput?.right?.triggerJustPressed) {
+                    inputPayload = { ...questInput, right: { ...questInput.right, triggerJustPressed: false } };
+                }
+                this._xrRightSelectConsumed = false;
+            }
             this.arcadeGame.update(dt, this.xrHead || this.camera, this.dolly, suspended, inputPayload, this.questRig);
 
             const strikes = this.dodge?.run.hits ?? this.flightGame?.run.rocksHit ?? 0;
@@ -2251,18 +2280,19 @@ class VRApp {
                 this.updateDodgeHud();
             }
         }
-        else if (this.entry !== 'dodge') this.flyUpdate(dt);
+        else if (this.entry !== 'dodge') {
+            if (questInput && !this.vrMenu?.visible && (questInput.left.secondaryJustPressed || questInput.left.stickJustPressed)) {
+                this.toggleVRMenu();
+            }
+            this.flyUpdate(dt);
+        }
         this.camera.updateWorldMatrix(true, false);
         this.gazeUpdate(dt);
 
         if (this.questRig) {
-            this.questRig.update(dt, questInput, {
-                hudTitle: this.mode === 'dodge' ? this.arcadeName.toUpperCase() : this.hudText.title,
-                hudStatus: this.mode === 'dodge' ? (this.arcadeGame?.run?.status?.() || '') : this.hudText.sub,
-                hudHint: this.isIntercept ? 'L-Trig: Shield · R-Trig: Blaster · Y: Menu' : 'A: Start/Pause · B: Recenter · Grip: Menu',
-                slug: this.arcadeSlug,
-                run: this.arcadeGame?.run
-            });
+            if (this.mode === 'dodge' && this.questRig.wristHud?.mesh.visible) {
+                this.questRig.wristHud.update(hudTitle, this.arcadeGame?.run?.status?.() || '', hudHint);
+            }
             if (this.flightGame && this.questRig.rightHand?.controller) {
                 setRayFromObject(this.raycaster, this.questRig.rightHand.controller);
                 const hover = this.flightGame.pick(this.raycaster);
@@ -2340,10 +2370,18 @@ class VRApp {
         };
         const steps = Math.ceil((3.1 + seconds) / 0.05);
         for (let i = 0; i < steps; i++) {
-            this.arcadeGame.update(0.05, this.camera, this.dolly, false, fakeInput || {
+            const stepInput = fakeInput || {
                 left: { connected: true, stick: { x: 0, y: 0 }, trigger: 0.9, triggerPressed: true, grip: 0, gripPressed: false },
                 right: { connected: true, stick: { x: 0, y: 0 }, trigger: i === steps - 2 ? 0.9 : 0, triggerPressed: i === steps - 2, triggerJustPressed: i === steps - 2, grip: 0, gripPressed: false }
-            }, this.questRig);
+            };
+            this.questRig?.update(0.05, stepInput, {
+                hudTitle: this.arcadeName.toUpperCase(),
+                hudStatus: this.arcadeGame.run.status(),
+                hudHint: 'Meta Quest 3 Touch Plus',
+                slug: this.arcadeSlug,
+                run: this.arcadeGame.run
+            });
+            this.arcadeGame.update(0.05, this.camera, this.dolly, false, stepInput, this.questRig);
         }
         this.questRig?.update(0.05, fakeInput || {
             left: { connected: true, stick: { x: 0, y: 0 }, trigger: 0.9, triggerPressed: true },

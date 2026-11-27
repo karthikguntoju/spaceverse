@@ -94,4 +94,42 @@ describe('Meta Quest 3 Touch Plus input & rig', () => {
         rig.setToolProfile('orbital-intercept');
         expect(rig.getShieldPose()).toBeTruthy();
     });
+
+    it('handles swapped WebXR handedness on connect, hides disconnected slots, and assigns stereo renderOrder', () => {
+        const dolly = new THREE.Group();
+        const listeners = [{}, {}];
+        const controllers = [0, 1].map(i => {
+            const c = new THREE.Object3D();
+            c.addEventListener = (ev, fn) => { (listeners[i][ev] ||= []).push(fn); };
+            return c;
+        });
+        const rig = new Quest3Rig({
+            dolly,
+            renderer: { xr: { getController: i => controllers[i], getControllerGrip: i => new THREE.Object3D() } }
+        });
+        rig.setToolProfile('orbital-intercept');
+
+        // Simulate Quest 3 waking Right Touch Plus on index 0 before Left connects on index 1
+        listeners[0].connected.forEach(fn => fn({ data: { handedness: 'right' } }));
+        expect(rig.rightHand.index).toBe(0);
+        expect(rig.slots[1].handedness).toBeNull();
+        expect(rig.slots[1].models.right.root.visible).toBe(false);
+
+        listeners[1].connected.forEach(fn => fn({ data: { handedness: 'left' } }));
+        expect(rig.leftHand.index).toBe(1);
+        expect(rig.wristHud.mesh.parent).toBe(rig.slots[1].mount);
+
+        // Disconnect clears pointer ray & model visibility cleanly
+        listeners[0].disconnected.forEach(fn => fn());
+        expect(rig.rightHand).toBeNull();
+        expect(rig.slots[0].rayLine.visible).toBe(false);
+        expect(rig.slots[0].models.right.root.visible).toBe(false);
+
+        // Stereo transparent draw order guards
+        const leftSlot = rig.slots[1];
+        expect(leftSlot.tools.left.tools.shield.disc.renderOrder).toBeGreaterThan(0);
+        expect(leftSlot.tools.left.tools.shield.disc.material.depthWrite).toBe(false);
+        expect(rig.wristHud.mesh.renderOrder).toBeGreaterThan(leftSlot.tools.left.tools.shield.disc.renderOrder);
+        expect(leftSlot.rayLine.material.depthWrite).toBe(false);
+    });
 });

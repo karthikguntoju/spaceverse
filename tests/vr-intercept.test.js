@@ -107,5 +107,40 @@ describe('Orbital Intercept Quest 3 simulation', () => {
         }
         expect(game.root.visible).toBe(true);
         expect(game.run.state).toBe('playing');
+        expect(game.empSphere.renderOrder).toBeGreaterThan(0);
+        expect(game.beamLines.every(b => b.material.depthWrite === false && b.renderOrder > game.empSphere.renderOrder)).toBe(true);
+    });
+
+    it('prioritizes vulnerable pylons on shield deflect and strips pylons before EMP damages Boss', () => {
+        const run = startRun();
+        run._beginWave(5);
+        run._spawnEntry('boss');
+        run.waveQueue = [];
+        const boss = run.targets.find(t => t.kind === 'boss');
+        expect(boss.hp).toBe(10);
+
+        // Deflected plasma bolt must strike an active pylon rather than wasting on protected boss
+        run.enemyShots = [{ id: 901, x: -0.3, y: 0.1, z: -0.8, vx: 0, vy: 0, vz: 4 }];
+        expect(run.deflectWithShield({ x: -0.3, y: 0.1, z: -0.8 }, null, 0.55)).toBe(1);
+        expect(boss.hp).toBe(10);
+        expect(run.targets.filter(t => t.kind === 'pylon').length).toBeLessThan(3);
+
+        // Bring remaining pylons low enough that EMP destroys them AND hurts Boss in same surge
+        for (const p of run.targets.filter(t => t.kind === 'pylon')) p.hp = 1;
+        run.empCharge = 100;
+        expect(run.triggerEMP()).toBe(true);
+        expect(run.targets.filter(t => t.kind === 'pylon')).toHaveLength(0);
+        expect(boss.hp).toBe(8);
+    });
+
+    it('applies Quest headPosition offset cleanly to root without double-offsetting dolly', () => {
+        const scene = new THREE.Scene();
+        const dolly = new THREE.Group();
+        const game = new InterceptGame(scene);
+        game.start(dolly, new THREE.Quaternion(), { x: 0.1, y: 0.3, z: -0.2 });
+        expect(game.origin.toArray()).toEqual([0, 0, 0]);
+        expect(game.root.position.y).toBeCloseTo(0.3);
+        game.update(0.05, new THREE.PerspectiveCamera(), dolly, false, {});
+        expect(dolly.position.y).toBe(0);
     });
 });

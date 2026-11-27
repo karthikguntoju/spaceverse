@@ -156,4 +156,30 @@ describe('Dodge scene and head controls', () => {
         expect(game.run.crystalsShot).toBe(1);
         expect(dolly.position.x).toBeGreaterThan(0.1);
     });
+
+    it('spawns crystals uniformly across all three lanes and aligns trench yaw + depth order cleanly', () => {
+        let idx = 0;
+        const seq = [0.05, 0.5, 0.9];
+        const run = new DodgeRun(() => seq[idx++ % seq.length]);
+        run.state = 'playing';
+        run.nextSpawn = 999;
+        for (let i = 0; i < 3; i++) {
+            run.nextCrystal = 0;
+            run.update(0.05, 0);
+        }
+        expect(run.crystals.map(c => c.x)).toEqual([-3.2, 0, 3.2]);
+
+        const scene = new THREE.Scene(), dolly = new THREE.Group();
+        const game = new DodgeGame(scene);
+        expect(game.phaseDome.renderOrder).toBeGreaterThan(0);
+        expect(game.phaseDome.material.depthWrite).toBe(false);
+        expect(game.warningLanes.every(w => w.material.depthWrite === false && w.renderOrder > 0)).toBe(true);
+
+        const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, Math.PI / 2, 0, 'YXZ'));
+        game.start(dolly, new THREE.Quaternion(), { x: 0, y: 0.2, z: 0 });
+        expect(game.root.position.y).toBeCloseTo(0.2);
+        game.recenter(q, { x: 0, y: 0.25, z: 0 });
+        expect(game.root.quaternion.angleTo(q)).toBeLessThan(0.001);
+        expect(game.root.position.y).toBeCloseTo(0.25);
+    });
 });

@@ -49,7 +49,7 @@ export const VR_ARCADE_META = Object.freeze({
                 'Left Trigger (Hold): Deploy Hex Aegis Shield & deflect bolts',
                 'Left Stick: Strafe defense platform',
                 'Left Grip (100%): Trigger EMP Shockwave',
-                'Y Button / Stick Click: VR Pause Menu'
+                'Y Button / Left Grip: VR Pause Menu'
             ],
             right: [
                 'Right Trigger: Fire Twin Plasma Blaster',
@@ -74,7 +74,7 @@ export const VR_ARCADE_META = Object.freeze({
             ],
             right: [
                 'Right Trigger: Fire Pulse Blaster (shatter crystals & rocks)',
-                'Right Stick Click / B: Recenter View',
+                'B Button: Recenter View',
                 'A Button: Start / Pause / Replay'
             ]
         }

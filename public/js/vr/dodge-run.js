@@ -154,7 +154,7 @@ export class DodgeRun {
         }
 
         if (this.nextCrystal <= 0 && this.crystals.length < 3 && this.elapsed + 4 < this.duration) {
-            const lane = (Math.floor(clamp(this.random() * 1.7 + 0.25, 0, 0.99999) * 3) - 1) * 3.2;
+            const lane = (Math.floor(clamp(this.random(), 0, 0.99999) * 3) - 1) * 3.2;
             this.crystals.push({
                 id: ++this.serial,
                 x: lane,

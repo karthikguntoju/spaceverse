@@ -336,13 +336,16 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
     const starsGeo = new THREE.BufferGeometry();
     starsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
     starsGeo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    group.add(new THREE.Points(starsGeo, new THREE.PointsMaterial({
+    const stars = new THREE.Points(starsGeo, new THREE.PointsMaterial({
         size: 0.36,
         vertexColors: true,
         transparent: true,
         opacity: 0.92,
-        depthWrite: false
-    })));
+        depthWrite: false,
+        toneMapped: false
+    }));
+    stars.renderOrder = -9;
+    group.add(stars);
 
     const starMapTex = safeLoadTexture('/public/textures/star-map.jpg');
     if (starMapTex) {
@@ -350,6 +353,7 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
             new THREE.SphereGeometry(220, 32, 20),
             new THREE.MeshBasicMaterial({ map: starMapTex, side: THREE.BackSide, transparent: true, opacity: 0.42, depthWrite: false })
         );
+        sky.renderOrder = -10;
         group.add(sky);
     }
 
@@ -359,9 +363,10 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
         const sunPos = preset === 'lunar-earthrise' ? [-76, 48, -145] : [-82, 54, -140];
         const sunOrb = new THREE.Mesh(
             new THREE.SphereGeometry(3.8, 16, 12),
-            new THREE.MeshBasicMaterial({ color: 0xfff3d4 })
+            new THREE.MeshBasicMaterial({ color: 0xfff3d4, toneMapped: false })
         );
         sunOrb.position.set(...sunPos);
+        sunOrb.renderOrder = -8;
         group.add(sunOrb);
         if (glowTex) {
             const corona = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -369,10 +374,12 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
                 color: 0xffd599,
                 transparent: true,
                 blending: THREE.AdditiveBlending,
-                depthWrite: false
+                depthWrite: false,
+                toneMapped: false
             }));
             corona.position.copy(sunOrb.position);
             corona.scale.set(28, 28, 1);
+            corona.renderOrder = -7;
             group.add(corona);
         }
     }
@@ -402,6 +409,7 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
             envMap
         });
         const globe = new THREE.Mesh(new THREE.SphereGeometry(radius, 96, 64), earthMat);
+        globe.renderOrder = -6;
         earthGroup.add(globe);
 
         let clouds = null;
@@ -416,6 +424,7 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
                     roughness: 0.9
                 })
             );
+            clouds.renderOrder = -5;
             earthGroup.add(clouds);
         }
 
@@ -423,6 +432,7 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
             new THREE.SphereGeometry(radius * 1.055, 96, 64),
             makeAtmosphereMaterial(0x4fc3ff, isOrbit ? 0.95 : 0.8, 3.0)
         );
+        atmo.renderOrder = -4;
         earthGroup.add(atmo);
 
         updaters.push(dt => {
@@ -454,7 +464,9 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
             depthWrite: false,
             forceSinglePass: true
         });
-        group.add(new THREE.Mesh(new THREE.SphereGeometry(170, 24, 16), skyMat));
+        const marsSky = new THREE.Mesh(new THREE.SphereGeometry(170, 24, 16), skyMat);
+        marsSky.renderOrder = -10;
+        group.add(marsSky);
 
         const sunGlow = createGlowTexture('rgba(255,214,170,1)', 'rgba(210,95,55,0)');
         if (sunGlow) {
@@ -463,10 +475,12 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
                 color: 0xffc899,
                 transparent: true,
                 blending: THREE.AdditiveBlending,
-                depthWrite: false
+                depthWrite: false,
+                toneMapped: false
             }));
             sun.position.set(-48, 34, -128);
             sun.scale.set(36, 36, 1);
+            sun.renderOrder = -7;
             group.add(sun);
         }
 
@@ -494,6 +508,7 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
                 metalness: 0.05
             })
         );
+        saturn.renderOrder = -6;
         saturnGroup.add(saturn);
 
         const ringAlpha = safeLoadTexture('/public/textures/saturn-ring-alpha.png');
@@ -517,12 +532,14 @@ export function buildSpaceBackdrop(parent, preset = 'earth-orbit', envMap = null
             })
         );
         ring.rotation.x = Math.PI / 2;
+        ring.renderOrder = -3;
         saturnGroup.add(ring);
 
         const atmo = new THREE.Mesh(
             new THREE.SphereGeometry(25.2, 40, 26),
             makeAtmosphereMaterial(0xf5d493, 0.45, 3.4)
         );
+        atmo.renderOrder = -4;
         saturnGroup.add(atmo);
 
         updaters.push(dt => { saturn.rotation.y += dt * 0.015; });
@@ -562,8 +579,10 @@ export class ParticlePool {
             transparent: true,
             opacity: 0.95,
             blending: THREE.AdditiveBlending,
-            depthWrite: false
+            depthWrite: false,
+            toneMapped: false
         }));
+        this.points.renderOrder = 20;
         this.points.frustumCulled = false;
         parent.add(this.points);
     }
@@ -675,12 +694,12 @@ export function buildMissionCabin({ style = 'capsule', accent = '#64ffda', envMa
     const dashW = style === 'eva' ? 1.85 : 2.55;
     const dashZ = style === 'eva' ? -1.45 : -1.78;
     part(new RoundedBoxGeometry(dashW, 0.22, 0.52, 3, 0.04), mDark, 0, -0.96, dashZ, -0.22, 0, 0);
-    part(new RoundedBoxGeometry(dashW - 0.14, 0.03, 0.03, 2, 0.01), mGlow, 0, -0.84, dashZ + 0.22);
+    part(new RoundedBoxGeometry(dashW - 0.14, 0.024, 0.026, 2, 0.008), mGlow, 0, -0.822, dashZ + 0.242);
 
     // Side armrests / consoles for seated Touch Plus immersion
     for (const side of [-1, 1]) {
         part(new RoundedBoxGeometry(0.28, 0.14, 1.35, 3, 0.03), mDark, side * 1.15, -0.88, -1.12, 0, side * 0.12, 0);
-        part(new RoundedBoxGeometry(0.02, 0.025, 1.15, 2, 0.008), mGlow, side * 1.02, -0.81, -1.12, 0, side * 0.12, 0);
+        part(new RoundedBoxGeometry(0.02, 0.02, 0.82, 2, 0.007), mGlow, side * 1.02, -0.802, -0.92, 0, side * 0.12, 0);
     }
 
     // Open-canopy A-pillars and overhead grab rail (wider on rover/lander for peripheral awareness)

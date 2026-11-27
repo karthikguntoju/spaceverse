@@ -280,7 +280,7 @@ export class Cockpit {
 
     /* ── shell: floor, roof, rear, sides ─────────────────────────────── */
     _buildShell() {
-        // floor with a lit grating strip and a subtle centre channel
+        // floor with a lit grating strip and subtle non-intersecting light channels
         this._box(2.6, 0.08, 2.7, 0, -1.1, 0.1, this.mHull, 0.03);
         this._box(0.8, 0.02, 1.5, 0, -1.055, 0.35, this.mHullDark, 0.005);
         this._box(2.4, 0.012, 0.02, 0, -1.05, -0.62, this.mAccentSoft, 0);
@@ -428,11 +428,12 @@ export class Cockpit {
             const screen = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshBasicMaterial({ map: texObj.tex, transparent: true }));
             screen.position.copy(pos); screen.rotation.copy(rot);
             this.group.add(screen);
-            // faint glass over the screen for a reflection
+            // faint glass over the screen for a reflection (spaced clearly to prevent depth fighting)
             const gl = new THREE.Mesh(new THREE.PlaneGeometry(w, h), new THREE.MeshPhysicalMaterial({
                 color: 0xffffff, transparent: true, opacity: 0.06, roughness: 0.08, metalness: 0, envMap: this.env, envMapIntensity: 0.6, depthWrite: false
             }));
-            gl.position.copy(pos).addScaledVector(normal, 0.003); gl.rotation.copy(rot);
+            gl.position.copy(pos).addScaledVector(normal, 0.006); gl.rotation.copy(rot);
+            gl.renderOrder = 4;
             this.group.add(gl);
             if (keys) {
                 const n = Math.round(w / 0.07);

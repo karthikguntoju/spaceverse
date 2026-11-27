@@ -452,4 +452,40 @@ describe('immersive headset controls', () => {
         app.updateDodgeHud();
         expect(localStore.get('spaceverse.arcade.orbital-intercept.best')).toBe('8850');
     });
+
+    it('prevents left-hand selectstart interference and double-fires during Quest 3 arcade play', () => {
+        const app = host();
+        app.dodge = null;
+        app.arcadeSlug = 'orbital-docking';
+        app.flightGame = new ArcadeFlight(app.scene, 'orbital-docking');
+        app.raycaster = new THREE.Raycaster();
+        app.questRig = new Quest3Rig({ dolly: app.dolly });
+        app.buildVRMenu();
+        app.startDodge();
+        app.flightGame.run.play();
+        for (let i = 0; i < 65; i++) app.flightGame.run.update(0.05);
+
+        // Aim controllers' WebXR -Z forward rays at the THRUST panel
+        const panelPos = app.flightGame.targets[1].getWorldPosition(new THREE.Vector3());
+        const aimMinusZ = (obj, target) => {
+            obj.updateMatrixWorld(true);
+            const from = obj.getWorldPosition(new THREE.Vector3());
+            const dir = target.clone().sub(from).normalize();
+            obj.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), dir);
+            obj.updateMatrixWorld(true);
+        };
+
+        // Left trigger selectstart must never click right-hand panels
+        aimMinusZ(app.questRig.leftHand.controller, panelPos);
+        const beforeClosing = app.flightGame.run.closing;
+        app.onControllerSelect(app.questRig.leftHand.controller);
+        expect(app.flightGame.run.closing).toBe(beforeClosing);
+        expect(app._xrRightSelectConsumed).toBeFalsy();
+
+        // Right controller selectstart activates once and marks edge consumed so loop() does not double-fire
+        aimMinusZ(app.questRig.rightHand.controller, panelPos);
+        app.onControllerSelect(app.questRig.rightHand.controller);
+        expect(app._xrRightSelectConsumed).toBe(true);
+        expect(app.flightGame.run.closing).toBeGreaterThan(beforeClosing);
+    });
 });
